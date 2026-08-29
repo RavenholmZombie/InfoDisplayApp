@@ -28,19 +28,21 @@
         /// </summary>
         private void InitializeComponent()
         {
+            components = new System.ComponentModel.Container();
             lblTime = new Label();
             lblDay = new Label();
             lblDate = new Label();
+            tmrClock = new System.Windows.Forms.Timer(components);
             SuspendLayout();
             // 
             // lblTime
             // 
-            lblTime.AutoSize = true;
+            lblTime.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             lblTime.Font = new Font("Segoe UI Variable Display Semib", 20F, FontStyle.Bold);
             lblTime.ForeColor = Color.White;
-            lblTime.Location = new Point(4, 7);
+            lblTime.Location = new Point(4, 18);
             lblTime.Name = "lblTime";
-            lblTime.Size = new Size(128, 36);
+            lblTime.Size = new Size(128, 30);
             lblTime.TabIndex = 0;
             lblTime.Text = "00:00 PM";
             lblTime.TextAlign = ContentAlignment.MiddleCenter;
@@ -49,7 +51,7 @@
             // 
             lblDay.Font = new Font("Segoe UI Variable Display Semib", 12F, FontStyle.Bold, GraphicsUnit.Point, 0);
             lblDay.ForeColor = Color.White;
-            lblDay.Location = new Point(4, 43);
+            lblDay.Location = new Point(4, 47);
             lblDay.Name = "lblDay";
             lblDay.Size = new Size(128, 29);
             lblDay.TabIndex = 1;
@@ -67,6 +69,10 @@
             lblDate.Text = "December 25\r\n2026";
             lblDate.TextAlign = ContentAlignment.TopCenter;
             // 
+            // tmrClock
+            // 
+            tmrClock.Tick += tmrClock_Tick;
+            // 
             // ctrlTimeDate
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -77,10 +83,11 @@
             Controls.Add(lblDate);
             Controls.Add(lblDay);
             Controls.Add(lblTime);
+            DoubleBuffered = true;
             Name = "ctrlTimeDate";
             Size = new Size(137, 137);
+            Load += ctrlTimeDate_Load;
             ResumeLayout(false);
-            PerformLayout();
         }
 
         #endregion
@@ -88,5 +95,6 @@
         private Label lblTime;
         private Label lblDay;
         private Label lblDate;
+        private System.Windows.Forms.Timer tmrClock;
     }
 }

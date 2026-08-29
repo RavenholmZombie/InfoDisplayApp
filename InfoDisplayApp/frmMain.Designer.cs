@@ -32,6 +32,8 @@
             pnlWeather = new Panel();
             pnlDateTime = new Panel();
             pnlTicker = new Panel();
+            btnPhiloMode = new Button();
+            btnCameraMode = new Button();
             SuspendLayout();
             // 
             // pnlTV
@@ -70,13 +72,39 @@
             pnlTicker.Size = new Size(828, 74);
             pnlTicker.TabIndex = 3;
             // 
+            // btnPhiloMode
+            // 
+            btnPhiloMode.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnPhiloMode.BackgroundImage = Properties.Resources.logo_philo;
+            btnPhiloMode.BackgroundImageLayout = ImageLayout.Stretch;
+            btnPhiloMode.Location = new Point(846, 196);
+            btnPhiloMode.Name = "btnPhiloMode";
+            btnPhiloMode.Size = new Size(137, 62);
+            btnPhiloMode.TabIndex = 4;
+            btnPhiloMode.UseVisualStyleBackColor = true;
+            btnPhiloMode.Click += btnPhiloMode_Click;
+            // 
+            // btnCameraMode
+            // 
+            btnCameraMode.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnCameraMode.BackgroundImage = Properties.Resources._63f9ed41_5b51_46ea_b416_fcdec03ab288;
+            btnCameraMode.BackgroundImageLayout = ImageLayout.Stretch;
+            btnCameraMode.Location = new Point(846, 264);
+            btnCameraMode.Name = "btnCameraMode";
+            btnCameraMode.Size = new Size(137, 62);
+            btnCameraMode.TabIndex = 5;
+            btnCameraMode.UseVisualStyleBackColor = true;
+            btnCameraMode.Click += btnCameraMode_Click;
+            // 
             // frmMain
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.Black;
-            BackgroundImage = Properties.Resources.ChatGPT_Image_Aug_26__2026__07_37_12_PM;
+            BackgroundImage = Properties.Resources.Coffee_Bean;
             ClientSize = new Size(992, 589);
+            Controls.Add(btnCameraMode);
+            Controls.Add(btnPhiloMode);
             Controls.Add(pnlTicker);
             Controls.Add(pnlDateTime);
             Controls.Add(pnlWeather);
@@ -102,5 +130,7 @@
         private Panel pnlWeather;
         private Panel pnlDateTime;
         private Panel pnlTicker;
+        private Button btnPhiloMode;
+        private Button btnCameraMode;
     }
 }

@@ -28,51 +28,51 @@
         /// </summary>
         private void InitializeComponent()
         {
-            pictureBox1 = new PictureBox();
+            pBoxWeatherIcon = new PictureBox();
             lblTown = new Label();
-            label1 = new Label();
-            label2 = new Label();
-            ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
+            lblCurrentCondition = new Label();
+            lblTemperature = new Label();
+            ((System.ComponentModel.ISupportInitialize)pBoxWeatherIcon).BeginInit();
             SuspendLayout();
             // 
-            // pictureBox1
+            // pBoxWeatherIcon
             // 
-            pictureBox1.Image = Properties.Resources.sunny_icon_23522;
-            pictureBox1.Location = new Point(42, 16);
-            pictureBox1.Name = "pictureBox1";
-            pictureBox1.Size = new Size(53, 53);
-            pictureBox1.SizeMode = PictureBoxSizeMode.StretchImage;
-            pictureBox1.TabIndex = 0;
-            pictureBox1.TabStop = false;
+            pBoxWeatherIcon.Image = Properties.Resources.sunny_icon_23522;
+            pBoxWeatherIcon.Location = new Point(42, 16);
+            pBoxWeatherIcon.Name = "pBoxWeatherIcon";
+            pBoxWeatherIcon.Size = new Size(53, 53);
+            pBoxWeatherIcon.SizeMode = PictureBoxSizeMode.StretchImage;
+            pBoxWeatherIcon.TabIndex = 0;
+            pBoxWeatherIcon.TabStop = false;
             // 
             // lblTown
             // 
-            lblTown.AutoSize = true;
             lblTown.Font = new Font("Segoe UI Variable Display Semib", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            lblTown.Location = new Point(24, 76);
+            lblTown.Location = new Point(8, 76);
             lblTown.Name = "lblTown";
-            lblTown.Size = new Size(89, 17);
+            lblTown.Size = new Size(121, 18);
             lblTown.TabIndex = 1;
             lblTown.Text = "Princeton, ME";
+            lblTown.TextAlign = ContentAlignment.MiddleCenter;
             // 
-            // label1
+            // lblCurrentCondition
             // 
-            label1.Location = new Point(18, 95);
-            label1.Name = "label1";
-            label1.Size = new Size(100, 18);
-            label1.TabIndex = 2;
-            label1.Text = "Sunny";
-            label1.TextAlign = ContentAlignment.TopCenter;
+            lblCurrentCondition.Location = new Point(18, 95);
+            lblCurrentCondition.Name = "lblCurrentCondition";
+            lblCurrentCondition.Size = new Size(100, 18);
+            lblCurrentCondition.TabIndex = 2;
+            lblCurrentCondition.Text = "Sunny";
+            lblCurrentCondition.TextAlign = ContentAlignment.TopCenter;
             // 
-            // label2
+            // lblTemperature
             // 
-            label2.Font = new Font("Segoe UI Semibold", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label2.Location = new Point(18, 114);
-            label2.Name = "label2";
-            label2.Size = new Size(100, 34);
-            label2.TabIndex = 3;
-            label2.Text = "67°F";
-            label2.TextAlign = ContentAlignment.MiddleCenter;
+            lblTemperature.Font = new Font("Segoe UI Semibold", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            lblTemperature.Location = new Point(18, 114);
+            lblTemperature.Name = "lblTemperature";
+            lblTemperature.Size = new Size(100, 34);
+            lblTemperature.TabIndex = 3;
+            lblTemperature.Text = "0°F";
+            lblTemperature.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // ctrlWeather
             // 
@@ -81,23 +81,24 @@
             BackColor = Color.Transparent;
             BackgroundImage = Properties.Resources.glass;
             BackgroundImageLayout = ImageLayout.Stretch;
-            Controls.Add(label2);
-            Controls.Add(label1);
+            Controls.Add(lblTemperature);
+            Controls.Add(lblCurrentCondition);
             Controls.Add(lblTown);
-            Controls.Add(pictureBox1);
+            Controls.Add(pBoxWeatherIcon);
+            DoubleBuffered = true;
             ForeColor = Color.White;
             Name = "ctrlWeather";
             Size = new Size(137, 178);
-            ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
+            Load += ctrlWeather_Load;
+            ((System.ComponentModel.ISupportInitialize)pBoxWeatherIcon).EndInit();
             ResumeLayout(false);
-            PerformLayout();
         }
 
         #endregion
 
-        private PictureBox pictureBox1;
+        private PictureBox pBoxWeatherIcon;
         private Label lblTown;
-        private Label label1;
-        private Label label2;
+        private Label lblCurrentCondition;
+        private Label lblTemperature;
     }
 }
