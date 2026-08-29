@@ -125,6 +125,7 @@ namespace InfoDisplayApp
         {
             btnPhiloMode.Enabled = !isPhiloMode;
             btnCameraMode.Enabled = isPhiloMode;
+            btnCameraMode.Enabled = _cameraView.IsConfigured;
         }
     }
 }

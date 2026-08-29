@@ -6,6 +6,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Text;
+using System.IO;
 using System.Windows.Forms;
 
 namespace InfoDisplayApp
@@ -14,11 +15,14 @@ namespace InfoDisplayApp
     {
         private LibVLC? _libVLC;
         private MediaPlayer? _mediaPlayer;
+        private bool _cameraConfigured;
 
         private string _cameraIp = "";
         private string _cameraUsername = "";
         private string _cameraPassword = "";
         private string _cameraStream = "stream1";
+
+        public bool IsConfigured => _cameraConfigured;
 
         private string RtspUrl =>
             $"rtsp://{Uri.EscapeDataString(_cameraUsername)}:" +
@@ -29,7 +33,7 @@ namespace InfoDisplayApp
         {
             InitializeComponent();
 
-            LoadCameraConfig();
+            _cameraConfigured = LoadCameraConfig();
 
             Core.Initialize();
 
@@ -46,65 +50,80 @@ namespace InfoDisplayApp
             Disposed += CtrlCameras_Disposed;
         }
 
-        private void LoadCameraConfig()
+        private bool LoadCameraConfig()
         {
             string configPath =
                 Path.Combine(AppContext.BaseDirectory, "camera.conf");
 
             if (!File.Exists(configPath))
             {
-                throw new FileNotFoundException(
-                    "Camera configuration file was not found.",
-                    configPath);
+                Debug.WriteLine(
+                    $"Camera configuration file not found: {configPath}");
+
+                return false;
             }
 
-            foreach (string rawLine in File.ReadAllLines(configPath))
+            try
             {
-                string line = rawLine.Trim();
-
-                if (string.IsNullOrWhiteSpace(line) ||
-                    line.StartsWith("#"))
+                foreach (string rawLine in File.ReadAllLines(configPath))
                 {
-                    continue;
+                    string line = rawLine.Trim();
+
+                    if (string.IsNullOrWhiteSpace(line) ||
+                        line.StartsWith("#"))
+                    {
+                        continue;
+                    }
+
+                    int separator = line.IndexOf('=');
+
+                    if (separator <= 0)
+                        continue;
+
+                    string key =
+                        line[..separator].Trim().ToLowerInvariant();
+
+                    string value =
+                        line[(separator + 1)..].Trim();
+
+                    switch (key)
+                    {
+                        case "ip":
+                            _cameraIp = value;
+                            break;
+
+                        case "username":
+                            _cameraUsername = value;
+                            break;
+
+                        case "password":
+                            _cameraPassword = value;
+                            break;
+
+                        case "stream":
+                            _cameraStream = value;
+                            break;
+                    }
                 }
 
-                int separator = line.IndexOf('=');
-
-                if (separator <= 0)
-                    continue;
-
-                string key =
-                    line[..separator].Trim().ToLowerInvariant();
-
-                string value =
-                    line[(separator + 1)..].Trim();
-
-                switch (key)
+                if (string.IsNullOrWhiteSpace(_cameraIp) ||
+                    string.IsNullOrWhiteSpace(_cameraUsername) ||
+                    string.IsNullOrWhiteSpace(_cameraPassword))
                 {
-                    case "ip":
-                        _cameraIp = value;
-                        break;
+                    Debug.WriteLine(
+                        "camera.conf is missing required settings.");
 
-                    case "username":
-                        _cameraUsername = value;
-                        break;
-
-                    case "password":
-                        _cameraPassword = value;
-                        break;
-
-                    case "stream":
-                        _cameraStream = value;
-                        break;
+                    return false;
                 }
+
+                return true;
             }
-
-            if (string.IsNullOrWhiteSpace(_cameraIp) ||
-                string.IsNullOrWhiteSpace(_cameraUsername) ||
-                string.IsNullOrWhiteSpace(_cameraPassword))
+            catch (Exception ex)
             {
-                throw new InvalidDataException(
-                    "camera.conf is missing required camera settings.");
+                Debug.WriteLine(
+                    $"Failed to read camera.conf: {ex}");
+
+                return false;
             }
         }
 
@@ -121,13 +140,22 @@ namespace InfoDisplayApp
 
         public void StartCamera()
         {
+            if (!_cameraConfigured)
+            {
+                Debug.WriteLine(
+                    "Camera cannot start because camera.conf is missing or invalid.");
+
+                return;
+            }
+
             if (_libVLC == null || _mediaPlayer == null)
                 return;
 
             if (_mediaPlayer.IsPlaying)
                 return;
 
-            using var media = new Media(_libVLC, new Uri(RtspUrl));
+            using var media =
+                new Media(_libVLC, new Uri(RtspUrl));
 
             _mediaPlayer.Play(media);
         }

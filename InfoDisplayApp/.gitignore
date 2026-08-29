@@ -1,0 +1,23 @@
+# ==========================================
+# InfoDisplayApp
+# ==========================================
+
+# Private camera configuration
+camera.conf
+
+# Visual Studio
+.vs/
+
+# Build output
+bin/
+obj/
+
+# User-specific Visual Studio files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Temporary files
+*.tmp
+*.log
