@@ -13,6 +13,14 @@ namespace InfoDisplayApp
         private void frmMain_Load(object sender, EventArgs e)
         {
             // -----------------------------
+            // EAS TEXT TICKER - WIP
+            // -----------------------------
+            ctrlEmergencyTicker ctrlEmergencyTicker = new ctrlEmergencyTicker();
+            pnlTicker.Controls.Add(ctrlEmergencyTicker);
+            ctrlEmergencyTicker.Dock = DockStyle.Fill;
+
+
+            // -----------------------------
             // PHILO
             // -----------------------------
 
@@ -126,6 +134,11 @@ namespace InfoDisplayApp
             btnPhiloMode.Enabled = !isPhiloMode;
             btnCameraMode.Enabled = isPhiloMode;
             btnCameraMode.Enabled = _cameraView.IsConfigured;
+        }
+
+        private void pnlWeather_Paint(object sender, PaintEventArgs e)
+        {
+
         }
     }
 }

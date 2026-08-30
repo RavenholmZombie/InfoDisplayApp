@@ -53,6 +53,7 @@
             pnlWeather.Name = "pnlWeather";
             pnlWeather.Size = new Size(137, 178);
             pnlWeather.TabIndex = 1;
+            pnlWeather.Paint += pnlWeather_Paint;
             // 
             // pnlDateTime
             // 
@@ -101,7 +102,7 @@
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.Black;
-            BackgroundImage = Properties.Resources.Coffee_Bean;
+            BackgroundImage = Properties.Resources.zapotec;
             ClientSize = new Size(992, 589);
             Controls.Add(btnCameraMode);
             Controls.Add(btnPhiloMode);
@@ -109,7 +110,6 @@
             Controls.Add(pnlDateTime);
             Controls.Add(pnlWeather);
             Controls.Add(pnlTV);
-            DoubleBuffered = true;
             FormBorderStyle = FormBorderStyle.None;
             MaximizeBox = false;
             MinimizeBox = false;

@@ -32,7 +32,9 @@
             lblTown = new Label();
             lblCurrentCondition = new Label();
             lblTemperature = new Label();
+            pBoxBtnRefresh = new PictureBox();
             ((System.ComponentModel.ISupportInitialize)pBoxWeatherIcon).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)pBoxBtnRefresh).BeginInit();
             SuspendLayout();
             // 
             // pBoxWeatherIcon
@@ -74,6 +76,19 @@
             lblTemperature.Text = "0°F";
             lblTemperature.TextAlign = ContentAlignment.MiddleCenter;
             // 
+            // pBoxBtnRefresh
+            // 
+            pBoxBtnRefresh.Image = Properties.Resources.refresh_norm;
+            pBoxBtnRefresh.Location = new Point(113, 145);
+            pBoxBtnRefresh.Name = "pBoxBtnRefresh";
+            pBoxBtnRefresh.Size = new Size(20, 20);
+            pBoxBtnRefresh.SizeMode = PictureBoxSizeMode.StretchImage;
+            pBoxBtnRefresh.TabIndex = 4;
+            pBoxBtnRefresh.TabStop = false;
+            pBoxBtnRefresh.MouseClick += pBoxBtnRefresh_MouseClick;
+            pBoxBtnRefresh.MouseEnter += pBoxBtnRefresh_MouseEnter;
+            pBoxBtnRefresh.MouseLeave += pBoxBtnRefresh_MouseLeave;
+            // 
             // ctrlWeather
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -81,6 +96,7 @@
             BackColor = Color.Transparent;
             BackgroundImage = Properties.Resources.glass;
             BackgroundImageLayout = ImageLayout.Stretch;
+            Controls.Add(pBoxBtnRefresh);
             Controls.Add(lblTemperature);
             Controls.Add(lblCurrentCondition);
             Controls.Add(lblTown);
@@ -91,6 +107,7 @@
             Size = new Size(137, 178);
             Load += ctrlWeather_Load;
             ((System.ComponentModel.ISupportInitialize)pBoxWeatherIcon).EndInit();
+            ((System.ComponentModel.ISupportInitialize)pBoxBtnRefresh).EndInit();
             ResumeLayout(false);
         }
 
@@ -100,5 +117,6 @@
         private Label lblTown;
         private Label lblCurrentCondition;
         private Label lblTemperature;
+        private PictureBox pBoxBtnRefresh;
     }
 }

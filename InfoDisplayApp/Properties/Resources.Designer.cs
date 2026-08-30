@@ -103,6 +103,46 @@ namespace InfoDisplayApp.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap refresh_click {
+            get {
+                object obj = ResourceManager.GetObject("refresh_click", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap refresh_disabled {
+            get {
+                object obj = ResourceManager.GetObject("refresh_disabled", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap refresh_highlight {
+            get {
+                object obj = ResourceManager.GetObject("refresh_highlight", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap refresh_norm {
+            get {
+                object obj = ResourceManager.GetObject("refresh_norm", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap sunny_icon_23522 {
             get {
                 object obj = ResourceManager.GetObject("sunny-icon-23522", resourceCulture);
@@ -266,6 +306,16 @@ namespace InfoDisplayApp.Properties {
         internal static System.Drawing.Bitmap weather_thunderstorm {
             get {
                 object obj = ResourceManager.GetObject("weather_thunderstorm", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap zapotec {
+            get {
+                object obj = ResourceManager.GetObject("zapotec", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

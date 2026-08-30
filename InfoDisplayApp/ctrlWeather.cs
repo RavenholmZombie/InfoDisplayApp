@@ -1,4 +1,5 @@
-﻿using System;
+﻿using InfoDisplayApp.Properties;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Net.Http;
@@ -56,6 +57,8 @@ namespace InfoDisplayApp
                 return;
 
             _isUpdating = true;
+            pBoxBtnRefresh.Enabled = false;
+            pBoxBtnRefresh.Image = Resources.refresh_disabled;
 
             try
             {
@@ -106,6 +109,8 @@ namespace InfoDisplayApp
             finally
             {
                 _isUpdating = false;
+                pBoxBtnRefresh.Enabled = true;
+                pBoxBtnRefresh.Image = Resources.refresh_norm;
             }
         }
 
@@ -201,6 +206,23 @@ namespace InfoDisplayApp
         {
             _weatherTimer.Stop();
             _weatherTimer.Dispose();
+        }
+
+        private void pBoxBtnRefresh_MouseEnter(object sender, EventArgs e)
+        {
+            pBoxBtnRefresh.Image = Resources.refresh_highlight;
+        }
+
+        private async void pBoxBtnRefresh_MouseClick(object sender, MouseEventArgs e)
+        {
+            pBoxBtnRefresh.Image = Resources.refresh_click;
+            await UpdateWeatherAsync();
+            pBoxBtnRefresh.Image = Resources.refresh_norm;
+        }
+
+        private void pBoxBtnRefresh_MouseLeave(object sender, EventArgs e)
+        {
+            pBoxBtnRefresh.Image = Resources.refresh_norm;
         }
     }
 }
