@@ -196,4 +196,19 @@
   <data name="refresh_disabled" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\refresh_disabled.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="glass_bl" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_bl.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="controls_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\controls_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="glass_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="controls_icn_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\controls_icn_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="exp_color_bg" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\exp_color_bg.gif;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
 </root>

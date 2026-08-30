@@ -34,7 +34,7 @@ namespace InfoDisplayApp
             DateTime now = DateTime.Now;
             lblTime.Text = now.ToString("h:mm tt");
             lblDay.Text = now.ToString("dddd");
-            lblDate.Text = now.ToString("MMMM d\r\nyyyy");
+            lblDate.Text = now.ToString("MMMM d yyyy");
         }
 
         private void tmrClock_Tick(object sender, EventArgs e)

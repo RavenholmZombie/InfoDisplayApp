@@ -28,30 +28,23 @@
         /// </summary>
         private void InitializeComponent()
         {
-            pnlTV = new Panel();
             pnlWeather = new Panel();
             pnlDateTime = new Panel();
-            pnlTicker = new Panel();
-            btnPhiloMode = new Button();
-            btnCameraMode = new Button();
+            pnlTicker = new DoubleBufferedPanel();
+            pnlTV = new Panel();
+            pnlBtnApps = new Panel();
+            pictureBox1 = new PictureBox();
+            pnlBtnApps.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             SuspendLayout();
-            // 
-            // pnlTV
-            // 
-            pnlTV.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            pnlTV.BackColor = Color.Black;
-            pnlTV.Location = new Point(0, 0);
-            pnlTV.Name = "pnlTV";
-            pnlTV.Size = new Size(837, 497);
-            pnlTV.TabIndex = 0;
             // 
             // pnlWeather
             // 
-            pnlWeather.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            pnlWeather.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             pnlWeather.BackColor = Color.Transparent;
-            pnlWeather.Location = new Point(846, 12);
+            pnlWeather.Location = new Point(771, 544);
             pnlWeather.Name = "pnlWeather";
-            pnlWeather.Size = new Size(137, 178);
+            pnlWeather.Size = new Size(180, 82);
             pnlWeather.TabIndex = 1;
             pnlWeather.Paint += pnlWeather_Paint;
             // 
@@ -59,57 +52,66 @@
             // 
             pnlDateTime.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             pnlDateTime.BackColor = Color.Transparent;
-            pnlDateTime.Location = new Point(846, 440);
+            pnlDateTime.Location = new Point(957, 544);
             pnlDateTime.Name = "pnlDateTime";
-            pnlDateTime.Size = new Size(137, 137);
+            pnlDateTime.Size = new Size(137, 82);
             pnlDateTime.TabIndex = 2;
             // 
             // pnlTicker
             // 
             pnlTicker.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             pnlTicker.BackColor = Color.Transparent;
-            pnlTicker.Location = new Point(9, 503);
+            pnlTicker.Location = new Point(8, 544);
             pnlTicker.Name = "pnlTicker";
-            pnlTicker.Size = new Size(828, 74);
+            pnlTicker.Size = new Size(605, 82);
             pnlTicker.TabIndex = 3;
             // 
-            // btnPhiloMode
+            // pnlTV
             // 
-            btnPhiloMode.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnPhiloMode.BackgroundImage = Properties.Resources.logo_philo;
-            btnPhiloMode.BackgroundImageLayout = ImageLayout.Stretch;
-            btnPhiloMode.Location = new Point(846, 196);
-            btnPhiloMode.Name = "btnPhiloMode";
-            btnPhiloMode.Size = new Size(137, 62);
-            btnPhiloMode.TabIndex = 4;
-            btnPhiloMode.UseVisualStyleBackColor = true;
-            btnPhiloMode.Click += btnPhiloMode_Click;
+            pnlTV.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            pnlTV.BackColor = Color.Black;
+            pnlTV.Location = new Point(0, 0);
+            pnlTV.Name = "pnlTV";
+            pnlTV.Size = new Size(1103, 534);
+            pnlTV.TabIndex = 0;
             // 
-            // btnCameraMode
+            // pnlBtnApps
             // 
-            btnCameraMode.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnCameraMode.BackgroundImage = Properties.Resources._63f9ed41_5b51_46ea_b416_fcdec03ab288;
-            btnCameraMode.BackgroundImageLayout = ImageLayout.Stretch;
-            btnCameraMode.Location = new Point(846, 264);
-            btnCameraMode.Name = "btnCameraMode";
-            btnCameraMode.Size = new Size(137, 62);
-            btnCameraMode.TabIndex = 5;
-            btnCameraMode.UseVisualStyleBackColor = true;
-            btnCameraMode.Click += btnCameraMode_Click;
+            pnlBtnApps.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            pnlBtnApps.BackColor = Color.Transparent;
+            pnlBtnApps.BackgroundImage = Properties.Resources.glass;
+            pnlBtnApps.BackgroundImageLayout = ImageLayout.Stretch;
+            pnlBtnApps.Controls.Add(pictureBox1);
+            pnlBtnApps.Location = new Point(619, 544);
+            pnlBtnApps.Name = "pnlBtnApps";
+            pnlBtnApps.Size = new Size(146, 82);
+            pnlBtnApps.TabIndex = 4;
+            // 
+            // pictureBox1
+            // 
+            pictureBox1.Image = Properties.Resources.controls_icn;
+            pictureBox1.Location = new Point(48, 16);
+            pictureBox1.Name = "pictureBox1";
+            pictureBox1.Size = new Size(50, 50);
+            pictureBox1.SizeMode = PictureBoxSizeMode.StretchImage;
+            pictureBox1.TabIndex = 0;
+            pictureBox1.TabStop = false;
             // 
             // frmMain
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.Black;
-            BackgroundImage = Properties.Resources.zapotec;
-            ClientSize = new Size(992, 589);
-            Controls.Add(btnCameraMode);
-            Controls.Add(btnPhiloMode);
+            BackgroundImage = Properties.Resources.glass_bl;
+            BackgroundImageLayout = ImageLayout.Stretch;
+            ClientSize = new Size(1103, 634);
+            Controls.Add(pnlBtnApps);
             Controls.Add(pnlTicker);
             Controls.Add(pnlDateTime);
             Controls.Add(pnlWeather);
             Controls.Add(pnlTV);
+            DoubleBuffered = true;
+            ForeColor = Color.White;
             FormBorderStyle = FormBorderStyle.None;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -121,16 +123,17 @@
             TopMost = true;
             WindowState = FormWindowState.Maximized;
             Load += frmMain_Load;
+            pnlBtnApps.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
             ResumeLayout(false);
         }
 
         #endregion
-
-        private Panel pnlTV;
         private Panel pnlWeather;
         private Panel pnlDateTime;
-        private Panel pnlTicker;
-        private Button btnPhiloMode;
-        private Button btnCameraMode;
+        private DoubleBufferedPanel pnlTicker;
+        private Panel pnlTV;
+        private Panel pnlBtnApps;
+        private PictureBox pictureBox1;
     }
 }

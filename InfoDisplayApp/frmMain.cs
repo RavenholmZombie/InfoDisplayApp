@@ -5,9 +5,71 @@ namespace InfoDisplayApp
         private ctrlPhiloWebView? _philoView;
         private ctrlCameras? _cameraView;
 
+        private readonly Random _random = new Random();
+        private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
+
+        private Color _startColor;
+        private Color _targetColor;
+
+        private int _fadeStep = 0;
+        private const int FadeSteps = 200;
+
         public frmMain()
         {
             InitializeComponent();
+
+            _startColor = RandomColor();
+            _targetColor = RandomColor();
+
+            BackColor = _startColor;
+
+            DoubleBuffered = true;
+            SetStyle(
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.UserPaint |
+                ControlStyles.OptimizedDoubleBuffer,
+                true
+            );
+
+            UpdateStyles();
+
+            _colorTimer.Interval = 30;
+            _colorTimer.Tick += ColorTimer_Tick;
+            _colorTimer.Start();
+        }
+
+        private Color RandomColor()
+        {
+            return Color.FromArgb(
+                _random.Next(50, 220),
+                _random.Next(50, 220),
+                _random.Next(50, 220)
+            );
+        }
+
+        private void ColorTimer_Tick(object? sender, EventArgs e)
+        {
+            _fadeStep++;
+
+            double progress = (double)_fadeStep / FadeSteps;
+
+            int r = (int)(_startColor.R +
+                (_targetColor.R - _startColor.R) * progress);
+
+            int g = (int)(_startColor.G +
+                (_targetColor.G - _startColor.G) * progress);
+
+            int b = (int)(_startColor.B +
+                (_targetColor.B - _startColor.B) * progress);
+
+            BackColor = Color.FromArgb(r, g, b);
+
+            if (_fadeStep >= FadeSteps)
+            {
+                _startColor = _targetColor;
+                _targetColor = RandomColor();
+                _fadeStep = 0;
+            }
         }
 
         private void frmMain_Load(object sender, EventArgs e)
@@ -15,9 +77,9 @@ namespace InfoDisplayApp
             // -----------------------------
             // EAS TEXT TICKER - WIP
             // -----------------------------
-            ctrlEmergencyTicker ctrlEmergencyTicker = new ctrlEmergencyTicker();
-            pnlTicker.Controls.Add(ctrlEmergencyTicker);
-            ctrlEmergencyTicker.Dock = DockStyle.Fill;
+            //ctrlEmergencyTicker ctrlEmergencyTicker = new ctrlEmergencyTicker();
+            //pnlTicker.Controls.Add(ctrlEmergencyTicker);
+            //ctrlEmergencyTicker.Dock = DockStyle.Fill;
 
 
             // -----------------------------
@@ -131,9 +193,9 @@ namespace InfoDisplayApp
 
         private void UpdateModeButtons(bool isPhiloMode)
         {
-            btnPhiloMode.Enabled = !isPhiloMode;
-            btnCameraMode.Enabled = isPhiloMode;
-            btnCameraMode.Enabled = _cameraView.IsConfigured;
+            //btnPhiloMode.Enabled = !isPhiloMode;
+            //btnCameraMode.Enabled = isPhiloMode;
+            //btnCameraMode.Enabled = _cameraView.IsConfigured;
         }
 
         private void pnlWeather_Paint(object sender, PaintEventArgs e)
