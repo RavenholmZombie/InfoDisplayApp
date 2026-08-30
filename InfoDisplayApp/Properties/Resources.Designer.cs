@@ -153,6 +153,16 @@ namespace InfoDisplayApp.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap philo_icn {
+            get {
+                object obj = ResourceManager.GetObject("philo_icn", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap refresh_click {
             get {
                 object obj = ResourceManager.GetObject("refresh_click", resourceCulture);
@@ -196,6 +206,16 @@ namespace InfoDisplayApp.Properties {
         internal static System.Drawing.Bitmap sunny_icon_23522 {
             get {
                 object obj = ResourceManager.GetObject("sunny-icon-23522", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap tapo_icn {
+            get {
+                object obj = ResourceManager.GetObject("tapo_icn", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -356,6 +376,16 @@ namespace InfoDisplayApp.Properties {
         internal static System.Drawing.Bitmap weather_thunderstorm {
             get {
                 object obj = ResourceManager.GetObject("weather_thunderstorm", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap youtube_icn {
+            get {
+                object obj = ResourceManager.GetObject("youtube_icn", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

@@ -32,10 +32,12 @@
             pnlDateTime = new Panel();
             pnlTicker = new DoubleBufferedPanel();
             pnlTV = new Panel();
+            pnlApps = new DoubleBufferedPanel();
             pnlBtnApps = new Panel();
-            pictureBox1 = new PictureBox();
+            pboxAppsIcon = new PictureBox();
+            pnlTV.SuspendLayout();
             pnlBtnApps.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)pboxAppsIcon).BeginInit();
             SuspendLayout();
             // 
             // pnlWeather
@@ -70,10 +72,20 @@
             // 
             pnlTV.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             pnlTV.BackColor = Color.Black;
+            pnlTV.Controls.Add(pnlApps);
             pnlTV.Location = new Point(0, 0);
             pnlTV.Name = "pnlTV";
             pnlTV.Size = new Size(1103, 534);
             pnlTV.TabIndex = 0;
+            // 
+            // pnlApps
+            // 
+            pnlApps.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            pnlApps.BackColor = Color.Transparent;
+            pnlApps.Location = new Point(546, 309);
+            pnlApps.Name = "pnlApps";
+            pnlApps.Size = new Size(297, 236);
+            pnlApps.TabIndex = 0;
             // 
             // pnlBtnApps
             // 
@@ -81,21 +93,24 @@
             pnlBtnApps.BackColor = Color.Transparent;
             pnlBtnApps.BackgroundImage = Properties.Resources.glass;
             pnlBtnApps.BackgroundImageLayout = ImageLayout.Stretch;
-            pnlBtnApps.Controls.Add(pictureBox1);
+            pnlBtnApps.Controls.Add(pboxAppsIcon);
             pnlBtnApps.Location = new Point(619, 544);
             pnlBtnApps.Name = "pnlBtnApps";
             pnlBtnApps.Size = new Size(146, 82);
             pnlBtnApps.TabIndex = 4;
+            pnlBtnApps.Click += pnlBtnApps_Click;
+            pnlBtnApps.MouseEnter += pnlBtnApps_MouseEnter;
+            pnlBtnApps.MouseLeave += pnlBtnApps_MouseLeave;
             // 
-            // pictureBox1
+            // pboxAppsIcon
             // 
-            pictureBox1.Image = Properties.Resources.controls_icn;
-            pictureBox1.Location = new Point(48, 16);
-            pictureBox1.Name = "pictureBox1";
-            pictureBox1.Size = new Size(50, 50);
-            pictureBox1.SizeMode = PictureBoxSizeMode.StretchImage;
-            pictureBox1.TabIndex = 0;
-            pictureBox1.TabStop = false;
+            pboxAppsIcon.Image = Properties.Resources.controls_icn;
+            pboxAppsIcon.Location = new Point(48, 16);
+            pboxAppsIcon.Name = "pboxAppsIcon";
+            pboxAppsIcon.Size = new Size(50, 50);
+            pboxAppsIcon.SizeMode = PictureBoxSizeMode.StretchImage;
+            pboxAppsIcon.TabIndex = 0;
+            pboxAppsIcon.TabStop = false;
             // 
             // frmMain
             // 
@@ -123,8 +138,9 @@
             TopMost = true;
             WindowState = FormWindowState.Maximized;
             Load += frmMain_Load;
+            pnlTV.ResumeLayout(false);
             pnlBtnApps.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
+            ((System.ComponentModel.ISupportInitialize)pboxAppsIcon).EndInit();
             ResumeLayout(false);
         }
 
@@ -134,6 +150,7 @@
         private DoubleBufferedPanel pnlTicker;
         private Panel pnlTV;
         private Panel pnlBtnApps;
-        private PictureBox pictureBox1;
+        private PictureBox pboxAppsIcon;
+        private DoubleBufferedPanel pnlApps;
     }
 }

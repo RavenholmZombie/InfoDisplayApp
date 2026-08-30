@@ -1,9 +1,13 @@
+using InfoDisplayApp.Properties;
+
 namespace InfoDisplayApp
 {
     public partial class frmMain : Form
     {
         private ctrlPhiloWebView? _philoView;
         private ctrlCameras? _cameraView;
+        private ctrlYouTubeWebView? _youtubeView;
+        private ctrlAppsPanel? _appsPanel;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -36,6 +40,10 @@ namespace InfoDisplayApp
             _colorTimer.Interval = 30;
             _colorTimer.Tick += ColorTimer_Tick;
             _colorTimer.Start();
+
+            pboxAppsIcon.MouseEnter += pnlBtnApps_MouseEnter;
+            pboxAppsIcon.MouseLeave += pnlBtnApps_MouseLeave;
+            pboxAppsIcon.Click += pnlBtnApps_Click;
         }
 
         private Color RandomColor()
@@ -107,6 +115,21 @@ namespace InfoDisplayApp
 
             pnlTV.Controls.Add(_cameraView);
 
+            // -----------------------------
+            // YOUTUBE
+            // -----------------------------
+
+            _youtubeView = new ctrlYouTubeWebView
+            {
+                Dock = DockStyle.Fill,
+                Visible = false
+            };
+
+            pnlTV.Controls.Add(_youtubeView);
+
+            // -----------------------------
+            // PHILO
+            // -----------------------------
 
             // Make absolutely sure Philo owns the viewport
             _philoView.BringToFront();
@@ -135,6 +158,17 @@ namespace InfoDisplayApp
 
             pnlWeather.Controls.Add(ctrlWeather);
 
+            // -----------------------------
+            // APP PANEL
+            // -----------------------------
+            ctrlAppsPanel ctrlAppsPanel = new ctrlAppsPanel
+            {
+                Dock = DockStyle.Fill
+            };
+
+            pnlApps.Controls.Add(ctrlAppsPanel);
+            pnlApps.Visible = false;
+
             UpdateModeButtons(true);
         }
 
@@ -142,7 +176,7 @@ namespace InfoDisplayApp
         // PHILO MODE
         // =====================================================
 
-        private void ShowPhiloMode()
+        public void ShowPhiloMode()
         {
             if (_philoView == null || _cameraView == null)
                 return;
@@ -150,9 +184,13 @@ namespace InfoDisplayApp
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
             _cameraView.Visible = false;
+            _youtubeView.SetMuted(true);
+            _youtubeView.Visible = false;
 
+            _philoView.SetMuted(false);
             _philoView.Visible = true;
             _philoView.BringToFront();
+            pnlApps.Hide();
 
             UpdateModeButtons(true);
         }
@@ -161,34 +199,46 @@ namespace InfoDisplayApp
         // CAMERA MODE
         // =====================================================
 
-        private void ShowCameraMode()
+        public void ShowCameraMode()
         {
             if (_philoView == null || _cameraView == null)
                 return;
 
             _philoView.Visible = false;
+            _philoView.SetMuted(true);
+            _youtubeView.Visible = false;
+            _youtubeView.SetMuted(true);
 
             _cameraView.Visible = true;
             _cameraView.BringToFront();
 
             _cameraView.SetMuted(false);
             _cameraView.StartCamera();
+            pnlApps.Hide();
 
             UpdateModeButtons(false);
         }
 
         // =====================================================
-        // MODE BUTTONS
+        // YOUTUBE MODE
         // =====================================================
 
-        private void btnPhiloMode_Click(object sender, EventArgs e)
+        public void ShowYouTubeMode()
         {
-            ShowPhiloMode();
-        }
+            if (_youtubeView == null || _cameraView == null || _philoView == null)
+                return;
 
-        private void btnCameraMode_Click(object sender, EventArgs e)
-        {
-            ShowCameraMode();
+            _cameraView.SetMuted(true);
+            _cameraView.StopCamera();
+            _cameraView.Visible = false;
+            _philoView.SetMuted(true);
+
+            _youtubeView.Visible = true;
+            _youtubeView.SetMuted(false);
+            _youtubeView.BringToFront();
+            pnlApps.Hide();
+
+            UpdateModeButtons(true);
         }
 
         private void UpdateModeButtons(bool isPhiloMode)
@@ -201,6 +251,31 @@ namespace InfoDisplayApp
         private void pnlWeather_Paint(object sender, PaintEventArgs e)
         {
 
+        }
+
+        private void pnlBtnApps_Click(object sender, EventArgs e)
+        {
+            if (pnlApps.Visible)
+            {
+                pnlApps.Visible = false;
+            }
+            else
+            {
+                pnlApps.Visible = true;
+                pnlApps.BringToFront();
+            }
+        }
+
+        private void pnlBtnApps_MouseEnter(object sender, EventArgs e)
+        {
+            pnlBtnApps.BackgroundImage = Resources.glass_hov;
+            pboxAppsIcon.Image = Resources.controls_icn_hov;
+        }
+
+        private void pnlBtnApps_MouseLeave(object sender, EventArgs e)
+        {
+            pnlBtnApps.BackgroundImage = Resources.glass;
+            pboxAppsIcon.Image = Resources.controls_icn;
         }
     }
 }
