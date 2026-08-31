@@ -22,6 +22,10 @@ namespace InfoDisplayApp
             icnYouTube.Click += appPnlYouTube_Click;
             lblYouTube.Click += appPnlYouTube_Click;
 
+            // EAS
+            icnEAS.Click += appPnlEAS_Click;
+            lblEAS.Click += appPnlEAS_Click;
+
             // Tapo
             icnTapo.Click += appPnlTapo_Click;
             lblTapo.Click += appPnlTapo_Click;
@@ -39,6 +43,11 @@ namespace InfoDisplayApp
         private void appPnlTapo_Click(object sender, EventArgs e)
         {
             SendAppChange(sender, e, "Tapo");
+        }
+
+        private void appPnlEAS_Click(object sender, EventArgs e)
+        {
+            SendAppChange(sender, e, "EAS");
         }
 
         private void SendAppChange(object sender, EventArgs e, String appName)
@@ -59,11 +68,29 @@ namespace InfoDisplayApp
                 {
                     mainForm.ShowCameraMode();
                 }
+                else if(appName == "EAS")
+                {
+                    if(mainForm.tickerMode == "EAS")
+                    {
+                        mainForm.ToggleTickerMode("Normal");
+                        mainForm.tickerMode = "normal";
+                    }
+                    else
+                    {
+                        mainForm.ToggleTickerMode("EAS");
+                        mainForm.tickerMode = "EAS";
+                    }
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error sending app change to main form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void ctrlAppsPanel_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }

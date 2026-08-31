@@ -11,6 +11,7 @@ namespace InfoDisplayApp
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
+        public string tickerMode = "normal";
 
         private Color _startColor;
         private Color _targetColor;
@@ -77,6 +78,30 @@ namespace InfoDisplayApp
                 _startColor = _targetColor;
                 _targetColor = RandomColor();
                 _fadeStep = 0;
+            }
+        }
+
+        public void ToggleTickerMode(string mode)
+        {
+            if(mode == "normal")
+            {
+                // Normal text ticker control
+                ctrlTicker ctrlTicker = new ctrlTicker
+                {
+                    Dock = DockStyle.Fill
+                };
+                pnlTicker.Controls.Add(ctrlTicker);
+                ctrlTicker.BringToFront();
+                tickerMode = "normal";
+            }
+            else
+            {
+                // EAS ticker control
+                ctrlEmergencyTicker ctrlEmergencyTicker = new ctrlEmergencyTicker();
+                pnlTicker.Controls.Add(ctrlEmergencyTicker);
+                ctrlEmergencyTicker.Dock = DockStyle.Fill;
+                ctrlEmergencyTicker.BringToFront();
+                tickerMode = "EAS";
             }
         }
 
@@ -151,7 +176,7 @@ namespace InfoDisplayApp
             ctrlTicker ctrlTicker = new ctrlTicker
             {
                 Dock = DockStyle.Fill
-            }; 
+            };
             pnlTicker.Controls.Add(ctrlTicker);
 
 

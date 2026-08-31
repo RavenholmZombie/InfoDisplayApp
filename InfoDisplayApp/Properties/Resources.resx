@@ -118,109 +118,115 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-  <data name="weather_mostlycloudy" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_mostlycloudy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="glass" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_sunny" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_sunny.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_lightrain" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_lightrain.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="63f9ed41-5b51-46ea-b416-fcdec03ab288" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\63f9ed41-5b51-46ea-b416-fcdec03ab288.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_lightsnow" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_lightsnow.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_thunderstorm" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_thunderstorm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_cloudy" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_cloudy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_partlycloudy" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_partlycloudy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_lightshowers" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_lightshowers.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="Coffee Bean" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\Coffee Bean.bmp;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_lightning" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_lightning.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_rain" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_rain.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="logo_philo" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\logo_philo.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_snow" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_snow.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_showers" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_showers.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_fog" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_fog.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_hail" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_hail.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="weather_thunder" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_thunder.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="sunny-icon-23522" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\sunny-icon-23522.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="weather_overcast" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_overcast.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="sunny-icon-23522" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\sunny-icon-23522.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="zapotec" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\zapotec.bmp;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="refresh_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\refresh_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="weather_lightshowers" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_lightshowers.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="refresh_highlight" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\refresh_highlight.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="refresh_click" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\refresh_click.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="zapotec" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\zapotec.bmp;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="refresh_disabled" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\refresh_disabled.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="glass_bl" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass_bl.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="controls_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\controls_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="glass_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="controls_icn_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\controls_icn_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="exp_color_bg" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\exp_color_bg.gif;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="philo_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\philo_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="tapo_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\tapo_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="weather_showers" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_showers.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="youtube_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\youtube_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="weather_lightning" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_lightning.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="philo_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\philo_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_thunderstorm" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_thunderstorm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="logo_philo" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\logo_philo.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="controls_icn_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\controls_icn_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_thunder" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_thunder.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_snow" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_snow.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_sunny" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_sunny.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="alarm" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\alarm.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="weather_rain" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_rain.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_hail" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_hail.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="tapo_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\tapo_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_partlycloudy" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_partlycloudy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="refresh_click" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\refresh_click.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="Coffee Bean" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Coffee Bean.bmp;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="glass_long" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\glass_long.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_cloudy" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_cloudy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="refresh_disabled" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\refresh_disabled.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="exp_color_bg" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\exp_color_bg.gif;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_lightsnow" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_lightsnow.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_fog" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_fog.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="glass_bl" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_bl.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="glass_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="glass" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="63f9ed41-5b51-46ea-b416-fcdec03ab288" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\63f9ed41-5b51-46ea-b416-fcdec03ab288.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="refresh_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\refresh_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_mostlycloudy" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_mostlycloudy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="weather_lightrain" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_lightrain.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="controls_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\controls_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="alert_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\alert_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
 </root>

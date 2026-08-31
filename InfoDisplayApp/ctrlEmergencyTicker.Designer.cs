@@ -75,6 +75,7 @@
             ForeColor = Color.White;
             Name = "ctrlEmergencyTicker";
             Size = new Size(828, 74);
+            Load += ctrlEmergencyTicker_Load;
             panel1.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
