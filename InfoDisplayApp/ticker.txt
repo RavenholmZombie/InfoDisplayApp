@@ -1,0 +1,6 @@
+# InfoDisplayApp ticker messages
+# One message per line.
+
+Welcome to InfoDisplayApp!
+RYCRAFT STATUS: Online
+Tapo Security Cameras: Operational

@@ -28,7 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
-            panel1 = new Panel();
+            panel1 = new DoubleBufferedPanel();
             lblTextTicker = new Label();
             panel1.SuspendLayout();
             SuspendLayout();
@@ -45,15 +45,16 @@
             // 
             // lblTextTicker
             // 
-            lblTextTicker.Dock = DockStyle.Fill;
-            lblTextTicker.Font = new Font("Segoe UI", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lblTextTicker.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            lblTextTicker.BackColor = Color.Transparent;
+            lblTextTicker.Font = new Font("Segoe UI", 30F);
+            lblTextTicker.ForeColor = Color.White;
             lblTextTicker.ImageAlign = ContentAlignment.MiddleRight;
             lblTextTicker.Location = new Point(0, 0);
             lblTextTicker.Name = "lblTextTicker";
             lblTextTicker.Size = new Size(582, 57);
             lblTextTicker.TabIndex = 0;
-            lblTextTicker.Text = "<Ticker Text Goes Here, Scrolling>";
-            lblTextTicker.TextAlign = ContentAlignment.MiddleRight;
+            lblTextTicker.TextAlign = ContentAlignment.TopRight;
             // 
             // ctrlTicker
             // 
@@ -63,6 +64,7 @@
             BackgroundImage = Resources.glass_long;
             BackgroundImageLayout = ImageLayout.Stretch;
             Controls.Add(panel1);
+            DoubleBuffered = true;
             ForeColor = Color.White;
             Name = "ctrlTicker";
             Size = new Size(605, 82);
@@ -72,7 +74,7 @@
 
         #endregion
 
-        private Panel panel1;
+        private DoubleBufferedPanel panel1;
         private Label lblTextTicker;
     }
 }
