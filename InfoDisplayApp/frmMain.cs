@@ -143,8 +143,16 @@ namespace InfoDisplayApp
             {
                 Dock = DockStyle.Fill
             };
-
             pnlDateTime.Controls.Add(ctrlTimeDate);
+
+            // -----------------------------
+            // TEXT TICKER
+            // -----------------------------
+            ctrlTicker ctrlTicker = new ctrlTicker
+            {
+                Dock = DockStyle.Fill
+            }; 
+            pnlTicker.Controls.Add(ctrlTicker);
 
 
             // -----------------------------
