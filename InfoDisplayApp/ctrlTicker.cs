@@ -26,10 +26,8 @@ namespace InfoDisplayApp.Properties
 
         private string _rycraftHost = "";
         private int _rycraftPort = 25565;
-
         private string _rycraftLocalHost = "";
         private int _rycraftLocalPort = 25565;
-
         private string _rycraftRconHost = "";
         private int _rycraftRconPort = 25575;
         private string _rycraftRconPassword = "";
@@ -58,7 +56,6 @@ namespace InfoDisplayApp.Properties
         public ctrlTicker()
         {
             InitializeComponent();
-
             lblTextTicker.Visible = false;
             panel1.Paint += panel1_Paint;
             panel1.Resize += panel1_Resize;
@@ -146,12 +143,7 @@ namespace InfoDisplayApp.Properties
 
             string message = _messages[_currentMessageIndex]
                 .Replace("{RYCRAFT_STATUS}", _rycraftStatus, StringComparison.OrdinalIgnoreCase)
-                .Replace(
-                    "{RYCRAFT_PLAYERS}",
-                    _rycraftPlayersOnline >= 0 && _rycraftPlayersMax >= 0
-                        ? $"{_rycraftPlayersOnline}/{_rycraftPlayersMax}"
-                        : "Unavailable",
-                    StringComparison.OrdinalIgnoreCase)
+                .Replace("{RYCRAFT_PLAYERS}", _rycraftPlayersOnline >= 0 && _rycraftPlayersMax >= 0 ? $"{_rycraftPlayersOnline}/{_rycraftPlayersMax}" : "Unavailable", StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_ONLINE_PLAYERS}", _rycraftPlayersOnline.ToString(), StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_MAX_PLAYERS}", _rycraftPlayersMax.ToString(), StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_PLAYER_NAMES}", _rycraftPlayerNames, StringComparison.OrdinalIgnoreCase)
@@ -162,11 +154,7 @@ namespace InfoDisplayApp.Properties
             using (Graphics graphics = panel1.CreateGraphics())
             {
                 graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                SizeF measured = graphics.MeasureString(
-                    _renderedMessage,
-                    lblTextTicker.Font,
-                    int.MaxValue,
-                    StringFormat.GenericTypographic);
+                SizeF measured = graphics.MeasureString(_renderedMessage, lblTextTicker.Font, int.MaxValue, StringFormat.GenericTypographic);
                 _messageWidth = measured.Width + 10f;
             }
 
@@ -181,12 +169,9 @@ namespace InfoDisplayApp.Properties
                 return;
 
             double nowSeconds = _scrollClock.Elapsed.TotalSeconds;
-            double elapsedSeconds = nowSeconds - _lastScrollSeconds;
+            double elapsedSeconds = Math.Min(nowSeconds - _lastScrollSeconds, 0.100);
             _lastScrollSeconds = nowSeconds;
-
-            elapsedSeconds = Math.Min(elapsedSeconds, 0.100);
             _scrollX -= ScrollPixelsPerSecond * elapsedSeconds;
-
             panel1.Invalidate();
 
             if (_scrollX + _messageWidth < 0)
@@ -204,7 +189,6 @@ namespace InfoDisplayApp.Properties
                 return;
 
             e.Graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-
             using SolidBrush brush = new(lblTextTicker.ForeColor);
             using StringFormat format = new(StringFormat.GenericTypographic)
             {
@@ -213,22 +197,11 @@ namespace InfoDisplayApp.Properties
                 FormatFlags = StringFormatFlags.NoWrap
             };
 
-            e.Graphics.DrawString(
-                _renderedMessage,
-                lblTextTicker.Font,
-                brush,
-                new RectangleF(
-                    (float)_scrollX,
-                    0,
-                    Math.Max(_messageWidth, 1f),
-                    panel1.ClientSize.Height),
-                format);
+            e.Graphics.DrawString(_renderedMessage, lblTextTicker.Font, brush,
+                new RectangleF((float)_scrollX, 0, Math.Max(_messageWidth, 1f), panel1.ClientSize.Height), format);
         }
 
-        private void panel1_Resize(object? sender, EventArgs e)
-        {
-            panel1.Invalidate();
-        }
+        private void panel1_Resize(object? sender, EventArgs e) => panel1.Invalidate();
 
         private void ResetScrollClock()
         {
@@ -239,13 +212,11 @@ namespace InfoDisplayApp.Properties
         private void ReloadTimer_Tick(object? sender, EventArgs e)
         {
             LoadTickerMessages();
-
             if (_messages.Count > 0 && !_scrollTimer.Enabled)
             {
                 ShowCurrentMessage();
                 _scrollTimer.Start();
             }
-
             if (_messages.Count == 0)
                 _scrollTimer.Stop();
         }
@@ -255,7 +226,6 @@ namespace InfoDisplayApp.Properties
             _scrollTimer.Stop();
             _reloadTimer.Stop();
             _statusTimer.Stop();
-
             _scrollTimer.Dispose();
             _reloadTimer.Dispose();
             _statusTimer.Dispose();
@@ -271,50 +241,25 @@ namespace InfoDisplayApp.Properties
                     foreach (string rawLine in File.ReadAllLines(StatusConfigPath))
                     {
                         string line = rawLine.Trim();
-                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
-                            continue;
-
+                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
                         int separator = line.IndexOf('=');
-                        if (separator <= 0)
-                            continue;
-
+                        if (separator <= 0) continue;
                         string key = line[..separator].Trim().ToLowerInvariant();
                         string value = line[(separator + 1)..].Trim();
-
                         switch (key)
                         {
-                            case "rycraft_host":
-                                _rycraftHost = value;
-                                break;
-                            case "rycraft_port":
-                                if (int.TryParse(value, out int port))
-                                    _rycraftPort = port;
-                                break;
-                            case "rycraft_local_host":
-                                _rycraftLocalHost = value;
-                                break;
-                            case "rycraft_local_port":
-                                if (int.TryParse(value, out int localPort))
-                                    _rycraftLocalPort = localPort;
-                                break;
-                            case "rycraft_rcon_host":
-                                _rycraftRconHost = value;
-                                break;
-                            case "rycraft_rcon_port":
-                                if (int.TryParse(value, out int rconPort))
-                                    _rycraftRconPort = rconPort;
-                                break;
-                            case "rycraft_rcon_password":
-                                _rycraftRconPassword = value;
-                                break;
+                            case "rycraft_host": _rycraftHost = value; break;
+                            case "rycraft_port": if (int.TryParse(value, out int port)) _rycraftPort = port; break;
+                            case "rycraft_local_host": _rycraftLocalHost = value; break;
+                            case "rycraft_local_port": if (int.TryParse(value, out int localPort)) _rycraftLocalPort = localPort; break;
+                            case "rycraft_rcon_host": _rycraftRconHost = value; break;
+                            case "rycraft_rcon_port": if (int.TryParse(value, out int rconPort)) _rycraftRconPort = rconPort; break;
+                            case "rycraft_rcon_password": _rycraftRconPassword = value; break;
                         }
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Unable to load status.conf: {ex}");
-            }
+            catch (Exception ex) { Debug.WriteLine($"Unable to load status.conf: {ex}"); }
 
             try
             {
@@ -323,38 +268,21 @@ namespace InfoDisplayApp.Properties
                     foreach (string rawLine in File.ReadAllLines(CameraConfigPath))
                     {
                         string line = rawLine.Trim();
-                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
-                            continue;
-
+                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
                         int separator = line.IndexOf('=');
-                        if (separator <= 0)
-                            continue;
-
+                        if (separator <= 0) continue;
                         string key = line[..separator].Trim().ToLowerInvariant();
                         string value = line[(separator + 1)..].Trim();
-
-                        if (key == "ip")
-                        {
-                            _tapoHost = value;
-                            break;
-                        }
+                        if (key == "ip") { _tapoHost = value; break; }
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Unable to read camera address: {ex}");
-            }
+            catch (Exception ex) { Debug.WriteLine($"Unable to read camera address: {ex}"); }
         }
 
-        private static async Task<bool> IsTcpServiceOnlineAsync(
-            string host,
-            int port,
-            int timeoutMilliseconds = 2500)
+        private static async Task<bool> IsTcpServiceOnlineAsync(string host, int port, int timeoutMilliseconds = 2500)
         {
-            if (string.IsNullOrWhiteSpace(host))
-                return false;
-
+            if (string.IsNullOrWhiteSpace(host)) return false;
             try
             {
                 using TcpClient client = new();
@@ -362,10 +290,7 @@ namespace InfoDisplayApp.Properties
                 await client.ConnectAsync(host, port, timeout.Token);
                 return client.Connected;
             }
-            catch
-            {
-                return false;
-            }
+            catch { return false; }
         }
 
         private async Task UpdateRycraftStatusAsync()
@@ -373,26 +298,19 @@ namespace InfoDisplayApp.Properties
             Task<bool> publicEndpointCheck = IsTcpServiceOnlineAsync(_rycraftHost, _rycraftPort);
             Task<MineStat?> localMinecraftCheck = QueryLocalRycraftAsync();
             Task<string?> rconPlayerListCheck = QueryRycraftPlayerNamesAsync();
-
             await Task.WhenAll(publicEndpointCheck, localMinecraftCheck, rconPlayerListCheck);
 
             bool publicOnline = publicEndpointCheck.Result;
             MineStat? localStatus = localMinecraftCheck.Result;
             string? rconPlayerNames = rconPlayerListCheck.Result;
             bool localOnline = localStatus?.ServerUp == true;
-
             _rycraftPlayerNames = rconPlayerNames ?? "Unavailable";
-
-            if (rconPlayerNames != null)
-                Debug.WriteLine($"Rycraft RCON players: {_rycraftPlayerNames}");
+            if (rconPlayerNames != null) Debug.WriteLine($"Rycraft RCON players: {_rycraftPlayerNames}");
 
             if (localOnline)
             {
-                if (!int.TryParse(localStatus!.CurrentPlayers, out _rycraftPlayersOnline))
-                    _rycraftPlayersOnline = -1;
-                if (!int.TryParse(localStatus.MaximumPlayers, out _rycraftPlayersMax))
-                    _rycraftPlayersMax = -1;
-
+                if (!int.TryParse(localStatus!.CurrentPlayers, out _rycraftPlayersOnline)) _rycraftPlayersOnline = -1;
+                if (!int.TryParse(localStatus.MaximumPlayers, out _rycraftPlayersMax)) _rycraftPlayersMax = -1;
                 Debug.WriteLine($"Rycraft local Minecraft status: Online - {_rycraftPlayersOnline}/{_rycraftPlayersMax} players");
                 Debug.WriteLine($"Rycraft version: {localStatus.Version}");
                 Debug.WriteLine($"Rycraft latency: {localStatus.Latency} ms");
@@ -405,14 +323,7 @@ namespace InfoDisplayApp.Properties
                 Debug.WriteLine("Rycraft local Minecraft status could not be retrieved.");
             }
 
-            _rycraftStatus = publicOnline && localOnline
-                ? "Online"
-                : !publicOnline && localOnline
-                    ? "Tunnel Offline"
-                    : publicOnline
-                        ? "Online"
-                        : "Offline";
-
+            _rycraftStatus = publicOnline && localOnline ? "Online" : !publicOnline && localOnline ? "Tunnel Offline" : publicOnline ? "Online" : "Offline";
             Debug.WriteLine($"Rycraft public endpoint: {(publicOnline ? "Online" : "Offline")}");
             Debug.WriteLine($"Rycraft final status: {_rycraftStatus}");
         }
@@ -424,24 +335,13 @@ namespace InfoDisplayApp.Properties
                 Debug.WriteLine("Rycraft local host is not configured. Add rycraft_local_host to status.conf.");
                 return null;
             }
-
-            try
-            {
-                return await Task.Run(() => new MineStat(_rycraftLocalHost, (ushort)_rycraftLocalPort));
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Rycraft local MineStat query failed: {ex}");
-                return null;
-            }
+            try { return await Task.Run(() => new MineStat(_rycraftLocalHost, (ushort)_rycraftLocalPort)); }
+            catch (Exception ex) { Debug.WriteLine($"Rycraft local MineStat query failed: {ex}"); return null; }
         }
 
         private async Task<string?> QueryRycraftPlayerNamesAsync()
         {
-            string host = string.IsNullOrWhiteSpace(_rycraftRconHost)
-                ? _rycraftLocalHost
-                : _rycraftRconHost;
-
+            string host = string.IsNullOrWhiteSpace(_rycraftRconHost) ? _rycraftLocalHost : _rycraftRconHost;
             if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(_rycraftRconPassword))
             {
                 Debug.WriteLine("Rycraft RCON is not configured. Add rycraft_rcon_password (and optionally host/port) to status.conf.");
@@ -452,104 +352,70 @@ namespace InfoDisplayApp.Properties
             {
                 using TcpClient client = new();
                 using CancellationTokenSource timeout = new(3000);
-
                 await client.ConnectAsync(host, _rycraftRconPort, timeout.Token);
                 using NetworkStream stream = client.GetStream();
 
                 const int authRequestId = 1001;
                 await SendRconPacketAsync(stream, authRequestId, 3, _rycraftRconPassword, timeout.Token);
                 RconPacket authResponse = await ReadRconPacketAsync(stream, timeout.Token);
-
-                if (authResponse.RequestId == -1)
-                {
-                    Debug.WriteLine("Rycraft RCON authentication failed.");
-                    return null;
-                }
+                if (authResponse.RequestId == -1) { Debug.WriteLine("Rycraft RCON authentication failed."); return null; }
 
                 const int commandRequestId = 1002;
                 await SendRconPacketAsync(stream, commandRequestId, 2, "list", timeout.Token);
                 RconPacket commandResponse = await ReadRconPacketAsync(stream, timeout.Token);
-
                 string response = commandResponse.Payload.Trim();
                 Debug.WriteLine($"Rycraft RCON list response: {response}");
                 return ParseRconPlayerNames(response);
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Rycraft RCON query failed: {ex.Message}");
-                return null;
-            }
+            catch (Exception ex) { Debug.WriteLine($"Rycraft RCON query failed: {ex.Message}"); return null; }
         }
 
         private static string ParseRconPlayerNames(string response)
         {
-            if (string.IsNullOrWhiteSpace(response))
-                return "None";
-
+            if (string.IsNullOrWhiteSpace(response)) return "None";
             int colon = response.IndexOf(':');
-            if (colon < 0)
-                return "None";
-
+            if (colon < 0) return "None";
             string names = response[(colon + 1)..].Trim();
             return string.IsNullOrWhiteSpace(names) ? "None" : names;
         }
 
-        private static async Task SendRconPacketAsync(
-            NetworkStream stream,
-            int requestId,
-            int type,
-            string payload,
-            CancellationToken cancellationToken)
+        private static async Task SendRconPacketAsync(NetworkStream stream, int requestId, int type, string payload, CancellationToken cancellationToken)
         {
             byte[] payloadBytes = Encoding.UTF8.GetBytes(payload);
             int packetLength = 4 + 4 + payloadBytes.Length + 2;
             byte[] packet = new byte[4 + packetLength];
-
             BitConverter.GetBytes(packetLength).CopyTo(packet, 0);
             BitConverter.GetBytes(requestId).CopyTo(packet, 4);
             BitConverter.GetBytes(type).CopyTo(packet, 8);
             payloadBytes.CopyTo(packet, 12);
             packet[^2] = 0;
             packet[^1] = 0;
-
             await stream.WriteAsync(packet, cancellationToken);
         }
 
-        private static async Task<RconPacket> ReadRconPacketAsync(
-            NetworkStream stream,
-            CancellationToken cancellationToken)
+        private static async Task<RconPacket> ReadRconPacketAsync(NetworkStream stream, CancellationToken cancellationToken)
         {
             byte[] lengthBytes = await ReadExactlyAsync(stream, 4, cancellationToken);
             int length = BitConverter.ToInt32(lengthBytes, 0);
-
-            if (length < 10 || length > 1024 * 1024)
-                throw new IOException($"Invalid RCON packet length: {length}");
-
+            if (length < 10 || length > 1024 * 1024) throw new IOException($"Invalid RCON packet length: {length}");
             byte[] body = await ReadExactlyAsync(stream, length, cancellationToken);
             int requestId = BitConverter.ToInt32(body, 0);
             int type = BitConverter.ToInt32(body, 4);
             int payloadLength = Math.Max(0, length - 10);
             string payload = Encoding.UTF8.GetString(body, 8, payloadLength);
-
             return new RconPacket(requestId, type, payload);
         }
 
-        private static async Task<byte[]> ReadExactlyAsync(
-            NetworkStream stream,
-            int count,
-            CancellationToken cancellationToken)
+        private static async Task<byte[]> ReadExactlyAsync(NetworkStream stream, int count, CancellationToken cancellationToken)
         {
             byte[] buffer = new byte[count];
             int offset = 0;
-
             while (offset < count)
             {
                 int read = await stream.ReadAsync(buffer.AsMemory(offset, count - offset), cancellationToken);
-                if (read == 0)
-                    throw new IOException("RCON connection closed unexpectedly.");
+                if (read == 0) throw new IOException("RCON connection closed unexpectedly.");
                 offset += read;
             }
-
             return buffer;
         }
 
@@ -559,7 +425,6 @@ namespace InfoDisplayApp.Properties
         {
             Task rycraftCheck = UpdateRycraftStatusAsync();
             Task<bool> tapoCheck = IsTcpServiceOnlineAsync(_tapoHost, TapoRtspPort);
-
             await Task.WhenAll(rycraftCheck, tapoCheck);
             _tapoStatus = tapoCheck.Result ? "Online" : "Offline";
             Debug.WriteLine($"Tapo: {_tapoStatus}");
@@ -568,14 +433,8 @@ namespace InfoDisplayApp.Properties
         private async void StatusTimer_Tick(object? sender, EventArgs e)
         {
             _statusTimer.Stop();
-            try
-            {
-                await UpdateStatusesAsync();
-            }
-            finally
-            {
-                _statusTimer.Start();
-            }
+            try { await UpdateStatusesAsync(); }
+            finally { _statusTimer.Start(); }
         }
     }
 }
