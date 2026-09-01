@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Text;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -48,10 +49,17 @@ namespace InfoDisplayApp.Properties
         private readonly List<string> _messages = new();
 
         private int _currentMessageIndex = 0;
-        private int _scrollX;
 
-        // Number of pixels moved per timer tick.
-        private const int ScrollSpeed = 10;
+        // Time-based ticker motion keeps the apparent speed consistent even
+        // when WinForms timer ticks arrive a little early or late.
+        private readonly Stopwatch _scrollClock = new();
+        private double _lastScrollSeconds;
+        private double _scrollX;
+        private float _messageWidth;
+        private string _renderedMessage = "";
+
+        // Preserve the old nominal speed: 10 pixels every ~16 ms.
+        private const double ScrollPixelsPerSecond = 625.0;
 
         // Space between the old message leaving and the next one entering.
         private const int MessageGap = 50;
@@ -64,13 +72,13 @@ namespace InfoDisplayApp.Properties
             InitializeComponent();
 
             //
-            // IMPORTANT:
-            // lblTextTicker must NOT be DockStyle.Fill because
-            // we're going to move it horizontally.
+            // Paint ticker text directly instead of physically moving a Label.
+            // Time-based motion prevents irregular WinForms timer cadence from
+            // turning into visible judder on the TV.
             //
-            lblTextTicker.Dock = DockStyle.None;
-            lblTextTicker.AutoSize = true;
-            lblTextTicker.TextAlign = ContentAlignment.MiddleLeft;
+            lblTextTicker.Visible = false;
+            panel1.Paint += panel1_Paint;
+            panel1.Resize += panel1_Resize;
 
             _scrollTimer = new System.Windows.Forms.Timer
             {
@@ -128,7 +136,8 @@ namespace InfoDisplayApp.Properties
                         $"Ticker file not found: {TickerPath}");
 
                     _messages.Clear();
-                    lblTextTicker.Text = "";
+                    _renderedMessage = "";
+                    panel1.Invalidate();
 
                     return;
                 }
@@ -145,7 +154,8 @@ namespace InfoDisplayApp.Properties
                 if (newMessages.Count == 0)
                 {
                     _messages.Clear();
-                    lblTextTicker.Text = "";
+                    _renderedMessage = "";
+                    panel1.Invalidate();
 
                     return;
                 }
@@ -175,7 +185,8 @@ namespace InfoDisplayApp.Properties
         {
             if (_messages.Count == 0)
             {
-                lblTextTicker.Text = "";
+                _renderedMessage = "";
+                panel1.Invalidate();
                 return;
             }
 
@@ -218,18 +229,22 @@ namespace InfoDisplayApp.Properties
                 _tapoStatus,
                 StringComparison.OrdinalIgnoreCase);
 
-            lblTextTicker.Text = message;
+            _renderedMessage = message;
 
-            //
-            // Resize label to fit this particular message.
-            //
-            Size preferredSize = TextRenderer.MeasureText(
-                lblTextTicker.Text,
-                lblTextTicker.Font);
+            using (Graphics graphics = panel1.CreateGraphics())
+            {
+                graphics.TextRenderingHint =
+                    TextRenderingHint.AntiAliasGridFit;
 
-            lblTextTicker.Size = new Size(
-                preferredSize.Width + 10,
-                panel1.ClientSize.Height);
+                SizeF measured =
+                    graphics.MeasureString(
+                        _renderedMessage,
+                        lblTextTicker.Font,
+                        int.MaxValue,
+                        StringFormat.GenericTypographic);
+
+                _messageWidth = measured.Width + 10f;
+            }
 
             //
             // Begin just beyond the right edge of the ticker.
@@ -237,9 +252,8 @@ namespace InfoDisplayApp.Properties
             _scrollX =
                 panel1.ClientSize.Width + MessageGap;
 
-            lblTextTicker.Location = new Point(
-                _scrollX,
-                0);
+            ResetScrollClock();
+            panel1.Invalidate();
         }
 
         private void ScrollTimer_Tick(
@@ -249,14 +263,26 @@ namespace InfoDisplayApp.Properties
             if (_messages.Count == 0)
                 return;
 
-            _scrollX -= ScrollSpeed;
+            double nowSeconds =
+                _scrollClock.Elapsed.TotalSeconds;
 
-            lblTextTicker.Left = _scrollX;
+            double elapsedSeconds =
+                nowSeconds - _lastScrollSeconds;
+
+            _lastScrollSeconds = nowSeconds;
+
+            // Avoid a giant jump if the UI thread was blocked or the PC resumed.
+            elapsedSeconds = Math.Min(elapsedSeconds, 0.100);
+
+            _scrollX -=
+                ScrollPixelsPerSecond * elapsedSeconds;
+
+            panel1.Invalidate();
 
             //
             // Has the entire message left the screen?
             //
-            if (lblTextTicker.Right < 0)
+            if (_scrollX + _messageWidth < 0)
             {
                 _currentMessageIndex++;
 
@@ -265,6 +291,52 @@ namespace InfoDisplayApp.Properties
 
                 ShowCurrentMessage();
             }
+        }
+
+        private void panel1_Paint(
+            object? sender,
+            PaintEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_renderedMessage))
+                return;
+
+            e.Graphics.TextRenderingHint =
+                TextRenderingHint.AntiAliasGridFit;
+
+            using SolidBrush brush =
+                new SolidBrush(lblTextTicker.ForeColor);
+
+            using StringFormat format =
+                new StringFormat(StringFormat.GenericTypographic)
+                {
+                    LineAlignment = StringAlignment.Center,
+                    Alignment = StringAlignment.Near,
+                    FormatFlags = StringFormatFlags.NoWrap
+                };
+
+            e.Graphics.DrawString(
+                _renderedMessage,
+                lblTextTicker.Font,
+                brush,
+                new RectangleF(
+                    (float)_scrollX,
+                    0,
+                    Math.Max(_messageWidth, 1f),
+                    panel1.ClientSize.Height),
+                format);
+        }
+
+        private void panel1_Resize(
+            object? sender,
+            EventArgs e)
+        {
+            panel1.Invalidate();
+        }
+
+        private void ResetScrollClock()
+        {
+            _scrollClock.Restart();
+            _lastScrollSeconds = 0;
         }
 
         private void ReloadTimer_Tick(
@@ -297,6 +369,7 @@ namespace InfoDisplayApp.Properties
             _scrollTimer.Dispose();
             _reloadTimer.Dispose();
             _statusTimer.Dispose();
+            _scrollClock.Stop();
         }
 
         private void LoadStatusConfiguration()
