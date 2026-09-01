@@ -44,6 +44,7 @@
             wvPhilo.Source = new Uri("https://www.philo.com/player/mytv", UriKind.Absolute);
             wvPhilo.TabIndex = 0;
             wvPhilo.ZoomFactor = 1D;
+            wvPhilo.CoreWebView2InitializationCompleted += wvPhilo_CoreWebView2InitializationCompleted;
             // 
             // ctrlPhiloWebView
             // 
