@@ -41,7 +41,6 @@ namespace InfoDisplayApp.Properties
 
         private readonly List<string> _messages = new();
         private int _currentMessageIndex;
-
         private readonly Stopwatch _scrollClock = new();
         private double _lastScrollSeconds;
         private double _scrollX;
@@ -62,10 +61,8 @@ namespace InfoDisplayApp.Properties
 
             _scrollTimer = new System.Windows.Forms.Timer { Interval = 16 };
             _scrollTimer.Tick += ScrollTimer_Tick;
-
             _reloadTimer = new System.Windows.Forms.Timer { Interval = 10_000 };
             _reloadTimer.Tick += ReloadTimer_Tick;
-
             _statusTimer = new System.Windows.Forms.Timer { Interval = 30_000 };
             _statusTimer.Tick += StatusTimer_Tick;
 
@@ -78,13 +75,11 @@ namespace InfoDisplayApp.Properties
             LoadStatusConfiguration();
             await UpdateStatusesAsync();
             LoadTickerMessages();
-
             if (_messages.Count > 0)
             {
                 ShowCurrentMessage();
                 _scrollTimer.Start();
             }
-
             _reloadTimer.Start();
             _statusTimer.Start();
         }
@@ -114,19 +109,14 @@ namespace InfoDisplayApp.Properties
                     panel1.Invalidate();
                     return;
                 }
-
-                if (_messages.SequenceEqual(newMessages))
-                    return;
+                if (_messages.SequenceEqual(newMessages)) return;
 
                 _messages.Clear();
                 _messages.AddRange(newMessages);
                 _currentMessageIndex = 0;
                 ShowCurrentMessage();
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Unable to load ticker.txt: {ex}");
-            }
+            catch (Exception ex) { Debug.WriteLine($"Unable to load ticker.txt: {ex}"); }
         }
 
         private void ShowCurrentMessage()
@@ -137,11 +127,9 @@ namespace InfoDisplayApp.Properties
                 panel1.Invalidate();
                 return;
             }
+            if (_currentMessageIndex >= _messages.Count) _currentMessageIndex = 0;
 
-            if (_currentMessageIndex >= _messages.Count)
-                _currentMessageIndex = 0;
-
-            string message = _messages[_currentMessageIndex]
+            _renderedMessage = _messages[_currentMessageIndex]
                 .Replace("{RYCRAFT_STATUS}", _rycraftStatus, StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_PLAYERS}", _rycraftPlayersOnline >= 0 && _rycraftPlayersMax >= 0 ? $"{_rycraftPlayersOnline}/{_rycraftPlayersMax}" : "Unavailable", StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_ONLINE_PLAYERS}", _rycraftPlayersOnline.ToString(), StringComparison.OrdinalIgnoreCase)
@@ -149,24 +137,21 @@ namespace InfoDisplayApp.Properties
                 .Replace("{RYCRAFT_PLAYER_NAMES}", _rycraftPlayerNames, StringComparison.OrdinalIgnoreCase)
                 .Replace("{TAPO_STATUS}", _tapoStatus, StringComparison.OrdinalIgnoreCase);
 
-            _renderedMessage = message;
-
             using (Graphics graphics = panel1.CreateGraphics())
             {
                 graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                SizeF measured = graphics.MeasureString(_renderedMessage, lblTextTicker.Font, int.MaxValue, StringFormat.GenericTypographic);
-                _messageWidth = measured.Width + 10f;
+                _messageWidth = graphics.MeasureString(_renderedMessage, lblTextTicker.Font, int.MaxValue, StringFormat.GenericTypographic).Width + 10f;
             }
 
             _scrollX = panel1.ClientSize.Width + MessageGap;
-            ResetScrollClock();
+            _scrollClock.Restart();
+            _lastScrollSeconds = 0;
             panel1.Invalidate();
         }
 
         private void ScrollTimer_Tick(object? sender, EventArgs e)
         {
-            if (_messages.Count == 0)
-                return;
+            if (_messages.Count == 0) return;
 
             double nowSeconds = _scrollClock.Elapsed.TotalSeconds;
             double elapsedSeconds = Math.Min(nowSeconds - _lastScrollSeconds, 0.100);
@@ -177,17 +162,14 @@ namespace InfoDisplayApp.Properties
             if (_scrollX + _messageWidth < 0)
             {
                 _currentMessageIndex++;
-                if (_currentMessageIndex >= _messages.Count)
-                    _currentMessageIndex = 0;
+                if (_currentMessageIndex >= _messages.Count) _currentMessageIndex = 0;
                 ShowCurrentMessage();
             }
         }
 
         private void panel1_Paint(object? sender, PaintEventArgs e)
         {
-            if (string.IsNullOrEmpty(_renderedMessage))
-                return;
-
+            if (string.IsNullOrEmpty(_renderedMessage)) return;
             e.Graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
             using SolidBrush brush = new(lblTextTicker.ForeColor);
             using StringFormat format = new(StringFormat.GenericTypographic)
@@ -196,18 +178,11 @@ namespace InfoDisplayApp.Properties
                 Alignment = StringAlignment.Near,
                 FormatFlags = StringFormatFlags.NoWrap
             };
-
             e.Graphics.DrawString(_renderedMessage, lblTextTicker.Font, brush,
                 new RectangleF((float)_scrollX, 0, Math.Max(_messageWidth, 1f), panel1.ClientSize.Height), format);
         }
 
         private void panel1_Resize(object? sender, EventArgs e) => panel1.Invalidate();
-
-        private void ResetScrollClock()
-        {
-            _scrollClock.Restart();
-            _lastScrollSeconds = 0;
-        }
 
         private void ReloadTimer_Tick(object? sender, EventArgs e)
         {
@@ -217,18 +192,13 @@ namespace InfoDisplayApp.Properties
                 ShowCurrentMessage();
                 _scrollTimer.Start();
             }
-            if (_messages.Count == 0)
-                _scrollTimer.Stop();
+            if (_messages.Count == 0) _scrollTimer.Stop();
         }
 
         private void ctrlTicker_Disposed(object? sender, EventArgs e)
         {
-            _scrollTimer.Stop();
-            _reloadTimer.Stop();
-            _statusTimer.Stop();
-            _scrollTimer.Dispose();
-            _reloadTimer.Dispose();
-            _statusTimer.Dispose();
+            _scrollTimer.Stop(); _reloadTimer.Stop(); _statusTimer.Stop();
+            _scrollTimer.Dispose(); _reloadTimer.Dispose(); _statusTimer.Dispose();
             _scrollClock.Stop();
         }
 
@@ -347,19 +317,16 @@ namespace InfoDisplayApp.Properties
                 Debug.WriteLine("Rycraft RCON is not configured. Add rycraft_rcon_password (and optionally host/port) to status.conf.");
                 return null;
             }
-
             try
             {
                 using TcpClient client = new();
                 using CancellationTokenSource timeout = new(3000);
                 await client.ConnectAsync(host, _rycraftRconPort, timeout.Token);
                 using NetworkStream stream = client.GetStream();
-
                 const int authRequestId = 1001;
                 await SendRconPacketAsync(stream, authRequestId, 3, _rycraftRconPassword, timeout.Token);
                 RconPacket authResponse = await ReadRconPacketAsync(stream, timeout.Token);
                 if (authResponse.RequestId == -1) { Debug.WriteLine("Rycraft RCON authentication failed."); return null; }
-
                 const int commandRequestId = 1002;
                 await SendRconPacketAsync(stream, commandRequestId, 2, "list", timeout.Token);
                 RconPacket commandResponse = await ReadRconPacketAsync(stream, timeout.Token);
@@ -388,8 +355,7 @@ namespace InfoDisplayApp.Properties
             BitConverter.GetBytes(requestId).CopyTo(packet, 4);
             BitConverter.GetBytes(type).CopyTo(packet, 8);
             payloadBytes.CopyTo(packet, 12);
-            packet[^2] = 0;
-            packet[^1] = 0;
+            packet[^2] = 0; packet[^1] = 0;
             await stream.WriteAsync(packet, cancellationToken);
         }
 
