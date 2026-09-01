@@ -23,7 +23,6 @@ namespace InfoDisplayApp.Properties
         private int _rycraftPlayersOnline = 0;
         private int _rycraftPlayersMax = 0;
         private string _tapoStatus = "Checking...";
-
         private string _rycraftHost = "";
         private int _rycraftPort = 25565;
         private string _rycraftLocalHost = "";
@@ -32,13 +31,10 @@ namespace InfoDisplayApp.Properties
         private int _rycraftRconPort = 25575;
         private string _rycraftRconPassword = "";
         private string _rycraftPlayerNames = "Unavailable";
-
         private string _tapoHost = "";
         private const int TapoRtspPort = 554;
-
         private string StatusConfigPath => Path.Combine(AppContext.BaseDirectory, "status.conf");
         private string CameraConfigPath => Path.Combine(AppContext.BaseDirectory, "camera.conf");
-
         private readonly List<string> _messages = new();
         private int _currentMessageIndex;
         private readonly Stopwatch _scrollClock = new();
@@ -46,10 +42,8 @@ namespace InfoDisplayApp.Properties
         private double _scrollX;
         private float _messageWidth;
         private string _renderedMessage = "";
-
         private const double ScrollPixelsPerSecond = 625.0;
         private const int MessageGap = 50;
-
         private string TickerPath => Path.Combine(AppContext.BaseDirectory, "ticker.txt");
 
         public ctrlTicker()
@@ -58,14 +52,12 @@ namespace InfoDisplayApp.Properties
             lblTextTicker.Visible = false;
             panel1.Paint += panel1_Paint;
             panel1.Resize += panel1_Resize;
-
             _scrollTimer = new System.Windows.Forms.Timer { Interval = 16 };
             _scrollTimer.Tick += ScrollTimer_Tick;
             _reloadTimer = new System.Windows.Forms.Timer { Interval = 10_000 };
             _reloadTimer.Tick += ReloadTimer_Tick;
             _statusTimer = new System.Windows.Forms.Timer { Interval = 30_000 };
             _statusTimer.Tick += StatusTimer_Tick;
-
             Load += ctrlTicker_Load;
             Disposed += ctrlTicker_Disposed;
         }
@@ -96,12 +88,10 @@ namespace InfoDisplayApp.Properties
                     panel1.Invalidate();
                     return;
                 }
-
                 List<string> newMessages = File.ReadAllLines(TickerPath)
                     .Select(line => line.Trim())
                     .Where(line => !string.IsNullOrWhiteSpace(line) && !line.StartsWith("#"))
                     .ToList();
-
                 if (newMessages.Count == 0)
                 {
                     _messages.Clear();
@@ -110,7 +100,6 @@ namespace InfoDisplayApp.Properties
                     return;
                 }
                 if (_messages.SequenceEqual(newMessages)) return;
-
                 _messages.Clear();
                 _messages.AddRange(newMessages);
                 _currentMessageIndex = 0;
@@ -128,7 +117,6 @@ namespace InfoDisplayApp.Properties
                 return;
             }
             if (_currentMessageIndex >= _messages.Count) _currentMessageIndex = 0;
-
             _renderedMessage = _messages[_currentMessageIndex]
                 .Replace("{RYCRAFT_STATUS}", _rycraftStatus, StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_PLAYERS}", _rycraftPlayersOnline >= 0 && _rycraftPlayersMax >= 0 ? $"{_rycraftPlayersOnline}/{_rycraftPlayersMax}" : "Unavailable", StringComparison.OrdinalIgnoreCase)
@@ -136,13 +124,11 @@ namespace InfoDisplayApp.Properties
                 .Replace("{RYCRAFT_MAX_PLAYERS}", _rycraftPlayersMax.ToString(), StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_PLAYER_NAMES}", _rycraftPlayerNames, StringComparison.OrdinalIgnoreCase)
                 .Replace("{TAPO_STATUS}", _tapoStatus, StringComparison.OrdinalIgnoreCase);
-
             using (Graphics graphics = panel1.CreateGraphics())
             {
                 graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
                 _messageWidth = graphics.MeasureString(_renderedMessage, lblTextTicker.Font, int.MaxValue, StringFormat.GenericTypographic).Width + 10f;
             }
-
             _scrollX = panel1.ClientSize.Width + MessageGap;
             _scrollClock.Restart();
             _lastScrollSeconds = 0;
@@ -152,13 +138,11 @@ namespace InfoDisplayApp.Properties
         private void ScrollTimer_Tick(object? sender, EventArgs e)
         {
             if (_messages.Count == 0) return;
-
             double nowSeconds = _scrollClock.Elapsed.TotalSeconds;
             double elapsedSeconds = Math.Min(nowSeconds - _lastScrollSeconds, 0.100);
             _lastScrollSeconds = nowSeconds;
             _scrollX -= ScrollPixelsPerSecond * elapsedSeconds;
             panel1.Invalidate();
-
             if (_scrollX + _messageWidth < 0)
             {
                 _currentMessageIndex++;
@@ -198,8 +182,7 @@ namespace InfoDisplayApp.Properties
         private void ctrlTicker_Disposed(object? sender, EventArgs e)
         {
             _scrollTimer.Stop(); _reloadTimer.Stop(); _statusTimer.Stop();
-            _scrollTimer.Dispose(); _reloadTimer.Dispose(); _statusTimer.Dispose();
-            _scrollClock.Stop();
+            _scrollTimer.Dispose(); _reloadTimer.Dispose(); _statusTimer.Dispose(); _scrollClock.Stop();
         }
 
         private void LoadStatusConfiguration()
@@ -230,7 +213,6 @@ namespace InfoDisplayApp.Properties
                 }
             }
             catch (Exception ex) { Debug.WriteLine($"Unable to load status.conf: {ex}"); }
-
             try
             {
                 if (File.Exists(CameraConfigPath))
@@ -269,14 +251,12 @@ namespace InfoDisplayApp.Properties
             Task<MineStat?> localMinecraftCheck = QueryLocalRycraftAsync();
             Task<string?> rconPlayerListCheck = QueryRycraftPlayerNamesAsync();
             await Task.WhenAll(publicEndpointCheck, localMinecraftCheck, rconPlayerListCheck);
-
             bool publicOnline = publicEndpointCheck.Result;
             MineStat? localStatus = localMinecraftCheck.Result;
             string? rconPlayerNames = rconPlayerListCheck.Result;
             bool localOnline = localStatus?.ServerUp == true;
             _rycraftPlayerNames = rconPlayerNames ?? "Unavailable";
             if (rconPlayerNames != null) Debug.WriteLine($"Rycraft RCON players: {_rycraftPlayerNames}");
-
             if (localOnline)
             {
                 if (!int.TryParse(localStatus!.CurrentPlayers, out _rycraftPlayersOnline)) _rycraftPlayersOnline = -1;
@@ -292,7 +272,6 @@ namespace InfoDisplayApp.Properties
                 _rycraftPlayersMax = -1;
                 Debug.WriteLine("Rycraft local Minecraft status could not be retrieved.");
             }
-
             _rycraftStatus = publicOnline && localOnline ? "Online" : !publicOnline && localOnline ? "Tunnel Offline" : publicOnline ? "Online" : "Offline";
             Debug.WriteLine($"Rycraft public endpoint: {(publicOnline ? "Online" : "Offline")}");
             Debug.WriteLine($"Rycraft final status: {_rycraftStatus}");
