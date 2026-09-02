@@ -85,7 +85,6 @@ namespace InfoDisplayApp
         {
             if(mode == "normal")
             {
-                // Normal text ticker control
                 ctrlTicker ctrlTicker = new ctrlTicker
                 {
                     Dock = DockStyle.Fill
@@ -96,7 +95,6 @@ namespace InfoDisplayApp
             }
             else
             {
-                // EAS ticker control
                 ctrlEmergencyTicker ctrlEmergencyTicker = new ctrlEmergencyTicker();
                 pnlTicker.Controls.Add(ctrlEmergencyTicker);
                 ctrlEmergencyTicker.Dock = DockStyle.Fill;
@@ -115,16 +113,6 @@ namespace InfoDisplayApp
             //ctrlEmergencyTicker.Dock = DockStyle.Fill;
 
             // -----------------------------
-            // MESSAGEBOX TEST
-            // -----------------------------
-            frmMessageWindow message = new frmMessageWindow();
-            message.SetIcon("error");
-            message.SetMessage("This is a test error message.");
-            message.TopMost = true;
-            message.Show(this);
-
-
-            // -----------------------------
             // PHILO
             // -----------------------------
 
@@ -135,7 +123,6 @@ namespace InfoDisplayApp
             };
 
             pnlTV.Controls.Add(_philoView);
-
 
             // -----------------------------
             // CAMERA
@@ -161,13 +148,7 @@ namespace InfoDisplayApp
 
             pnlTV.Controls.Add(_youtubeView);
 
-            // -----------------------------
-            // PHILO
-            // -----------------------------
-
-            // Make absolutely sure Philo owns the viewport
             _philoView.BringToFront();
-
 
             // -----------------------------
             // DATE / TIME
@@ -187,7 +168,6 @@ namespace InfoDisplayApp
                 Dock = DockStyle.Fill
             };
             pnlTicker.Controls.Add(ctrlTicker);
-
 
             // -----------------------------
             // WEATHER
@@ -214,10 +194,6 @@ namespace InfoDisplayApp
             UpdateModeButtons(true);
         }
 
-        // =====================================================
-        // PHILO MODE
-        // =====================================================
-
         public void ShowPhiloMode()
         {
             if (_philoView == null || _cameraView == null)
@@ -226,8 +202,9 @@ namespace InfoDisplayApp
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
             _cameraView.Visible = false;
-            _youtubeView.SetMuted(true);
-            _youtubeView.Visible = false;
+            _youtubeView?.SetMuted(true);
+            if (_youtubeView != null)
+                _youtubeView.Visible = false;
 
             _philoView.SetMuted(false);
             _philoView.Visible = true;
@@ -237,10 +214,6 @@ namespace InfoDisplayApp
             UpdateModeButtons(true);
         }
 
-        // =====================================================
-        // CAMERA MODE
-        // =====================================================
-
         public void ShowCameraMode()
         {
             if (_philoView == null || _cameraView == null)
@@ -248,8 +221,9 @@ namespace InfoDisplayApp
 
             _philoView.Visible = false;
             _philoView.SetMuted(true);
-            _youtubeView.Visible = false;
-            _youtubeView.SetMuted(true);
+            _youtubeView?.SetMuted(true);
+            if (_youtubeView != null)
+                _youtubeView.Visible = false;
 
             _cameraView.Visible = true;
             _cameraView.BringToFront();
@@ -260,10 +234,6 @@ namespace InfoDisplayApp
 
             UpdateModeButtons(false);
         }
-
-        // =====================================================
-        // YOUTUBE MODE
-        // =====================================================
 
         public void ShowYouTubeMode()
         {
@@ -292,7 +262,6 @@ namespace InfoDisplayApp
 
         private void pnlWeather_Paint(object sender, PaintEventArgs e)
         {
-
         }
 
         private void pnlBtnApps_Click(object sender, EventArgs e)
