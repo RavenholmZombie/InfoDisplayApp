@@ -114,6 +114,15 @@ namespace InfoDisplayApp
             //pnlTicker.Controls.Add(ctrlEmergencyTicker);
             //ctrlEmergencyTicker.Dock = DockStyle.Fill;
 
+            // -----------------------------
+            // MESSAGEBOX TEST
+            // -----------------------------
+            frmMessageWindow message = new frmMessageWindow();
+            message.SetIcon("error");
+            message.SetMessage("This is a test error message.");
+            message.TopMost = true;
+            message.Show(this);
+
 
             // -----------------------------
             // PHILO
