@@ -2,120 +2,152 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Text;
 using System.IO;
 using System.Linq;
-using System.Windows.Forms;
+using System.Net.Http;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 using MineStatLib;
 
 namespace InfoDisplayApp.Properties
 {
     public partial class ctrlTicker : UserControl
     {
-        private readonly System.Windows.Forms.Timer _scrollTimer;
+        private static readonly HttpClient _httpClient = new HttpClient();
+
         private readonly System.Windows.Forms.Timer _reloadTimer;
         private readonly System.Windows.Forms.Timer _statusTimer;
+        private readonly System.Windows.Forms.Timer _weatherTimer;
+        private readonly System.Threading.Timer _animationTimer;
+
+        private int _animationFramePending;
+        private bool _animationRunning;
+        private bool _timerResolutionRequested;
+        private bool _weatherUpdating;
 
         private string _rycraftStatus = "Checking...";
-        private int _rycraftPlayersOnline = 0;
-        private int _rycraftPlayersMax = 0;
+        private int _rycraftPlayersOnline;
+        private int _rycraftPlayersMax;
+        private string _rycraftPlayerNames = "Unavailable";
         private string _tapoStatus = "Checking...";
+
+        private string _princetonForecast = "Weather unavailable";
+        private string _baileyvilleForecast = "Weather unavailable";
+        private string _calaisForecast = "Weather unavailable";
 
         private string _rycraftHost = "";
         private int _rycraftPort = 25565;
-
-        // Local/LAN endpoint used for the actual Minecraft Server List Ping.
-        // The public Playit.gg endpoint is checked separately for reachability.
         private string _rycraftLocalHost = "";
         private int _rycraftLocalPort = 25565;
-
-        // RCON is used only on the LAN to retrieve the exact list of
-        // currently connected player names.
         private string _rycraftRconHost = "";
         private int _rycraftRconPort = 25575;
         private string _rycraftRconPassword = "";
-        private string _rycraftPlayerNames = "Unavailable";
 
-        private string _tapoHost = "";
-        private const int TapoRtspPort = 554;
+        private const string CheddarCameraIp = "192.168.40.210";
+        private const string DenCameraIp = "192.168.40.209";
+        private const string DoorbellCameraIp = "192.168.40.233";
+        private const int CameraPingTimeoutMilliseconds = 1500;
 
-        private string StatusConfigPath => Path.Combine(AppContext.BaseDirectory, "status.conf");
+        private static readonly WeatherLocation Princeton =
+            new("Princeton, ME", 45.143109, -67.526589);
 
-        private string CameraConfigPath => Path.Combine(AppContext.BaseDirectory, "camera.conf");
+        private static readonly WeatherLocation Baileyville =
+            new("Baileyville, ME", 45.15529, -67.40888);
 
-        private readonly List<string> _messages = new();
+        private static readonly WeatherLocation Calais =
+            new("Calais, ME", 45.18829, -67.27664);
 
-        private int _currentMessageIndex = 0;
-        private int _scrollX;
-
-        // Number of pixels moved per timer tick.
-        private const int ScrollSpeed = 10;
-
-        // Space between the old message leaving and the next one entering.
-        private const int MessageGap = 50;
+        private string StatusConfigPath =>
+            Path.Combine(AppContext.BaseDirectory, "status.conf");
 
         private string TickerPath =>
             Path.Combine(AppContext.BaseDirectory, "ticker.txt");
+
+        private readonly List<string> _messages = new();
+        private int _currentMessageIndex;
+
+        private readonly Stopwatch _scrollClock = new();
+        private double _lastScrollSeconds;
+        private double _scrollX;
+        private float _messageWidth;
+        private string _renderedMessage = "";
+
+        private const double ScrollPixelsPerSecond = 240.0;
+        private const int AnimationPulseMilliseconds = 8;
+        private const int MessageGap = 50;
+        private const uint TimerResolutionMilliseconds = 1;
+
+        [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+        private static extern uint TimeBeginPeriod(uint period);
+
+        [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+        private static extern uint TimeEndPeriod(uint period);
 
         public ctrlTicker()
         {
             InitializeComponent();
 
-            //
-            // IMPORTANT:
-            // lblTextTicker must NOT be DockStyle.Fill because
-            // we're going to move it horizontally.
-            //
-            lblTextTicker.Dock = DockStyle.None;
-            lblTextTicker.AutoSize = true;
-            lblTextTicker.TextAlign = ContentAlignment.MiddleLeft;
+            lblTextTicker.Visible = false;
+            panel1.Paint += panel1_Paint;
+            panel1.Resize += panel1_Resize;
 
-            _scrollTimer = new System.Windows.Forms.Timer
-            {
-                // Roughly 60 FPS
-                Interval = 16
-            };
-
-            _scrollTimer.Tick += ScrollTimer_Tick;
+            _animationTimer = new System.Threading.Timer(
+                AnimationTimerCallback,
+                null,
+                Timeout.Infinite,
+                Timeout.Infinite);
 
             _reloadTimer = new System.Windows.Forms.Timer
             {
-                // Check ticker.txt every 10 seconds.
                 Interval = 10_000
             };
-
             _reloadTimer.Tick += ReloadTimer_Tick;
-
-            Load += ctrlTicker_Load;
-            Disposed += ctrlTicker_Disposed;
 
             _statusTimer = new System.Windows.Forms.Timer
             {
-                // Check every 30 seconds.
                 Interval = 30_000
             };
-
             _statusTimer.Tick += StatusTimer_Tick;
+
+            _weatherTimer = new System.Windows.Forms.Timer
+            {
+                Interval = 15 * 60 * 1000
+            };
+            _weatherTimer.Tick += WeatherTimer_Tick;
+
+            Load += ctrlTicker_Load;
+            Disposed += ctrlTicker_Disposed;
         }
 
         private async void ctrlTicker_Load(object? sender, EventArgs e)
         {
+            _timerResolutionRequested =
+                TimeBeginPeriod(TimerResolutionMilliseconds) == 0;
+
             LoadStatusConfiguration();
 
-            await UpdateStatusesAsync();
+            await Task.WhenAll(
+                UpdateStatusesAsync(),
+                UpdateForecastsAsync());
 
             LoadTickerMessages();
 
             if (_messages.Count > 0)
             {
                 ShowCurrentMessage();
-                _scrollTimer.Start();
+                StartAnimation();
             }
 
             _reloadTimer.Start();
             _statusTimer.Start();
+            _weatherTimer.Start();
         }
 
         private void LoadTickerMessages()
@@ -124,18 +156,12 @@ namespace InfoDisplayApp.Properties
             {
                 if (!File.Exists(TickerPath))
                 {
-                    Debug.WriteLine(
-                        $"Ticker file not found: {TickerPath}");
-
-                    _messages.Clear();
-                    lblTextTicker.Text = "";
-
+                    Debug.WriteLine($"Ticker file not found: {TickerPath}");
+                    ClearTicker();
                     return;
                 }
 
-                string[] lines = File.ReadAllLines(TickerPath);
-
-                List<string> newMessages = lines
+                List<string> newMessages = File.ReadAllLines(TickerPath)
                     .Select(line => line.Trim())
                     .Where(line =>
                         !string.IsNullOrWhiteSpace(line) &&
@@ -144,290 +170,569 @@ namespace InfoDisplayApp.Properties
 
                 if (newMessages.Count == 0)
                 {
-                    _messages.Clear();
-                    lblTextTicker.Text = "";
-
+                    ClearTicker();
                     return;
                 }
 
-                //
-                // Only rebuild the ticker if the file's
-                // actual contents have changed.
-                //
                 if (_messages.SequenceEqual(newMessages))
                     return;
 
                 _messages.Clear();
                 _messages.AddRange(newMessages);
-
                 _currentMessageIndex = 0;
-
                 ShowCurrentMessage();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"Unable to load ticker.txt: {ex}");
+                Debug.WriteLine($"Unable to load ticker.txt: {ex}");
             }
+        }
+
+        private void ClearTicker()
+        {
+            _messages.Clear();
+            _renderedMessage = "";
+            StopAnimation();
+            panel1.Invalidate();
+            panel1.Update();
         }
 
         private void ShowCurrentMessage()
         {
             if (_messages.Count == 0)
             {
-                lblTextTicker.Text = "";
+                _renderedMessage = "";
+                panel1.Invalidate();
                 return;
             }
 
             if (_currentMessageIndex >= _messages.Count)
                 _currentMessageIndex = 0;
 
-            string message = _messages[_currentMessageIndex];
+            _renderedMessage = _messages[_currentMessageIndex]
+                .Replace(
+                    "{RYCRAFT_STATUS}",
+                    _rycraftStatus,
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{RYCRAFT_PLAYERS}",
+                    _rycraftPlayersOnline >= 0 && _rycraftPlayersMax >= 0
+                        ? $"{_rycraftPlayersOnline}/{_rycraftPlayersMax}"
+                        : "Unavailable",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{RYCRAFT_ONLINE_PLAYERS}",
+                    _rycraftPlayersOnline.ToString(),
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{RYCRAFT_MAX_PLAYERS}",
+                    _rycraftPlayersMax.ToString(),
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{RYCRAFT_PLAYER_NAMES}",
+                    _rycraftPlayerNames,
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{TAPO_STATUS}",
+                    _tapoStatus,
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{LOCAL_FORECAST}",
+                    _princetonForecast,
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{PRINCETON_FORECAST}",
+                    _princetonForecast,
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{BAILEYVILLE_FORECAST}",
+                    _baileyvilleForecast,
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{CALAIS_FORECAST}",
+                    _calaisForecast,
+                    StringComparison.OrdinalIgnoreCase);
 
-            message = message
-            .Replace(
-                "{RYCRAFT_STATUS}",
-                _rycraftStatus,
-                StringComparison.OrdinalIgnoreCase)
+            using Graphics graphics = panel1.CreateGraphics();
+            graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
 
-            .Replace(
-                "{RYCRAFT_PLAYERS}",
-                _rycraftPlayersOnline >= 0 &&
-                _rycraftPlayersMax >= 0
-                    ? $"{_rycraftPlayersOnline}/{_rycraftPlayersMax}"
-                    : "Unavailable",
-                StringComparison.OrdinalIgnoreCase)
+            _messageWidth = graphics.MeasureString(
+                _renderedMessage,
+                lblTextTicker.Font,
+                int.MaxValue,
+                StringFormat.GenericTypographic).Width + 10f;
 
-            .Replace(
-                "{RYCRAFT_ONLINE_PLAYERS}",
-                _rycraftPlayersOnline.ToString(),
-                StringComparison.OrdinalIgnoreCase)
+            _scrollX = panel1.ClientSize.Width + MessageGap;
 
-            .Replace(
-                "{RYCRAFT_MAX_PLAYERS}",
-                _rycraftPlayersMax.ToString(),
-                StringComparison.OrdinalIgnoreCase)
-
-            .Replace(
-                "{RYCRAFT_PLAYER_NAMES}",
-                _rycraftPlayerNames,
-                StringComparison.OrdinalIgnoreCase)
-
-            .Replace(
-                "{TAPO_STATUS}",
-                _tapoStatus,
-                StringComparison.OrdinalIgnoreCase);
-
-            lblTextTicker.Text = message;
-
-            //
-            // Resize label to fit this particular message.
-            //
-            Size preferredSize = TextRenderer.MeasureText(
-                lblTextTicker.Text,
-                lblTextTicker.Font);
-
-            lblTextTicker.Size = new Size(
-                preferredSize.Width + 10,
-                panel1.ClientSize.Height);
-
-            //
-            // Begin just beyond the right edge of the ticker.
-            //
-            _scrollX =
-                panel1.ClientSize.Width + MessageGap;
-
-            lblTextTicker.Location = new Point(
-                _scrollX,
-                0);
+            ResetScrollClock();
+            panel1.Invalidate();
+            panel1.Update();
         }
 
-        private void ScrollTimer_Tick(
-            object? sender,
-            EventArgs e)
+        private void StartAnimation()
         {
-            if (_messages.Count == 0)
+            if (_animationRunning || IsDisposed)
                 return;
 
-            _scrollX -= ScrollSpeed;
+            _animationRunning = true;
+            ResetScrollClock();
+            _animationTimer.Change(0, AnimationPulseMilliseconds);
+        }
 
-            lblTextTicker.Left = _scrollX;
+        private void StopAnimation()
+        {
+            if (!_animationRunning)
+                return;
 
-            //
-            // Has the entire message left the screen?
-            //
-            if (lblTextTicker.Right < 0)
+            _animationRunning = false;
+            _animationTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            Interlocked.Exchange(ref _animationFramePending, 0);
+        }
+
+        private void AnimationTimerCallback(object? state)
+        {
+            if (!_animationRunning ||
+                IsDisposed ||
+                Disposing ||
+                !IsHandleCreated)
             {
-                _currentMessageIndex++;
+                return;
+            }
 
-                if (_currentMessageIndex >= _messages.Count)
-                    _currentMessageIndex = 0;
+            if (Interlocked.Exchange(ref _animationFramePending, 1) != 0)
+                return;
 
-                ShowCurrentMessage();
+            try
+            {
+                BeginInvoke(new Action(RenderAnimationFrame));
+            }
+            catch (ObjectDisposedException)
+            {
+                Interlocked.Exchange(ref _animationFramePending, 0);
+            }
+            catch (InvalidOperationException)
+            {
+                Interlocked.Exchange(ref _animationFramePending, 0);
             }
         }
 
-        private void ReloadTimer_Tick(
-            object? sender,
-            EventArgs e)
+        private void RenderAnimationFrame()
+        {
+            try
+            {
+                if (!_animationRunning ||
+                    IsDisposed ||
+                    _messages.Count == 0)
+                {
+                    return;
+                }
+
+                double now = _scrollClock.Elapsed.TotalSeconds;
+                double elapsed = Math.Clamp(
+                    now - _lastScrollSeconds,
+                    0.0,
+                    0.050);
+
+                _lastScrollSeconds = now;
+                _scrollX -= ScrollPixelsPerSecond * elapsed;
+
+                panel1.Invalidate();
+                panel1.Update();
+
+                if (_scrollX + _messageWidth < 0)
+                {
+                    _currentMessageIndex =
+                        (_currentMessageIndex + 1) % _messages.Count;
+
+                    ShowCurrentMessage();
+                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _animationFramePending, 0);
+            }
+        }
+
+        private void panel1_Paint(object? sender, PaintEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_renderedMessage))
+                return;
+
+            e.Graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+
+            using SolidBrush brush = new(lblTextTicker.ForeColor);
+            using StringFormat format =
+                new(StringFormat.GenericTypographic)
+                {
+                    LineAlignment = StringAlignment.Center,
+                    Alignment = StringAlignment.Near,
+                    FormatFlags = StringFormatFlags.NoWrap
+                };
+
+            e.Graphics.DrawString(
+                _renderedMessage,
+                lblTextTicker.Font,
+                brush,
+                new RectangleF(
+                    (float)_scrollX,
+                    0,
+                    Math.Max(_messageWidth, 1f),
+                    panel1.ClientSize.Height),
+                format);
+        }
+
+        private void panel1_Resize(object? sender, EventArgs e) =>
+            panel1.Invalidate();
+
+        private void ResetScrollClock()
+        {
+            _scrollClock.Restart();
+            _lastScrollSeconds = 0;
+        }
+
+        private void ReloadTimer_Tick(object? sender, EventArgs e)
         {
             LoadTickerMessages();
 
-            if (_messages.Count > 0 &&
-                !_scrollTimer.Enabled)
+            if (_messages.Count > 0 && !_animationRunning)
             {
                 ShowCurrentMessage();
-                _scrollTimer.Start();
+                StartAnimation();
             }
 
             if (_messages.Count == 0)
+                StopAnimation();
+        }
+
+        private void ctrlTicker_Disposed(object? sender, EventArgs e)
+        {
+            StopAnimation();
+
+            _reloadTimer.Stop();
+            _statusTimer.Stop();
+            _weatherTimer.Stop();
+
+            _animationTimer.Dispose();
+            _reloadTimer.Dispose();
+            _statusTimer.Dispose();
+            _weatherTimer.Dispose();
+
+            _scrollClock.Stop();
+
+            if (_timerResolutionRequested)
             {
-                _scrollTimer.Stop();
+                TimeEndPeriod(TimerResolutionMilliseconds);
+                _timerResolutionRequested = false;
             }
         }
 
-        private void ctrlTicker_Disposed(
-    object? sender,
-    EventArgs e)
+        private async Task UpdateForecastsAsync()
         {
-            _scrollTimer.Stop();
-            _reloadTimer.Stop();
-            _statusTimer.Stop();
+            if (_weatherUpdating)
+                return;
 
-            _scrollTimer.Dispose();
-            _reloadTimer.Dispose();
-            _statusTimer.Dispose();
+            _weatherUpdating = true;
+
+            try
+            {
+                Task<string> princetonTask = GetForecastAsync(Princeton);
+                Task<string> baileyvilleTask = GetForecastAsync(Baileyville);
+                Task<string> calaisTask = GetForecastAsync(Calais);
+
+                await Task.WhenAll(
+                    princetonTask,
+                    baileyvilleTask,
+                    calaisTask);
+
+                _princetonForecast = princetonTask.Result;
+                _baileyvilleForecast = baileyvilleTask.Result;
+                _calaisForecast = calaisTask.Result;
+
+                Debug.WriteLine($"Ticker forecast: {_princetonForecast}");
+                Debug.WriteLine($"Ticker forecast: {_baileyvilleForecast}");
+                Debug.WriteLine($"Ticker forecast: {_calaisForecast}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ticker weather update failed: {ex}");
+
+                const string unavailable =
+                    "Weather is temporarily unavailable | Source: Open-Meteo";
+
+                _princetonForecast = $"Princeton, ME: {unavailable}";
+                _baileyvilleForecast = $"Baileyville, ME: {unavailable}";
+                _calaisForecast = $"Calais, ME: {unavailable}";
+            }
+            finally
+            {
+                _weatherUpdating = false;
+            }
         }
+
+        private static async Task<string> GetForecastAsync(
+            WeatherLocation location)
+        {
+            string url =
+                "https://api.open-meteo.com/v1/forecast" +
+                $"?latitude={location.Latitude}" +
+                $"&longitude={location.Longitude}" +
+                "&current=temperature_2m,weather_code" +
+                "&hourly=weather_code" +
+                "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+                "&temperature_unit=fahrenheit" +
+                "&timezone=America%2FNew_York" +
+                "&forecast_days=2";
+
+            string json = await _httpClient.GetStringAsync(url);
+
+            using JsonDocument document = JsonDocument.Parse(json);
+
+            JsonElement root = document.RootElement;
+            JsonElement current = root.GetProperty("current");
+            JsonElement daily = root.GetProperty("daily");
+            JsonElement hourly = root.GetProperty("hourly");
+
+            double currentTemperature =
+                current.GetProperty("temperature_2m").GetDouble();
+
+            int currentWeatherCode =
+                current.GetProperty("weather_code").GetInt32();
+
+            int todayWeatherCode =
+                daily.GetProperty("weather_code")[0].GetInt32();
+
+            double todayHigh =
+                daily.GetProperty("temperature_2m_max")[0].GetDouble();
+
+            JsonElement lows =
+                daily.GetProperty("temperature_2m_min");
+
+            double tonightLow = lows.GetArrayLength() > 1
+                ? lows[1].GetDouble()
+                : lows[0].GetDouble();
+
+            string todayDate =
+                daily.GetProperty("time")[0].GetString() ??
+                DateTime.Now.ToString("yyyy-MM-dd");
+
+            int tonightWeatherCode =
+                GetTonightWeatherCode(
+                    hourly,
+                    todayDate,
+                    todayWeatherCode);
+
+            return
+                $"Currently in {location.Name}: " +
+                $"{GetWeatherDescription(currentWeatherCode)}, " +
+                $"{Math.Round(currentTemperature):0}°F | " +
+                $"Today's Forecast: {GetWeatherDescription(todayWeatherCode)}, " +
+                $"High: {Math.Round(todayHigh):0}°F | " +
+                $"Tonight: {GetWeatherDescription(tonightWeatherCode)}, " +
+                $"Low: {Math.Round(tonightLow):0}°F | " +
+                "Source: Open-Meteo";
+        }
+
+        private static int GetTonightWeatherCode(
+            JsonElement hourly,
+            string todayDate,
+            int fallbackCode)
+        {
+            JsonElement times = hourly.GetProperty("time");
+            JsonElement codes = hourly.GetProperty("weather_code");
+
+            DateTime today = DateTime.Parse(todayDate);
+            DateTime windowStart = today.Date.AddHours(18);
+            DateTime windowEnd = today.Date.AddDays(1).AddHours(6);
+
+            int selectedCode = fallbackCode;
+            int selectedSeverity = -1;
+
+            for (int i = 0; i < times.GetArrayLength(); i++)
+            {
+                string? timeText = times[i].GetString();
+
+                if (timeText == null ||
+                    !DateTime.TryParse(timeText, out DateTime time))
+                {
+                    continue;
+                }
+
+                if (time < windowStart || time >= windowEnd)
+                    continue;
+
+                int code = codes[i].GetInt32();
+                int severity = GetWeatherSeverity(code);
+
+                if (severity > selectedSeverity)
+                {
+                    selectedCode = code;
+                    selectedSeverity = severity;
+                }
+            }
+
+            return selectedCode;
+        }
+
+        private static int GetWeatherSeverity(int code) => code switch
+        {
+            96 or 99 => 100,
+            95 => 95,
+            82 => 90,
+            86 => 88,
+            75 => 86,
+            65 => 84,
+            67 => 82,
+            81 => 80,
+            73 => 78,
+            63 => 76,
+            66 => 74,
+            85 => 72,
+            80 => 70,
+            71 => 68,
+            57 => 66,
+            55 => 64,
+            56 => 62,
+            53 => 60,
+            61 => 58,
+            51 => 56,
+            77 => 54,
+            45 or 48 => 40,
+            3 => 30,
+            2 => 20,
+            1 => 10,
+            _ => 0
+        };
+
+        private static string GetWeatherDescription(int code) => code switch
+        {
+            0 => "Clear Skies",
+            1 => "Mostly Clear",
+            2 => "Partly Cloudy",
+            3 => "Cloudy",
+            45 or 48 => "Foggy",
+            51 => "Light Drizzle",
+            53 => "Drizzle",
+            55 => "Heavy Drizzle",
+            56 or 57 => "Freezing Drizzle",
+            61 => "Light Rain",
+            63 => "Rain",
+            65 => "Heavy Rain",
+            66 or 67 => "Freezing Rain",
+            71 => "Light Snow",
+            73 => "Snow",
+            75 => "Heavy Snow",
+            77 => "Snow Grains",
+            80 => "Light Showers",
+            81 => "Showers",
+            82 => "Heavy Showers",
+            85 => "Snow Showers",
+            86 => "Heavy Snow Showers",
+            95 => "Thunderstorms",
+            96 or 99 => "Severe Thunderstorms",
+            _ => "Unknown Conditions"
+        };
+
+        private async void WeatherTimer_Tick(object? sender, EventArgs e)
+        {
+            _weatherTimer.Stop();
+
+            try
+            {
+                await UpdateForecastsAsync();
+            }
+            finally
+            {
+                if (!IsDisposed)
+                    _weatherTimer.Start();
+            }
+        }
+
+        private readonly record struct WeatherLocation(
+            string Name,
+            double Latitude,
+            double Longitude);
 
         private void LoadStatusConfiguration()
         {
-            //
-            // Rycraft
-            //
             try
             {
-                if (File.Exists(StatusConfigPath))
+                if (!File.Exists(StatusConfigPath))
+                    return;
+
+                foreach (string rawLine in File.ReadAllLines(StatusConfigPath))
                 {
-                    foreach (string rawLine in File.ReadAllLines(StatusConfigPath))
+                    string line = rawLine.Trim();
+
+                    if (string.IsNullOrWhiteSpace(line) ||
+                        line.StartsWith("#"))
                     {
-                        string line = rawLine.Trim();
-
-                        if (string.IsNullOrWhiteSpace(line) ||
-                            line.StartsWith("#"))
-                        {
-                            continue;
-                        }
-
-                        int separator = line.IndexOf('=');
-
-                        if (separator <= 0)
-                            continue;
-
-                        string key =
-                            line[..separator].Trim().ToLowerInvariant();
-
-                        string value =
-                            line[(separator + 1)..].Trim();
-
-                        switch (key)
-                        {
-                            case "rycraft_host":
-                                _rycraftHost = value;
-                                break;
-
-                            case "rycraft_port":
-                                if (int.TryParse(value, out int port))
-                                    _rycraftPort = port;
-                                break;
-
-                            case "rycraft_local_host":
-                                _rycraftLocalHost = value;
-                                break;
-
-                            case "rycraft_local_port":
-                                if (int.TryParse(value, out int localPort))
-                                    _rycraftLocalPort = localPort;
-                                break;
-
-                            case "rycraft_rcon_host":
-                                _rycraftRconHost = value;
-                                break;
-
-                            case "rycraft_rcon_port":
-                                if (int.TryParse(value, out int rconPort))
-                                    _rycraftRconPort = rconPort;
-                                break;
-
-                            case "rycraft_rcon_password":
-                                _rycraftRconPassword = value;
-                                break;
-                        }
+                        continue;
                     }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(
-                    $"Unable to load status.conf: {ex}");
-            }
 
-            //
-            // Tapo IP comes from our existing camera.conf.
-            //
-            try
-            {
-                if (File.Exists(CameraConfigPath))
-                {
-                    foreach (string rawLine in File.ReadAllLines(CameraConfigPath))
+                    int separator = line.IndexOf('=');
+                    if (separator <= 0)
+                        continue;
+
+                    string key = line[..separator]
+                        .Trim()
+                        .ToLowerInvariant();
+
+                    string value = line[(separator + 1)..].Trim();
+
+                    switch (key)
                     {
-                        string line = rawLine.Trim();
-
-                        if (string.IsNullOrWhiteSpace(line) ||
-                            line.StartsWith("#"))
-                        {
-                            continue;
-                        }
-
-                        int separator = line.IndexOf('=');
-
-                        if (separator <= 0)
-                            continue;
-
-                        string key =
-                            line[..separator].Trim().ToLowerInvariant();
-
-                        string value =
-                            line[(separator + 1)..].Trim();
-
-                        if (key == "ip")
-                        {
-                            _tapoHost = value;
+                        case "rycraft_host":
+                            _rycraftHost = value;
                             break;
-                        }
+
+                        case "rycraft_port":
+                            if (int.TryParse(value, out int port))
+                                _rycraftPort = port;
+                            break;
+
+                        case "rycraft_local_host":
+                            _rycraftLocalHost = value;
+                            break;
+
+                        case "rycraft_local_port":
+                            if (int.TryParse(value, out int localPort))
+                                _rycraftLocalPort = localPort;
+                            break;
+
+                        case "rycraft_rcon_host":
+                            _rycraftRconHost = value;
+                            break;
+
+                        case "rycraft_rcon_port":
+                            if (int.TryParse(value, out int rconPort))
+                                _rycraftRconPort = rconPort;
+                            break;
+
+                        case "rycraft_rcon_password":
+                            _rycraftRconPassword = value;
+                            break;
                     }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"Unable to read camera address: {ex}");
+                Debug.WriteLine($"Unable to load status.conf: {ex}");
             }
         }
 
         private static async Task<bool> IsTcpServiceOnlineAsync(
-    string host,
-    int port,
-    int timeoutMilliseconds = 2500)
+            string host,
+            int port,
+            int timeoutMilliseconds = 2500)
         {
             if (string.IsNullOrWhiteSpace(host))
                 return false;
 
             try
             {
-                using TcpClient client = new TcpClient();
-
+                using TcpClient client = new();
                 using CancellationTokenSource timeout =
-                    new CancellationTokenSource(timeoutMilliseconds);
+                    new(timeoutMilliseconds);
 
                 await client.ConnectAsync(
                     host,
@@ -442,18 +747,28 @@ namespace InfoDisplayApp.Properties
             }
         }
 
+        private static async Task<bool> IsHostReachableByPingAsync(
+            string host,
+            int timeoutMilliseconds = CameraPingTimeoutMilliseconds)
+        {
+            try
+            {
+                using Ping ping = new();
+                PingReply reply = await ping.SendPingAsync(
+                    host,
+                    timeoutMilliseconds);
+
+                return reply.Status == IPStatus.Success;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ping failed for {host}: {ex.Message}");
+                return false;
+            }
+        }
+
         private async Task UpdateRycraftStatusAsync()
         {
-            //
-            // Two independent checks:
-            //
-            // 1. Public Playit.gg endpoint:
-            //    tells us whether outside players can reach Rycraft.
-            //
-            // 2. Local/LAN Minecraft endpoint:
-            //    retrieves the actual Server List Ping data and player count.
-            //
-
             Task<bool> publicEndpointCheck =
                 IsTcpServiceOnlineAsync(
                     _rycraftHost,
@@ -475,14 +790,13 @@ namespace InfoDisplayApp.Properties
             string? rconPlayerNames = rconPlayerListCheck.Result;
             bool localOnline = localStatus?.ServerUp == true;
 
+            _rycraftPlayerNames =
+                rconPlayerNames ?? "Unavailable";
+
             if (rconPlayerNames != null)
             {
-                _rycraftPlayerNames = rconPlayerNames;
-                Debug.WriteLine($"Rycraft RCON players: {_rycraftPlayerNames}");
-            }
-            else
-            {
-                _rycraftPlayerNames = "Unavailable";
+                Debug.WriteLine(
+                    $"Rycraft RCON players: {_rycraftPlayerNames}");
             }
 
             if (localOnline)
@@ -505,14 +819,9 @@ namespace InfoDisplayApp.Properties
                     $"Rycraft local Minecraft status: Online - " +
                     $"{_rycraftPlayersOnline}/{_rycraftPlayersMax} players");
 
-                Debug.WriteLine(
-                    $"Rycraft version: {localStatus.Version}");
-
-                Debug.WriteLine(
-                    $"Rycraft latency: {localStatus.Latency} ms");
-
-                Debug.WriteLine(
-                    $"Rycraft protocol: {localStatus.Protocol}");
+                Debug.WriteLine($"Rycraft version: {localStatus.Version}");
+                Debug.WriteLine($"Rycraft latency: {localStatus.Latency} ms");
+                Debug.WriteLine($"Rycraft protocol: {localStatus.Protocol}");
             }
             else
             {
@@ -523,23 +832,14 @@ namespace InfoDisplayApp.Properties
                     "Rycraft local Minecraft status could not be retrieved.");
             }
 
-            if (publicOnline && localOnline)
-            {
-                _rycraftStatus = "Online";
-            }
-            else if (!publicOnline && localOnline)
-            {
-                _rycraftStatus = "Tunnel Offline";
-            }
-            else if (publicOnline && !localOnline)
-            {
-                // Public endpoint is reachable, but local status data is unavailable.
-                _rycraftStatus = "Online";
-            }
-            else
-            {
-                _rycraftStatus = "Offline";
-            }
+            _rycraftStatus =
+                publicOnline && localOnline
+                    ? "Online"
+                    : !publicOnline && localOnline
+                        ? "Tunnel Offline"
+                        : publicOnline
+                            ? "Online"
+                            : "Offline";
 
             Debug.WriteLine(
                 $"Rycraft public endpoint: " +
@@ -587,17 +887,16 @@ namespace InfoDisplayApp.Properties
             {
                 Debug.WriteLine(
                     "Rycraft RCON is not configured. " +
-                    "Add rycraft_rcon_password (and optionally host/port) to status.conf.");
+                    "Add rycraft_rcon_password " +
+                    "(and optionally host/port) to status.conf.");
 
                 return null;
             }
 
             try
             {
-                using TcpClient client = new TcpClient();
-
-                using CancellationTokenSource timeout =
-                    new CancellationTokenSource(3000);
+                using TcpClient client = new();
+                using CancellationTokenSource timeout = new(3000);
 
                 await client.ConnectAsync(
                     host,
@@ -607,6 +906,7 @@ namespace InfoDisplayApp.Properties
                 using NetworkStream stream = client.GetStream();
 
                 const int authRequestId = 1001;
+
                 await SendRconPacketAsync(
                     stream,
                     authRequestId,
@@ -628,6 +928,7 @@ namespace InfoDisplayApp.Properties
                 }
 
                 const int commandRequestId = 1002;
+
                 await SendRconPacketAsync(
                     stream,
                     commandRequestId,
@@ -640,8 +941,7 @@ namespace InfoDisplayApp.Properties
                         stream,
                         timeout.Token);
 
-                string response =
-                    commandResponse.Payload.Trim();
+                string response = commandResponse.Payload.Trim();
 
                 Debug.WriteLine(
                     $"Rycraft RCON list response: {response}");
@@ -663,17 +963,14 @@ namespace InfoDisplayApp.Properties
                 return "None";
 
             int colon = response.IndexOf(':');
-
             if (colon < 0)
                 return "None";
 
-            string names =
-                response[(colon + 1)..].Trim();
+            string names = response[(colon + 1)..].Trim();
 
-            if (string.IsNullOrWhiteSpace(names))
-                return "None";
-
-            return names;
+            return string.IsNullOrWhiteSpace(names)
+                ? "None"
+                : names;
         }
 
         private static async Task SendRconPacketAsync(
@@ -683,29 +980,15 @@ namespace InfoDisplayApp.Properties
             string payload,
             CancellationToken cancellationToken)
         {
-            byte[] payloadBytes =
-                Encoding.UTF8.GetBytes(payload);
+            byte[] payloadBytes = Encoding.UTF8.GetBytes(payload);
+            int packetLength = 4 + 4 + payloadBytes.Length + 2;
+            byte[] packet = new byte[4 + packetLength];
 
-            int packetLength =
-                4 + 4 + payloadBytes.Length + 2;
+            BitConverter.GetBytes(packetLength).CopyTo(packet, 0);
+            BitConverter.GetBytes(requestId).CopyTo(packet, 4);
+            BitConverter.GetBytes(type).CopyTo(packet, 8);
+            payloadBytes.CopyTo(packet, 12);
 
-            byte[] packet =
-                new byte[4 + packetLength];
-
-            BitConverter.GetBytes(packetLength)
-                .CopyTo(packet, 0);
-
-            BitConverter.GetBytes(requestId)
-                .CopyTo(packet, 4);
-
-            BitConverter.GetBytes(type)
-                .CopyTo(packet, 8);
-
-            payloadBytes.CopyTo(
-                packet,
-                12);
-
-            // Last two bytes are the required NUL terminators.
             packet[^2] = 0;
             packet[^1] = 0;
 
@@ -718,50 +1001,32 @@ namespace InfoDisplayApp.Properties
             NetworkStream stream,
             CancellationToken cancellationToken)
         {
-            byte[] lengthBytes =
-                await ReadExactlyAsync(
-                    stream,
-                    4,
-                    cancellationToken);
+            byte[] lengthBytes = await ReadExactlyAsync(
+                stream,
+                4,
+                cancellationToken);
 
-            int length =
-                BitConverter.ToInt32(
-                    lengthBytes,
-                    0);
+            int length = BitConverter.ToInt32(lengthBytes, 0);
 
-            if (length < 10 ||
-                length > 1024 * 1024)
+            if (length < 10 || length > 1024 * 1024)
             {
                 throw new IOException(
                     $"Invalid RCON packet length: {length}");
             }
 
-            byte[] body =
-                await ReadExactlyAsync(
-                    stream,
-                    length,
-                    cancellationToken);
+            byte[] body = await ReadExactlyAsync(
+                stream,
+                length,
+                cancellationToken);
 
-            int requestId =
-                BitConverter.ToInt32(
-                    body,
-                    0);
+            int requestId = BitConverter.ToInt32(body, 0);
+            int type = BitConverter.ToInt32(body, 4);
+            int payloadLength = Math.Max(0, length - 10);
 
-            int type =
-                BitConverter.ToInt32(
-                    body,
-                    4);
-
-            int payloadLength =
-                Math.Max(
-                    0,
-                    length - 10);
-
-            string payload =
-                Encoding.UTF8.GetString(
-                    body,
-                    8,
-                    payloadLength);
+            string payload = Encoding.UTF8.GetString(
+                body,
+                8,
+                payloadLength);
 
             return new RconPacket(
                 requestId,
@@ -774,19 +1039,14 @@ namespace InfoDisplayApp.Properties
             int count,
             CancellationToken cancellationToken)
         {
-            byte[] buffer =
-                new byte[count];
-
+            byte[] buffer = new byte[count];
             int offset = 0;
 
             while (offset < count)
             {
-                int read =
-                    await stream.ReadAsync(
-                        buffer.AsMemory(
-                            offset,
-                            count - offset),
-                        cancellationToken);
+                int read = await stream.ReadAsync(
+                    buffer.AsMemory(offset, count - offset),
+                    cancellationToken);
 
                 if (read == 0)
                 {
@@ -807,30 +1067,43 @@ namespace InfoDisplayApp.Properties
 
         private async Task UpdateStatusesAsync()
         {
-            Task rycraftCheck =
-                UpdateRycraftStatusAsync();
-
-            Task<bool> tapoCheck =
-                IsTcpServiceOnlineAsync(
-                    _tapoHost,
-                    TapoRtspPort);
+            Task rycraftCheck = UpdateRycraftStatusAsync();
+            Task<bool> cheddarCheck =
+                IsHostReachableByPingAsync(CheddarCameraIp);
+            Task<bool> denCheck =
+                IsHostReachableByPingAsync(DenCameraIp);
+            Task<bool> doorbellCheck =
+                IsHostReachableByPingAsync(DoorbellCameraIp);
 
             await Task.WhenAll(
                 rycraftCheck,
-                tapoCheck);
+                cheddarCheck,
+                denCheck,
+                doorbellCheck);
+
+            string cheddarStatus =
+                cheddarCheck.Result ? "Online" : "Offline";
+            string denStatus =
+                denCheck.Result ? "Online" : "Offline";
+            string doorbellStatus =
+                doorbellCheck.Result ? "Online" : "Offline, Possibly Asleep";
 
             _tapoStatus =
-                tapoCheck.Result
-                    ? "Online"
-                    : "Offline";
+                $"Cheddar Camera (Backyard): {cheddarStatus} | " +
+                $"Den Camera (Office): {denStatus} | " +
+                $"Doorbell Camera (Front Door): {doorbellStatus}";
 
             Debug.WriteLine(
-                $"Tapo: {_tapoStatus}");
+                $"Tapo Cheddar Camera ({CheddarCameraIp}): {cheddarStatus}");
+            Debug.WriteLine(
+                $"Tapo Den Camera ({DenCameraIp}): {denStatus}");
+            Debug.WriteLine(
+                $"Tapo Doorbell Camera ({DoorbellCameraIp}): {doorbellStatus}");
         }
 
         private async void StatusTimer_Tick(
-    object? sender,
-    EventArgs e)
+            object? sender,
+            EventArgs e)
         {
             _statusTimer.Stop();
 
@@ -840,7 +1113,8 @@ namespace InfoDisplayApp.Properties
             }
             finally
             {
-                _statusTimer.Start();
+                if (!IsDisposed)
+                    _statusTimer.Start();
             }
         }
     }
