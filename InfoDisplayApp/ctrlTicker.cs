@@ -96,10 +96,7 @@ namespace InfoDisplayApp.Properties
             catch (Exception ex) { Debug.WriteLine($"Unable to load ticker.txt: {ex}"); }
         }
 
-        private void ClearTicker()
-        {
-            _messages.Clear(); _renderedMessage = ""; StopAnimation(); panel1.Invalidate(); panel1.Update();
-        }
+        private void ClearTicker() { _messages.Clear(); _renderedMessage = ""; StopAnimation(); panel1.Invalidate(); panel1.Update(); }
 
         private void ShowCurrentMessage()
         {
@@ -119,17 +116,8 @@ namespace InfoDisplayApp.Properties
             ResetScrollClock(); panel1.Invalidate(); panel1.Update();
         }
 
-        private void StartAnimation()
-        {
-            if (_animationRunning || IsDisposed) return;
-            _animationRunning = true; ResetScrollClock(); _animationTimer.Change(0, AnimationPulseMilliseconds);
-        }
-
-        private void StopAnimation()
-        {
-            if (!_animationRunning) return;
-            _animationRunning = false; _animationTimer.Change(Timeout.Infinite, Timeout.Infinite); Interlocked.Exchange(ref _animationFramePending, 0);
-        }
+        private void StartAnimation() { if (_animationRunning || IsDisposed) return; _animationRunning = true; ResetScrollClock(); _animationTimer.Change(0, AnimationPulseMilliseconds); }
+        private void StopAnimation() { if (!_animationRunning) return; _animationRunning = false; _animationTimer.Change(Timeout.Infinite, Timeout.Infinite); Interlocked.Exchange(ref _animationFramePending, 0); }
 
         private void AnimationTimerCallback(object? state)
         {
@@ -166,13 +154,7 @@ namespace InfoDisplayApp.Properties
 
         private void panel1_Resize(object? sender, EventArgs e) => panel1.Invalidate();
         private void ResetScrollClock() { _scrollClock.Restart(); _lastScrollSeconds = 0; }
-
-        private void ReloadTimer_Tick(object? sender, EventArgs e)
-        {
-            LoadTickerMessages();
-            if (_messages.Count > 0 && !_animationRunning) { ShowCurrentMessage(); StartAnimation(); }
-            if (_messages.Count == 0) StopAnimation();
-        }
+        private void ReloadTimer_Tick(object? sender, EventArgs e) { LoadTickerMessages(); if (_messages.Count > 0 && !_animationRunning) { ShowCurrentMessage(); StartAnimation(); } if (_messages.Count == 0) StopAnimation(); }
 
         private void ctrlTicker_Disposed(object? sender, EventArgs e)
         {
