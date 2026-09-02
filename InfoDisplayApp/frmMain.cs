@@ -4,9 +4,8 @@ namespace InfoDisplayApp
 {
     public partial class frmMain : Form
     {
-        private ctrlPhiloWebView? _philoView;
         private ctrlCameras? _cameraView;
-        private ctrlYouTubeWebView? _youtubeView;
+        private ExternalBrowserController? _browserController;
         private ctrlAppsPanel? _appsPanel;
 
         private readonly Random _random = new Random();
@@ -45,6 +44,8 @@ namespace InfoDisplayApp
             pboxAppsIcon.MouseEnter += pnlBtnApps_MouseEnter;
             pboxAppsIcon.MouseLeave += pnlBtnApps_MouseLeave;
             pboxAppsIcon.Click += pnlBtnApps_Click;
+
+            FormClosed += frmMain_FormClosed;
         }
 
         private Color RandomColor()
@@ -103,27 +104,8 @@ namespace InfoDisplayApp
             }
         }
 
-        private void frmMain_Load(object sender, EventArgs e)
+        private async void frmMain_Load(object sender, EventArgs e)
         {
-            // -----------------------------
-            // EAS TEXT TICKER - WIP
-            // -----------------------------
-            //ctrlEmergencyTicker ctrlEmergencyTicker = new ctrlEmergencyTicker();
-            //pnlTicker.Controls.Add(ctrlEmergencyTicker);
-            //ctrlEmergencyTicker.Dock = DockStyle.Fill;
-
-            // -----------------------------
-            // PHILO
-            // -----------------------------
-
-            _philoView = new ctrlPhiloWebView
-            {
-                Dock = DockStyle.Fill,
-                Visible = true
-            };
-
-            pnlTV.Controls.Add(_philoView);
-
             // -----------------------------
             // CAMERA
             // -----------------------------
@@ -137,18 +119,26 @@ namespace InfoDisplayApp
             pnlTV.Controls.Add(_cameraView);
 
             // -----------------------------
-            // YOUTUBE
+            // EXTERNAL BROWSER VIEWERS
             // -----------------------------
+            // Philo and YouTube run in separate normal Edge app windows. They
+            // are positioned over pnlTV and controlled through localhost CDP.
+            // This keeps DRM/video playback out of WebView2's embedded media
+            // pipeline while retaining instant source switching.
 
-            _youtubeView = new ctrlYouTubeWebView
+            _browserController = new ExternalBrowserController(this, pnlTV);
+
+            try
             {
-                Dock = DockStyle.Fill,
-                Visible = false
-            };
-
-            pnlTV.Controls.Add(_youtubeView);
-
-            _philoView.BringToFront();
+                await _browserController.InitializeAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"External browser viewer initialization failed: {ex}");
+                AppMessages.Error(
+                    "Philo/YouTube browser viewer could not be started.",
+                    ex);
+            }
 
             // -----------------------------
             // DATE / TIME
@@ -194,40 +184,48 @@ namespace InfoDisplayApp
             UpdateModeButtons(true);
         }
 
-        public void ShowPhiloMode()
+        public async void ShowPhiloMode()
         {
-            if (_philoView == null || _cameraView == null)
+            if (_cameraView == null || _browserController == null)
                 return;
 
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
             _cameraView.Visible = false;
-            _youtubeView?.SetMuted(true);
-            if (_youtubeView != null)
-                _youtubeView.Visible = false;
 
-            _philoView.SetMuted(false);
-            _philoView.Visible = true;
-            _philoView.BringToFront();
+            try
+            {
+                await _browserController.ShowPhiloAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to switch to Philo: {ex}");
+                AppMessages.Error("Unable to switch to Philo.", ex);
+            }
+
             pnlApps.Hide();
-
             UpdateModeButtons(true);
         }
 
-        public void ShowCameraMode()
+        public async void ShowCameraMode()
         {
-            if (_philoView == null || _cameraView == null)
+            if (_cameraView == null)
                 return;
 
-            _philoView.Visible = false;
-            _philoView.SetMuted(true);
-            _youtubeView?.SetMuted(true);
-            if (_youtubeView != null)
-                _youtubeView.Visible = false;
+            if (_browserController != null)
+            {
+                try
+                {
+                    await _browserController.HideAllAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Unable to hide browser viewers: {ex.Message}");
+                }
+            }
 
             _cameraView.Visible = true;
             _cameraView.BringToFront();
-
             _cameraView.SetMuted(false);
             _cameraView.StartCamera();
             pnlApps.Hide();
@@ -235,21 +233,26 @@ namespace InfoDisplayApp
             UpdateModeButtons(false);
         }
 
-        public void ShowYouTubeMode()
+        public async void ShowYouTubeMode()
         {
-            if (_youtubeView == null || _cameraView == null || _philoView == null)
+            if (_cameraView == null || _browserController == null)
                 return;
 
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
             _cameraView.Visible = false;
-            _philoView.SetMuted(true);
 
-            _youtubeView.Visible = true;
-            _youtubeView.SetMuted(false);
-            _youtubeView.BringToFront();
+            try
+            {
+                await _browserController.ShowYouTubeAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to switch to YouTube: {ex}");
+                AppMessages.Error("Unable to switch to YouTube.", ex);
+            }
+
             pnlApps.Hide();
-
             UpdateModeButtons(true);
         }
 
@@ -287,6 +290,12 @@ namespace InfoDisplayApp
         {
             pnlBtnApps.BackgroundImage = Resources.glass;
             pboxAppsIcon.Image = Resources.controls_icn;
+        }
+
+        private void frmMain_FormClosed(object? sender, FormClosedEventArgs e)
+        {
+            _browserController?.Dispose();
+            _browserController = null;
         }
     }
 }
