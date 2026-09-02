@@ -20,16 +20,13 @@ namespace InfoDisplayApp.Properties
         private readonly System.Windows.Forms.Timer _reloadTimer;
         private readonly System.Windows.Forms.Timer _statusTimer;
         private readonly System.Threading.Timer _animationTimer;
-
         private int _animationFramePending;
         private bool _animationRunning;
         private bool _timerResolutionRequested;
-
         private string _rycraftStatus = "Checking...";
         private int _rycraftPlayersOnline;
         private int _rycraftPlayersMax;
         private string _tapoStatus = "Checking...";
-
         private string _rycraftHost = "";
         private int _rycraftPort = 25565;
         private string _rycraftLocalHost = "";
@@ -38,84 +35,50 @@ namespace InfoDisplayApp.Properties
         private int _rycraftRconPort = 25575;
         private string _rycraftRconPassword = "";
         private string _rycraftPlayerNames = "Unavailable";
-
         private string _tapoHost = "";
         private const int TapoRtspPort = 554;
-
-        private string StatusConfigPath =>
-            Path.Combine(AppContext.BaseDirectory, "status.conf");
-
-        private string CameraConfigPath =>
-            Path.Combine(AppContext.BaseDirectory, "camera.conf");
-
+        private string StatusConfigPath => Path.Combine(AppContext.BaseDirectory, "status.conf");
+        private string CameraConfigPath => Path.Combine(AppContext.BaseDirectory, "camera.conf");
         private readonly List<string> _messages = new();
         private int _currentMessageIndex;
-
         private readonly Stopwatch _scrollClock = new();
         private double _lastScrollSeconds;
         private double _scrollX;
         private float _messageWidth;
         private string _renderedMessage = "";
-
         private const double ScrollPixelsPerSecond = 240.0;
         private const int AnimationPulseMilliseconds = 8;
         private const int MessageGap = 50;
         private const uint TimerResolutionMilliseconds = 1;
-
-        private string TickerPath =>
-            Path.Combine(AppContext.BaseDirectory, "ticker.txt");
+        private string TickerPath => Path.Combine(AppContext.BaseDirectory, "ticker.txt");
 
         [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
         private static extern uint TimeBeginPeriod(uint period);
-
         [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
         private static extern uint TimeEndPeriod(uint period);
 
         public ctrlTicker()
         {
             InitializeComponent();
-
             lblTextTicker.Visible = false;
             panel1.Paint += panel1_Paint;
             panel1.Resize += panel1_Resize;
-
-            _animationTimer = new System.Threading.Timer(
-                AnimationTimerCallback,
-                null,
-                Timeout.Infinite,
-                Timeout.Infinite);
-
-            _reloadTimer = new System.Windows.Forms.Timer
-            {
-                Interval = 10_000
-            };
+            _animationTimer = new System.Threading.Timer(AnimationTimerCallback, null, Timeout.Infinite, Timeout.Infinite);
+            _reloadTimer = new System.Windows.Forms.Timer { Interval = 10_000 };
             _reloadTimer.Tick += ReloadTimer_Tick;
-
-            _statusTimer = new System.Windows.Forms.Timer
-            {
-                Interval = 30_000
-            };
+            _statusTimer = new System.Windows.Forms.Timer { Interval = 30_000 };
             _statusTimer.Tick += StatusTimer_Tick;
-
             Load += ctrlTicker_Load;
             Disposed += ctrlTicker_Disposed;
         }
 
         private async void ctrlTicker_Load(object? sender, EventArgs e)
         {
-            _timerResolutionRequested =
-                TimeBeginPeriod(TimerResolutionMilliseconds) == 0;
-
+            _timerResolutionRequested = TimeBeginPeriod(TimerResolutionMilliseconds) == 0;
             LoadStatusConfiguration();
             await UpdateStatusesAsync();
             LoadTickerMessages();
-
-            if (_messages.Count > 0)
-            {
-                ShowCurrentMessage();
-                StartAnimation();
-            }
-
+            if (_messages.Count > 0) { ShowCurrentMessage(); StartAnimation(); }
             _reloadTimer.Start();
             _statusTimer.Start();
         }
@@ -124,61 +87,24 @@ namespace InfoDisplayApp.Properties
         {
             try
             {
-                if (!File.Exists(TickerPath))
-                {
-                    Debug.WriteLine($"Ticker file not found: {TickerPath}");
-                    ClearTicker();
-                    return;
-                }
-
-                List<string> newMessages = File.ReadAllLines(TickerPath)
-                    .Select(line => line.Trim())
-                    .Where(line =>
-                        !string.IsNullOrWhiteSpace(line) &&
-                        !line.StartsWith("#"))
-                    .ToList();
-
-                if (newMessages.Count == 0)
-                {
-                    ClearTicker();
-                    return;
-                }
-
-                if (_messages.SequenceEqual(newMessages))
-                    return;
-
-                _messages.Clear();
-                _messages.AddRange(newMessages);
-                _currentMessageIndex = 0;
-                ShowCurrentMessage();
+                if (!File.Exists(TickerPath)) { Debug.WriteLine($"Ticker file not found: {TickerPath}"); ClearTicker(); return; }
+                List<string> newMessages = File.ReadAllLines(TickerPath).Select(line => line.Trim()).Where(line => !string.IsNullOrWhiteSpace(line) && !line.StartsWith("#")).ToList();
+                if (newMessages.Count == 0) { ClearTicker(); return; }
+                if (_messages.SequenceEqual(newMessages)) return;
+                _messages.Clear(); _messages.AddRange(newMessages); _currentMessageIndex = 0; ShowCurrentMessage();
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Unable to load ticker.txt: {ex}");
-            }
+            catch (Exception ex) { Debug.WriteLine($"Unable to load ticker.txt: {ex}"); }
         }
 
         private void ClearTicker()
         {
-            _messages.Clear();
-            _renderedMessage = "";
-            StopAnimation();
-            panel1.Invalidate();
-            panel1.Update();
+            _messages.Clear(); _renderedMessage = ""; StopAnimation(); panel1.Invalidate(); panel1.Update();
         }
 
         private void ShowCurrentMessage()
         {
-            if (_messages.Count == 0)
-            {
-                _renderedMessage = "";
-                panel1.Invalidate();
-                return;
-            }
-
-            if (_currentMessageIndex >= _messages.Count)
-                _currentMessageIndex = 0;
-
+            if (_messages.Count == 0) { _renderedMessage = ""; panel1.Invalidate(); return; }
+            if (_currentMessageIndex >= _messages.Count) _currentMessageIndex = 0;
             _renderedMessage = _messages[_currentMessageIndex]
                 .Replace("{RYCRAFT_STATUS}", _rycraftStatus, StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_PLAYERS}", _rycraftPlayersOnline >= 0 && _rycraftPlayersMax >= 0 ? $"{_rycraftPlayersOnline}/{_rycraftPlayersMax}" : "Unavailable", StringComparison.OrdinalIgnoreCase)
@@ -186,159 +112,72 @@ namespace InfoDisplayApp.Properties
                 .Replace("{RYCRAFT_MAX_PLAYERS}", _rycraftPlayersMax.ToString(), StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_PLAYER_NAMES}", _rycraftPlayerNames, StringComparison.OrdinalIgnoreCase)
                 .Replace("{TAPO_STATUS}", _tapoStatus, StringComparison.OrdinalIgnoreCase);
-
             using Graphics graphics = panel1.CreateGraphics();
             graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-
-            _messageWidth = graphics.MeasureString(
-                _renderedMessage,
-                lblTextTicker.Font,
-                int.MaxValue,
-                StringFormat.GenericTypographic).Width + 10f;
-
+            _messageWidth = graphics.MeasureString(_renderedMessage, lblTextTicker.Font, int.MaxValue, StringFormat.GenericTypographic).Width + 10f;
             _scrollX = panel1.ClientSize.Width + MessageGap;
-
-            ResetScrollClock();
-            panel1.Invalidate();
-            panel1.Update();
+            ResetScrollClock(); panel1.Invalidate(); panel1.Update();
         }
 
         private void StartAnimation()
         {
-            if (_animationRunning || IsDisposed)
-                return;
-
-            _animationRunning = true;
-            ResetScrollClock();
-            _animationTimer.Change(0, AnimationPulseMilliseconds);
+            if (_animationRunning || IsDisposed) return;
+            _animationRunning = true; ResetScrollClock(); _animationTimer.Change(0, AnimationPulseMilliseconds);
         }
 
         private void StopAnimation()
         {
-            if (!_animationRunning)
-                return;
-
-            _animationRunning = false;
-            _animationTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            Interlocked.Exchange(ref _animationFramePending, 0);
+            if (!_animationRunning) return;
+            _animationRunning = false; _animationTimer.Change(Timeout.Infinite, Timeout.Infinite); Interlocked.Exchange(ref _animationFramePending, 0);
         }
 
         private void AnimationTimerCallback(object? state)
         {
-            if (!_animationRunning || IsDisposed || Disposing || !IsHandleCreated)
-                return;
-
-            if (Interlocked.Exchange(ref _animationFramePending, 1) != 0)
-                return;
-
-            try
-            {
-                BeginInvoke(new Action(RenderAnimationFrame));
-            }
-            catch (InvalidOperationException)
-            {
-                Interlocked.Exchange(ref _animationFramePending, 0);
-            }
-            catch (ObjectDisposedException)
-            {
-                Interlocked.Exchange(ref _animationFramePending, 0);
-            }
+            if (!_animationRunning || IsDisposed || Disposing || !IsHandleCreated) return;
+            if (Interlocked.Exchange(ref _animationFramePending, 1) != 0) return;
+            try { BeginInvoke(new Action(RenderAnimationFrame)); }
+            catch (InvalidOperationException) { Interlocked.Exchange(ref _animationFramePending, 0); }
+            catch (ObjectDisposedException) { Interlocked.Exchange(ref _animationFramePending, 0); }
         }
 
         private void RenderAnimationFrame()
         {
             try
             {
-                if (!_animationRunning || IsDisposed || _messages.Count == 0)
-                    return;
-
+                if (!_animationRunning || IsDisposed || _messages.Count == 0) return;
                 double now = _scrollClock.Elapsed.TotalSeconds;
-                double elapsed = now - _lastScrollSeconds;
+                double elapsed = Math.Clamp(now - _lastScrollSeconds, 0.0, 0.050);
                 _lastScrollSeconds = now;
-
-                elapsed = Math.Clamp(elapsed, 0.0, 0.050);
                 _scrollX -= ScrollPixelsPerSecond * elapsed;
-
-                panel1.Invalidate();
-                panel1.Update();
-
-                if (_scrollX + _messageWidth < 0)
-                {
-                    _currentMessageIndex = (_currentMessageIndex + 1) % _messages.Count;
-                    ShowCurrentMessage();
-                }
+                panel1.Invalidate(); panel1.Update();
+                if (_scrollX + _messageWidth < 0) { _currentMessageIndex = (_currentMessageIndex + 1) % _messages.Count; ShowCurrentMessage(); }
             }
-            finally
-            {
-                Interlocked.Exchange(ref _animationFramePending, 0);
-            }
+            finally { Interlocked.Exchange(ref _animationFramePending, 0); }
         }
 
         private void panel1_Paint(object? sender, PaintEventArgs e)
         {
-            if (string.IsNullOrEmpty(_renderedMessage))
-                return;
-
+            if (string.IsNullOrEmpty(_renderedMessage)) return;
             e.Graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-
             using SolidBrush brush = new(lblTextTicker.ForeColor);
-            using StringFormat format = new(StringFormat.GenericTypographic)
-            {
-                LineAlignment = StringAlignment.Center,
-                Alignment = StringAlignment.Near,
-                FormatFlags = StringFormatFlags.NoWrap
-            };
-
-            e.Graphics.DrawString(
-                _renderedMessage,
-                lblTextTicker.Font,
-                brush,
-                new RectangleF(
-                    (float)_scrollX,
-                    0,
-                    Math.Max(_messageWidth, 1f),
-                    panel1.ClientSize.Height),
-                format);
+            using StringFormat format = new(StringFormat.GenericTypographic) { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Near, FormatFlags = StringFormatFlags.NoWrap };
+            e.Graphics.DrawString(_renderedMessage, lblTextTicker.Font, brush, new RectangleF((float)_scrollX, 0, Math.Max(_messageWidth, 1f), panel1.ClientSize.Height), format);
         }
 
         private void panel1_Resize(object? sender, EventArgs e) => panel1.Invalidate();
-
-        private void ResetScrollClock()
-        {
-            _scrollClock.Restart();
-            _lastScrollSeconds = 0;
-        }
+        private void ResetScrollClock() { _scrollClock.Restart(); _lastScrollSeconds = 0; }
 
         private void ReloadTimer_Tick(object? sender, EventArgs e)
         {
             LoadTickerMessages();
-
-            if (_messages.Count > 0 && !_animationRunning)
-            {
-                ShowCurrentMessage();
-                StartAnimation();
-            }
-
-            if (_messages.Count == 0)
-                StopAnimation();
+            if (_messages.Count > 0 && !_animationRunning) { ShowCurrentMessage(); StartAnimation(); }
+            if (_messages.Count == 0) StopAnimation();
         }
 
         private void ctrlTicker_Disposed(object? sender, EventArgs e)
         {
-            StopAnimation();
-            _reloadTimer.Stop();
-            _statusTimer.Stop();
-
-            _animationTimer.Dispose();
-            _reloadTimer.Dispose();
-            _statusTimer.Dispose();
-            _scrollClock.Stop();
-
-            if (_timerResolutionRequested)
-            {
-                TimeEndPeriod(TimerResolutionMilliseconds);
-                _timerResolutionRequested = false;
-            }
+            StopAnimation(); _reloadTimer.Stop(); _statusTimer.Stop(); _animationTimer.Dispose(); _reloadTimer.Dispose(); _statusTimer.Dispose(); _scrollClock.Stop();
+            if (_timerResolutionRequested) { TimeEndPeriod(TimerResolutionMilliseconds); _timerResolutionRequested = false; }
         }
 
         private void LoadStatusConfiguration()
@@ -364,7 +203,6 @@ namespace InfoDisplayApp.Properties
                     }
             }
             catch (Exception ex) { Debug.WriteLine($"Unable to load status.conf: {ex}"); }
-
             try
             {
                 if (File.Exists(CameraConfigPath))
