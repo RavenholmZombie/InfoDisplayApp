@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -33,6 +34,7 @@ namespace InfoDisplayApp
         private static SynchronizationContext? _uiContext;
         private static Form? _owner;
         private static bool _initialized;
+        private static bool _publishing;
 
         public static event EventHandler<AppMessageEventArgs>? MessageRaised;
 
@@ -64,6 +66,8 @@ namespace InfoDisplayApp
                 Error("An unobserved background task error occurred.", e.Exception);
                 e.SetObserved();
             };
+
+            Trace.Listeners.Add(new AppMessageTraceListener());
         }
 
         public static void Info(string message) =>
@@ -84,55 +88,136 @@ namespace InfoDisplayApp
             Error(message, exception);
         }
 
+        internal static void FromDiagnosticOutput(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message) || _publishing)
+                return;
+
+            string trimmed = message.Trim();
+            string lower = trimmed.ToLowerInvariant();
+
+            AppMessageType? type = null;
+
+            if (lower.Contains("exception") ||
+                lower.Contains("error") ||
+                lower.Contains("failed") ||
+                lower.Contains("failure") ||
+                lower.Contains("encountered"))
+            {
+                type = AppMessageType.Error;
+            }
+            else if (lower.Contains("warning") ||
+                     lower.Contains("warn") ||
+                     lower.Contains("unavailable") ||
+                     lower.Contains("offline") ||
+                     lower.Contains("timeout") ||
+                     lower.Contains("cancelled") ||
+                     lower.Contains("canceled"))
+            {
+                type = AppMessageType.Warning;
+            }
+
+            if (type.HasValue)
+                Raise(type.Value, trimmed, null, echoToDebug: false);
+        }
+
         private static void Raise(
             AppMessageType type,
             string message,
-            Exception? exception)
+            Exception? exception,
+            bool echoToDebug = true)
         {
             if (string.IsNullOrWhiteSpace(message))
                 return;
 
-            string logText = exception == null
-                ? $"[{type}] {message}"
-                : $"[{type}] {message}{Environment.NewLine}{exception}";
+            if (_publishing)
+                return;
 
-            Debug.WriteLine(logText);
+            _publishing = true;
 
-            AppMessageEventArgs args = new(type, message, exception);
-            MessageRaised?.Invoke(null, args);
-
-            void ShowWindow(object? _)
+            try
             {
-                try
+                if (echoToDebug)
                 {
-                    if (_owner == null || _owner.IsDisposed)
-                        return;
+                    string logText = exception == null
+                        ? $"[{type}] {message}"
+                        : $"[{type}] {message}{Environment.NewLine}{exception}";
 
-                    string detail = exception == null
-                        ? message
-                        : $"{message}{Environment.NewLine}{Environment.NewLine}{exception.Message}";
+                    Debug.WriteLine(logText);
+                }
 
-                    frmMessageWindow window = new();
-                    window.SetIcon(type switch
+                AppMessageEventArgs args = new(type, message, exception);
+                MessageRaised?.Invoke(null, args);
+
+                void ShowWindow(object? _)
+                {
+                    try
                     {
-                        AppMessageType.Warning => "warning",
-                        AppMessageType.Error => "error",
-                        _ => "info"
-                    });
-                    window.SetMessage(detail);
-                    window.TopMost = true;
-                    window.Show(_owner);
-                }
-                catch (Exception showException)
-                {
-                    Debug.WriteLine($"Failed to show in-app message window: {showException}");
-                }
-            }
+                        if (_owner == null || _owner.IsDisposed)
+                            return;
 
-            if (_uiContext != null)
-                _uiContext.Post(ShowWindow, null);
-            else
-                ShowWindow(null);
+                        string detail = exception == null
+                            ? message
+                            : $"{message}{Environment.NewLine}{Environment.NewLine}{exception.Message}";
+
+                        frmMessageWindow window = new();
+                        window.SetIcon(type switch
+                        {
+                            AppMessageType.Warning => "warning",
+                            AppMessageType.Error => "error",
+                            _ => "info"
+                        });
+                        window.SetMessage(detail);
+                        window.TopMost = true;
+                        window.Show(_owner);
+                    }
+                    catch (Exception showException)
+                    {
+                        Debug.WriteLine($"Failed to show in-app message window: {showException}");
+                    }
+                }
+
+                if (_uiContext != null)
+                    _uiContext.Post(ShowWindow, null);
+                else
+                    ShowWindow(null);
+            }
+            finally
+            {
+                _publishing = false;
+            }
+        }
+    }
+
+    internal sealed class AppMessageTraceListener : TraceListener
+    {
+        private readonly object _sync = new();
+        private readonly StringBuilder _buffer = new();
+
+        public override void Write(string? message)
+        {
+            if (message == null)
+                return;
+
+            lock (_sync)
+            {
+                _buffer.Append(message);
+            }
+        }
+
+        public override void WriteLine(string? message)
+        {
+            lock (_sync)
+            {
+                if (!string.IsNullOrEmpty(message))
+                    _buffer.Append(message);
+
+                string completed = _buffer.ToString();
+                _buffer.Clear();
+
+                if (!string.IsNullOrWhiteSpace(completed))
+                    AppMessages.FromDiagnosticOutput(completed);
+            }
         }
     }
 }
