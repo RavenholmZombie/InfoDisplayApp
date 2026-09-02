@@ -170,11 +170,12 @@ namespace InfoDisplayApp
             private const int GwlExStyle = -20;
             private const int GwlpHwndParent = -8;
 
-            private const long WsCaption = 0x00C00000L;
-            private const long WsThickFrame = 0x00040000L;
-            private const long WsMinimizeBox = 0x00020000L;
-            private const long WsMaximizeBox = 0x00010000L;
-            private const long WsSysMenu = 0x00080000L;
+            // Replace Edge's normal overlapped-window frame with a popup-style
+            // top-level window. Clearing only WS_CAPTION was not enough on some
+            // Edge builds, which could recreate the standard blue title bar.
+            private const long WsOverlappedWindow = 0x00CF0000L;
+            private const long WsPopup = unchecked((long)0x80000000L);
+            private const long WsVisible = 0x10000000L;
             private const long WsExToolWindow = 0x00000080L;
             private const long WsExAppWindow = 0x00040000L;
 
@@ -189,7 +190,6 @@ namespace InfoDisplayApp
 
             // frmMain itself is TopMost. HWND_TOP only moves a window within its
             // current z-order band, so Edge could remain underneath frmMain.
-            // Make only the active browser window topmost so it can occupy pnlTV.
             private static readonly IntPtr HwndTopMost = new(-1);
 
             public BrowserWindow(
@@ -355,7 +355,8 @@ namespace InfoDisplayApp
             private void ConfigureWindow()
             {
                 long style = GetWindowLongPtr(_windowHandle, GwlStyle).ToInt64();
-                style &= ~(WsCaption | WsThickFrame | WsMinimizeBox | WsMaximizeBox | WsSysMenu);
+                style &= ~WsOverlappedWindow;
+                style |= WsPopup | WsVisible;
                 SetWindowLongPtr(_windowHandle, GwlStyle, new IntPtr(style));
 
                 long exStyle = GetWindowLongPtr(_windowHandle, GwlExStyle).ToInt64();
@@ -363,6 +364,8 @@ namespace InfoDisplayApp
                 exStyle &= ~WsExAppWindow;
                 SetWindowLongPtr(_windowHandle, GwlExStyle, new IntPtr(exStyle));
 
+                // Keep the external viewer tied to InfoDisplay's lifetime/z-order,
+                // while leaving it a genuine top-level Chromium window.
                 SetWindowLongPtr(_windowHandle, GwlpHwndParent, _owner.Handle);
 
                 SetWindowPos(
@@ -372,7 +375,13 @@ namespace InfoDisplayApp
                     0,
                     0,
                     0,
-                    SwpNoMove | SwpNoSize | SwpNoActivate | SwpFrameChanged);
+                    SwpNoMove |
+                    SwpNoSize |
+                    SwpNoActivate |
+                    SwpFrameChanged |
+                    SwpShowWindow);
+
+                Position();
             }
 
             private async Task<bool> EvaluateJavaScriptAsync(string expression)
