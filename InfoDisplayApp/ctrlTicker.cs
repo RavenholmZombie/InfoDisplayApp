@@ -124,8 +124,8 @@ namespace InfoDisplayApp.Properties
             if (!_animationRunning || IsDisposed || Disposing || !IsHandleCreated) return;
             if (Interlocked.Exchange(ref _animationFramePending, 1) != 0) return;
             try { BeginInvoke(new Action(RenderAnimationFrame)); }
-            catch (InvalidOperationException) { Interlocked.Exchange(ref _animationFramePending, 0); }
             catch (ObjectDisposedException) { Interlocked.Exchange(ref _animationFramePending, 0); }
+            catch (InvalidOperationException) { Interlocked.Exchange(ref _animationFramePending, 0); }
         }
 
         private void RenderAnimationFrame()
