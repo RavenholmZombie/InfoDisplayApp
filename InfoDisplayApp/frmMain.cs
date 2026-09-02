@@ -1,4 +1,5 @@
 using InfoDisplayApp.Properties;
+using System.Diagnostics;
 
 namespace InfoDisplayApp
 {
