@@ -14,12 +14,6 @@ using System.Windows.Forms;
 
 namespace InfoDisplayApp
 {
-    /// <summary>
-    /// Hosts Philo and YouTube in normal Edge app windows instead of WebView2.
-    /// The browser windows remain top-level windows owned by InfoDisplayApp and
-    /// are positioned directly over pnlTV. Playback is controlled through the
-    /// Chromium DevTools protocol exposed on localhost.
-    /// </summary>
     internal sealed class ExternalBrowserController : IDisposable
     {
         private readonly Form _owner;
@@ -65,10 +59,6 @@ namespace InfoDisplayApp
         {
             ThrowIfDisposed();
 
-            // Start these sequentially. Edge's launcher process often hands the
-            // window off to another msedge.exe process and exits immediately.
-            // Sequential startup also lets each BrowserWindow reliably identify
-            // the new top-level window that belongs to its own app-mode launch.
             await _philo.StartAsync();
             await _youtube.StartAsync();
 
@@ -86,7 +76,6 @@ namespace InfoDisplayApp
             await _youtube.SetMutedAsync(true);
             _youtube.Hide();
 
-            _philo.Position();
             _philo.Show();
             await _philo.SetMutedAsync(false);
         }
@@ -98,7 +87,6 @@ namespace InfoDisplayApp
             await _philo.SetMutedAsync(true);
             _philo.Hide();
 
-            _youtube.Position();
             _youtube.Show();
             await _youtube.SetMutedAsync(false);
         }
@@ -199,7 +187,10 @@ namespace InfoDisplayApp
             private const int SwShowNoActivate = 8;
             private const uint WmClose = 0x0010;
 
-            private static readonly IntPtr HwndTop = IntPtr.Zero;
+            // frmMain itself is TopMost. HWND_TOP only moves a window within its
+            // current z-order band, so Edge could remain underneath frmMain.
+            // Make only the active browser window topmost so it can occupy pnlTV.
+            private static readonly IntPtr HwndTopMost = new(-1);
 
             public BrowserWindow(
                 string name,
@@ -264,7 +255,6 @@ namespace InfoDisplayApp
                     _windowProcessId = (int)actualProcessId;
 
                 ConfigureWindow();
-                Position();
 
                 Debug.WriteLine(
                     $"{_name}: external Edge viewer started. " +
@@ -303,9 +293,9 @@ namespace InfoDisplayApp
                 if (_windowHandle == IntPtr.Zero || _disposed || !IsWindow(_windowHandle))
                     return;
 
-                Position();
                 ShowWindow(_windowHandle, SwShowNoActivate);
                 _visible = true;
+                Position();
                 RefreshZOrderIfVisible();
             }
 
@@ -331,7 +321,7 @@ namespace InfoDisplayApp
 
                 SetWindowPos(
                     _windowHandle,
-                    HwndTop,
+                    HwndTopMost,
                     0,
                     0,
                     0,
@@ -354,7 +344,7 @@ namespace InfoDisplayApp
 
                 SetWindowPos(
                     _windowHandle,
-                    HwndTop,
+                    HwndTopMost,
                     screenLocation.X,
                     screenLocation.Y,
                     Math.Max(size.Width, 1),
@@ -373,13 +363,11 @@ namespace InfoDisplayApp
                 exStyle &= ~WsExAppWindow;
                 SetWindowLongPtr(_windowHandle, GwlExStyle, new IntPtr(exStyle));
 
-                // Keep Chromium as a real top-level window, but make InfoDisplay
-                // its owner so minimizing/activation behaves like one application.
                 SetWindowLongPtr(_windowHandle, GwlpHwndParent, _owner.Handle);
 
                 SetWindowPos(
                     _windowHandle,
-                    HwndTop,
+                    HwndTopMost,
                     0,
                     0,
                     0,
@@ -457,9 +445,7 @@ namespace InfoDisplayApp
                         .ToList();
 
                     EdgeWindowInfo preferred = candidates.FirstOrDefault(window =>
-                        window.Title.Contains(
-                            preferredTitle,
-                            StringComparison.OrdinalIgnoreCase));
+                        window.Title.Contains(preferredTitle, StringComparison.OrdinalIgnoreCase));
 
                     if (preferred.Handle != IntPtr.Zero)
                         return preferred.Handle;
@@ -467,13 +453,8 @@ namespace InfoDisplayApp
                     if (candidates.Count == 1)
                         return candidates[0].Handle;
 
-                    // Some Edge builds create the window before our initial
-                    // snapshot completes. As a fallback, accept a title match
-                    // even if its HWND was already present in that snapshot.
                     EdgeWindowInfo fallback = GetVisibleEdgeWindows().FirstOrDefault(window =>
-                        window.Title.Contains(
-                            preferredTitle,
-                            StringComparison.OrdinalIgnoreCase));
+                        window.Title.Contains(preferredTitle, StringComparison.OrdinalIgnoreCase));
 
                     if (fallback.Handle != IntPtr.Zero)
                         return fallback.Handle;
@@ -485,9 +466,7 @@ namespace InfoDisplayApp
             }
 
             private static HashSet<IntPtr> SnapshotVisibleEdgeWindows() =>
-                GetVisibleEdgeWindows()
-                    .Select(window => window.Handle)
-                    .ToHashSet();
+                GetVisibleEdgeWindows().Select(window => window.Handle).ToHashSet();
 
             private static List<EdgeWindowInfo> GetVisibleEdgeWindows()
             {
@@ -563,9 +542,7 @@ namespace InfoDisplayApp
                 try
                 {
                     if (_windowHandle != IntPtr.Zero && IsWindow(_windowHandle))
-                    {
                         PostMessage(_windowHandle, WmClose, IntPtr.Zero, IntPtr.Zero);
-                    }
 
                     if (_windowProcessId.HasValue)
                     {
@@ -577,7 +554,6 @@ namespace InfoDisplayApp
                         }
                         catch (ArgumentException)
                         {
-                            // The browser already exited normally.
                         }
                     }
                 }
