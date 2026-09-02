@@ -5,9 +5,11 @@ using System.Drawing;
 using System.Drawing.Text;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -17,16 +19,22 @@ namespace InfoDisplayApp.Properties
 {
     public partial class ctrlTicker : UserControl
     {
+        private static readonly HttpClient _httpClient = new HttpClient();
         private readonly System.Windows.Forms.Timer _reloadTimer;
         private readonly System.Windows.Forms.Timer _statusTimer;
+        private readonly System.Windows.Forms.Timer _weatherTimer;
         private readonly System.Threading.Timer _animationTimer;
         private int _animationFramePending;
         private bool _animationRunning;
         private bool _timerResolutionRequested;
+        private bool _weatherUpdating;
+
         private string _rycraftStatus = "Checking...";
         private int _rycraftPlayersOnline;
         private int _rycraftPlayersMax;
         private string _tapoStatus = "Checking...";
+        private string _localForecast = "Weather unavailable";
+
         private string _rycraftHost = "";
         private int _rycraftPort = 25565;
         private string _rycraftLocalHost = "";
@@ -36,7 +44,12 @@ namespace InfoDisplayApp.Properties
         private string _rycraftRconPassword = "";
         private string _rycraftPlayerNames = "Unavailable";
         private string _tapoHost = "";
+
         private const int TapoRtspPort = 554;
+        private const double WeatherLatitude = 45.143109;
+        private const double WeatherLongitude = -67.526589;
+        private const string WeatherLocationName = "Princeton, ME";
+
         private string StatusConfigPath => Path.Combine(AppContext.BaseDirectory, "status.conf");
         private string CameraConfigPath => Path.Combine(AppContext.BaseDirectory, "camera.conf");
         private readonly List<string> _messages = new();
@@ -63,11 +76,18 @@ namespace InfoDisplayApp.Properties
             lblTextTicker.Visible = false;
             panel1.Paint += panel1_Paint;
             panel1.Resize += panel1_Resize;
+
             _animationTimer = new System.Threading.Timer(AnimationTimerCallback, null, Timeout.Infinite, Timeout.Infinite);
+
             _reloadTimer = new System.Windows.Forms.Timer { Interval = 10_000 };
             _reloadTimer.Tick += ReloadTimer_Tick;
+
             _statusTimer = new System.Windows.Forms.Timer { Interval = 30_000 };
             _statusTimer.Tick += StatusTimer_Tick;
+
+            _weatherTimer = new System.Windows.Forms.Timer { Interval = 15 * 60 * 1000 };
+            _weatherTimer.Tick += WeatherTimer_Tick;
+
             Load += ctrlTicker_Load;
             Disposed += ctrlTicker_Disposed;
         }
@@ -76,11 +96,16 @@ namespace InfoDisplayApp.Properties
         {
             _timerResolutionRequested = TimeBeginPeriod(TimerResolutionMilliseconds) == 0;
             LoadStatusConfiguration();
-            await UpdateStatusesAsync();
+
+            await Task.WhenAll(
+                UpdateStatusesAsync(),
+                UpdateLocalForecastAsync());
+
             LoadTickerMessages();
             if (_messages.Count > 0) { ShowCurrentMessage(); StartAnimation(); }
             _reloadTimer.Start();
             _statusTimer.Start();
+            _weatherTimer.Start();
         }
 
         private void LoadTickerMessages()
@@ -108,7 +133,9 @@ namespace InfoDisplayApp.Properties
                 .Replace("{RYCRAFT_ONLINE_PLAYERS}", _rycraftPlayersOnline.ToString(), StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_MAX_PLAYERS}", _rycraftPlayersMax.ToString(), StringComparison.OrdinalIgnoreCase)
                 .Replace("{RYCRAFT_PLAYER_NAMES}", _rycraftPlayerNames, StringComparison.OrdinalIgnoreCase)
-                .Replace("{TAPO_STATUS}", _tapoStatus, StringComparison.OrdinalIgnoreCase);
+                .Replace("{TAPO_STATUS}", _tapoStatus, StringComparison.OrdinalIgnoreCase)
+                .Replace("{LOCAL_FORECAST}", _localForecast, StringComparison.OrdinalIgnoreCase);
+
             using Graphics graphics = panel1.CreateGraphics();
             graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
             _messageWidth = graphics.MeasureString(_renderedMessage, lblTextTicker.Font, int.MaxValue, StringFormat.GenericTypographic).Width + 10f;
@@ -158,8 +185,165 @@ namespace InfoDisplayApp.Properties
 
         private void ctrlTicker_Disposed(object? sender, EventArgs e)
         {
-            StopAnimation(); _reloadTimer.Stop(); _statusTimer.Stop(); _animationTimer.Dispose(); _reloadTimer.Dispose(); _statusTimer.Dispose(); _scrollClock.Stop();
+            StopAnimation();
+            _reloadTimer.Stop();
+            _statusTimer.Stop();
+            _weatherTimer.Stop();
+            _animationTimer.Dispose();
+            _reloadTimer.Dispose();
+            _statusTimer.Dispose();
+            _weatherTimer.Dispose();
+            _scrollClock.Stop();
             if (_timerResolutionRequested) { TimeEndPeriod(TimerResolutionMilliseconds); _timerResolutionRequested = false; }
+        }
+
+        private async Task UpdateLocalForecastAsync()
+        {
+            if (_weatherUpdating) return;
+            _weatherUpdating = true;
+
+            try
+            {
+                string url =
+                    "https://api.open-meteo.com/v1/forecast" +
+                    $"?latitude={WeatherLatitude}" +
+                    $"&longitude={WeatherLongitude}" +
+                    "&current=temperature_2m,weather_code" +
+                    "&hourly=weather_code" +
+                    "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+                    "&temperature_unit=fahrenheit" +
+                    "&timezone=America%2FNew_York" +
+                    "&forecast_days=2";
+
+                string json = await _httpClient.GetStringAsync(url);
+                using JsonDocument document = JsonDocument.Parse(json);
+                JsonElement root = document.RootElement;
+                JsonElement current = root.GetProperty("current");
+                JsonElement daily = root.GetProperty("daily");
+                JsonElement hourly = root.GetProperty("hourly");
+
+                double currentTemperature = current.GetProperty("temperature_2m").GetDouble();
+                int currentWeatherCode = current.GetProperty("weather_code").GetInt32();
+                int todayWeatherCode = daily.GetProperty("weather_code")[0].GetInt32();
+                double todayHigh = daily.GetProperty("temperature_2m_max")[0].GetDouble();
+                double tonightLow = daily.GetProperty("temperature_2m_min").GetArrayLength() > 1
+                    ? daily.GetProperty("temperature_2m_min")[1].GetDouble()
+                    : daily.GetProperty("temperature_2m_min")[0].GetDouble();
+
+                string todayDate = daily.GetProperty("time")[0].GetString() ?? DateTime.Now.ToString("yyyy-MM-dd");
+                int tonightWeatherCode = GetTonightWeatherCode(hourly, todayDate, todayWeatherCode);
+
+                _localForecast =
+                    $"Currently in {WeatherLocationName}: {GetWeatherDescription(currentWeatherCode)}, {Math.Round(currentTemperature):0}°F | " +
+                    $"Today's Forecast: {GetWeatherDescription(todayWeatherCode)}, High: {Math.Round(todayHigh):0}°F | " +
+                    $"Tonight: {GetWeatherDescription(tonightWeatherCode)}, Low: {Math.Round(tonightLow):0}°F | " +
+                    "Source: Open-Meteo";
+
+                Debug.WriteLine($"Ticker forecast: {_localForecast}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ticker weather update failed: {ex}");
+                _localForecast = "Local weather is temporarily unavailable | Source: Open-Meteo";
+            }
+            finally
+            {
+                _weatherUpdating = false;
+            }
+        }
+
+        private static int GetTonightWeatherCode(JsonElement hourly, string todayDate, int fallbackCode)
+        {
+            JsonElement times = hourly.GetProperty("time");
+            JsonElement codes = hourly.GetProperty("weather_code");
+            DateTime today = DateTime.Parse(todayDate);
+            DateTime windowStart = today.Date.AddHours(18);
+            DateTime windowEnd = today.Date.AddDays(1).AddHours(6);
+            int selectedCode = fallbackCode;
+            int selectedSeverity = -1;
+
+            for (int i = 0; i < times.GetArrayLength(); i++)
+            {
+                string? timeText = times[i].GetString();
+                if (timeText == null || !DateTime.TryParse(timeText, out DateTime time)) continue;
+                if (time < windowStart || time >= windowEnd) continue;
+
+                int code = codes[i].GetInt32();
+                int severity = GetWeatherSeverity(code);
+                if (severity > selectedSeverity)
+                {
+                    selectedCode = code;
+                    selectedSeverity = severity;
+                }
+            }
+
+            return selectedCode;
+        }
+
+        private static int GetWeatherSeverity(int code) => code switch
+        {
+            96 or 99 => 100,
+            95 => 95,
+            82 => 90,
+            86 => 88,
+            75 => 86,
+            65 => 84,
+            67 => 82,
+            81 => 80,
+            73 => 78,
+            63 => 76,
+            66 => 74,
+            85 => 72,
+            80 => 70,
+            71 => 68,
+            57 => 66,
+            55 => 64,
+            56 => 62,
+            53 => 60,
+            61 => 58,
+            51 => 56,
+            77 => 54,
+            45 or 48 => 40,
+            3 => 30,
+            2 => 20,
+            1 => 10,
+            _ => 0
+        };
+
+        private static string GetWeatherDescription(int code) => code switch
+        {
+            0 => "Clear Skies",
+            1 => "Mostly Clear",
+            2 => "Partly Cloudy",
+            3 => "Cloudy",
+            45 or 48 => "Foggy",
+            51 => "Light Drizzle",
+            53 => "Drizzle",
+            55 => "Heavy Drizzle",
+            56 or 57 => "Freezing Drizzle",
+            61 => "Light Rain",
+            63 => "Rain",
+            65 => "Heavy Rain",
+            66 or 67 => "Freezing Rain",
+            71 => "Light Snow",
+            73 => "Snow",
+            75 => "Heavy Snow",
+            77 => "Snow Grains",
+            80 => "Light Showers",
+            81 => "Showers",
+            82 => "Heavy Showers",
+            85 => "Snow Showers",
+            86 => "Heavy Snow Showers",
+            95 => "Thunderstorms",
+            96 or 99 => "Severe Thunderstorms",
+            _ => "Unknown Conditions"
+        };
+
+        private async void WeatherTimer_Tick(object? sender, EventArgs e)
+        {
+            _weatherTimer.Stop();
+            try { await UpdateLocalForecastAsync(); }
+            finally { if (!IsDisposed) _weatherTimer.Start(); }
         }
 
         private void LoadStatusConfiguration()
