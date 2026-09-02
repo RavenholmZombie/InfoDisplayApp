@@ -96,6 +96,15 @@ namespace InfoDisplayApp
             string trimmed = message.Trim();
             string lower = trimmed.ToLowerInvariant();
 
+            // The battery-powered Tapo doorbell normally stops answering pings
+            // while asleep. That is expected behavior and should remain a ticker
+            // status only, not interrupt the TV/dashboard with a warning window.
+            if (lower.Contains("doorbell camera") &&
+                lower.Contains("offline, possibly asleep"))
+            {
+                return;
+            }
+
             AppMessageType? type = null;
 
             if (lower.Contains("exception") ||
