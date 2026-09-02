@@ -8,10 +8,14 @@ namespace InfoDisplayApp
         [STAThread]
         static void Main()
         {
-            // To customize application configuration such as set high DPI settings or default font,
-            // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
-            Application.Run(new frmMain());
+
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+
+            frmMain mainForm = new();
+            AppMessages.Initialize(mainForm);
+
+            Application.Run(mainForm);
         }
     }
 }
