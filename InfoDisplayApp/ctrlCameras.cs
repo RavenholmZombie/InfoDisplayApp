@@ -1,12 +1,9 @@
 ﻿using LibVLCSharp.Shared;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Drawing;
-using System.Text;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace InfoDisplayApp
@@ -15,7 +12,10 @@ namespace InfoDisplayApp
     {
         private LibVLC? _libVLC;
         private MediaPlayer? _mediaPlayer;
+        private Media? _media;
+        private CancellationTokenSource? _cameraStartCancellation;
         private bool _cameraConfigured;
+        private bool _cameraStarting;
 
         private string _cameraIp = "";
         private string _cameraUsername = "";
@@ -40,9 +40,19 @@ namespace InfoDisplayApp
             _libVLC = new LibVLC(
                 "--rtsp-tcp",
                 "--network-caching=300",
-                "--live-caching=300");
+                "--live-caching=300",
+                "--no-video-title-show");
 
             _mediaPlayer = new MediaPlayer(_libVLC);
+
+            _mediaPlayer.Opening += (_, _) =>
+                Debug.WriteLine("Tapo camera: VLC opening RTSP stream.");
+            _mediaPlayer.Playing += (_, _) =>
+                Debug.WriteLine("Tapo camera: VLC playback started.");
+            _mediaPlayer.EncounteredError += (_, _) =>
+                Debug.WriteLine("Tapo camera: VLC encountered a playback error.");
+            _mediaPlayer.Stopped += (_, _) =>
+                Debug.WriteLine("Tapo camera: VLC playback stopped.");
 
             vlcPlayer.MediaPlayer = _mediaPlayer;
             vlcPlayer.Dock = DockStyle.Fill;
@@ -130,6 +140,7 @@ namespace InfoDisplayApp
         private void ctrlCameras_Load(object sender, EventArgs e)
         {
         }
+
         public void SetMuted(bool muted)
         {
             if (_mediaPlayer == null)
@@ -151,22 +162,79 @@ namespace InfoDisplayApp
             if (_libVLC == null || _mediaPlayer == null)
                 return;
 
-            if (_mediaPlayer.IsPlaying)
+            if (_cameraStarting || _mediaPlayer.IsPlaying)
                 return;
 
-            using var media =
-                new Media(_libVLC, new Uri(RtspUrl));
+            _cameraStartCancellation?.Cancel();
+            _cameraStartCancellation?.Dispose();
+            _cameraStartCancellation = new CancellationTokenSource();
 
-            _mediaPlayer.Play(media);
+            _ = StartCameraAsync(_cameraStartCancellation.Token);
+        }
+
+        private async Task StartCameraAsync(CancellationToken cancellationToken)
+        {
+            if (_libVLC == null || _mediaPlayer == null)
+                return;
+
+            _cameraStarting = true;
+
+            try
+            {
+                Debug.WriteLine($"Tapo camera: starting RTSP stream at {_cameraIp}/{_cameraStream}.");
+
+                // Let the VideoView become visible and finish its layout before asking
+                // LibVLC to attach/start the native video output.
+                await Task.Yield();
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                _media?.Dispose();
+                _media = new Media(_libVLC, new Uri(RtspUrl));
+
+                MediaPlayer player = _mediaPlayer;
+                Media media = _media;
+
+                // LibVLC normally returns from Play immediately, but keeping the native
+                // start call off the WinForms UI thread prevents a stalled RTSP/native
+                // VLC call from freezing the entire dashboard.
+                bool started = await Task.Run(
+                    () => player.Play(media),
+                    cancellationToken);
+
+                Debug.WriteLine(
+                    $"Tapo camera: VLC Play returned {(started ? "success" : "failure")}.");
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("Tapo camera: start cancelled.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Tapo camera: failed to start stream: {ex}");
+            }
+            finally
+            {
+                _cameraStarting = false;
+            }
         }
 
         public void StopCamera()
         {
+            _cameraStartCancellation?.Cancel();
+
             if (_mediaPlayer == null)
                 return;
 
-            if (_mediaPlayer.IsPlaying)
-                _mediaPlayer.Stop();
+            try
+            {
+                if (_mediaPlayer.IsPlaying)
+                    _mediaPlayer.Stop();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Tapo camera: failed to stop stream: {ex}");
+            }
         }
 
         public void RestartCamera()
@@ -177,12 +245,27 @@ namespace InfoDisplayApp
 
         private void CtrlCameras_Disposed(object? sender, EventArgs e)
         {
+            _cameraStartCancellation?.Cancel();
+            _cameraStartCancellation?.Dispose();
+            _cameraStartCancellation = null;
+
             if (_mediaPlayer != null)
             {
-                _mediaPlayer.Stop();
+                try
+                {
+                    _mediaPlayer.Stop();
+                }
+                catch
+                {
+                    // Best effort during shutdown.
+                }
+
                 _mediaPlayer.Dispose();
                 _mediaPlayer = null;
             }
+
+            _media?.Dispose();
+            _media = null;
 
             if (_libVLC != null)
             {
@@ -193,7 +276,6 @@ namespace InfoDisplayApp
 
         private void vlcPlayer_Click(object sender, EventArgs e)
         {
-
         }
     }
 }
