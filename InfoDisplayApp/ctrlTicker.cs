@@ -6,6 +6,7 @@ using System.Drawing.Text;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -34,6 +35,7 @@ namespace InfoDisplayApp.Properties
         private string _rycraftStatus = "Checking...";
         private int _rycraftPlayersOnline;
         private int _rycraftPlayersMax;
+        private string _rycraftPlayerNames = "Unavailable";
         private string _tapoStatus = "Checking...";
 
         private string _princetonForecast = "Weather unavailable";
@@ -47,10 +49,11 @@ namespace InfoDisplayApp.Properties
         private string _rycraftRconHost = "";
         private int _rycraftRconPort = 25575;
         private string _rycraftRconPassword = "";
-        private string _rycraftPlayerNames = "Unavailable";
-        private string _tapoHost = "";
 
-        private const int TapoRtspPort = 554;
+        private const string CheddarCameraIp = "192.168.40.210";
+        private const string DenCameraIp = "192.168.40.209";
+        private const string DoorbellCameraIp = "192.168.40.233";
+        private const int CameraPingTimeoutMilliseconds = 1500;
 
         private static readonly WeatherLocation Princeton =
             new("Princeton, ME", 45.143109, -67.526589);
@@ -63,9 +66,6 @@ namespace InfoDisplayApp.Properties
 
         private string StatusConfigPath =>
             Path.Combine(AppContext.BaseDirectory, "status.conf");
-
-        private string CameraConfigPath =>
-            Path.Combine(AppContext.BaseDirectory, "camera.conf");
 
         private string TickerPath =>
             Path.Combine(AppContext.BaseDirectory, "ticker.txt");
@@ -236,7 +236,6 @@ namespace InfoDisplayApp.Properties
                     "{TAPO_STATUS}",
                     _tapoStatus,
                     StringComparison.OrdinalIgnoreCase)
-                // Keep LOCAL_FORECAST as a backwards-compatible Princeton alias.
                 .Replace(
                     "{LOCAL_FORECAST}",
                     _princetonForecast,
@@ -657,104 +656,67 @@ namespace InfoDisplayApp.Properties
         {
             try
             {
-                if (File.Exists(StatusConfigPath))
+                if (!File.Exists(StatusConfigPath))
+                    return;
+
+                foreach (string rawLine in File.ReadAllLines(StatusConfigPath))
                 {
-                    foreach (string rawLine in File.ReadAllLines(StatusConfigPath))
+                    string line = rawLine.Trim();
+
+                    if (string.IsNullOrWhiteSpace(line) ||
+                        line.StartsWith("#"))
                     {
-                        string line = rawLine.Trim();
+                        continue;
+                    }
 
-                        if (string.IsNullOrWhiteSpace(line) ||
-                            line.StartsWith("#"))
-                        {
-                            continue;
-                        }
+                    int separator = line.IndexOf('=');
+                    if (separator <= 0)
+                        continue;
 
-                        int separator = line.IndexOf('=');
-                        if (separator <= 0)
-                            continue;
+                    string key = line[..separator]
+                        .Trim()
+                        .ToLowerInvariant();
 
-                        string key = line[..separator]
-                            .Trim()
-                            .ToLowerInvariant();
+                    string value = line[(separator + 1)..].Trim();
 
-                        string value = line[(separator + 1)..].Trim();
+                    switch (key)
+                    {
+                        case "rycraft_host":
+                            _rycraftHost = value;
+                            break;
 
-                        switch (key)
-                        {
-                            case "rycraft_host":
-                                _rycraftHost = value;
-                                break;
+                        case "rycraft_port":
+                            if (int.TryParse(value, out int port))
+                                _rycraftPort = port;
+                            break;
 
-                            case "rycraft_port":
-                                if (int.TryParse(value, out int port))
-                                    _rycraftPort = port;
-                                break;
+                        case "rycraft_local_host":
+                            _rycraftLocalHost = value;
+                            break;
 
-                            case "rycraft_local_host":
-                                _rycraftLocalHost = value;
-                                break;
+                        case "rycraft_local_port":
+                            if (int.TryParse(value, out int localPort))
+                                _rycraftLocalPort = localPort;
+                            break;
 
-                            case "rycraft_local_port":
-                                if (int.TryParse(value, out int localPort))
-                                    _rycraftLocalPort = localPort;
-                                break;
+                        case "rycraft_rcon_host":
+                            _rycraftRconHost = value;
+                            break;
 
-                            case "rycraft_rcon_host":
-                                _rycraftRconHost = value;
-                                break;
+                        case "rycraft_rcon_port":
+                            if (int.TryParse(value, out int rconPort))
+                                _rycraftRconPort = rconPort;
+                            break;
 
-                            case "rycraft_rcon_port":
-                                if (int.TryParse(value, out int rconPort))
-                                    _rycraftRconPort = rconPort;
-                                break;
-
-                            case "rycraft_rcon_password":
-                                _rycraftRconPassword = value;
-                                break;
-                        }
+                        case "rycraft_rcon_password":
+                            _rycraftRconPassword = value;
+                            break;
                     }
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Unable to load status.conf: {ex}");
-            }
-
-            try
-            {
-                if (File.Exists(CameraConfigPath))
-                {
-                    foreach (string rawLine in File.ReadAllLines(CameraConfigPath))
-                    {
-                        string line = rawLine.Trim();
-
-                        if (string.IsNullOrWhiteSpace(line) ||
-                            line.StartsWith("#"))
-                        {
-                            continue;
-                        }
-
-                        int separator = line.IndexOf('=');
-                        if (separator <= 0)
-                            continue;
-
-                        string key = line[..separator]
-                            .Trim()
-                            .ToLowerInvariant();
-
-                        string value = line[(separator + 1)..].Trim();
-
-                        if (key == "ip")
-                        {
-                            _tapoHost = value;
-                            break;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Unable to read camera address: {ex}");
             }
         }
 
@@ -781,6 +743,26 @@ namespace InfoDisplayApp.Properties
             }
             catch
             {
+                return false;
+            }
+        }
+
+        private static async Task<bool> IsHostReachableByPingAsync(
+            string host,
+            int timeoutMilliseconds = CameraPingTimeoutMilliseconds)
+        {
+            try
+            {
+                using Ping ping = new();
+                PingReply reply = await ping.SendPingAsync(
+                    host,
+                    timeoutMilliseconds);
+
+                return reply.Status == IPStatus.Success;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ping failed for {host}: {ex.Message}");
                 return false;
             }
         }
@@ -1086,20 +1068,37 @@ namespace InfoDisplayApp.Properties
         private async Task UpdateStatusesAsync()
         {
             Task rycraftCheck = UpdateRycraftStatusAsync();
-
-            Task<bool> tapoCheck = IsTcpServiceOnlineAsync(
-                _tapoHost,
-                TapoRtspPort);
+            Task<bool> cheddarCheck =
+                IsHostReachableByPingAsync(CheddarCameraIp);
+            Task<bool> denCheck =
+                IsHostReachableByPingAsync(DenCameraIp);
+            Task<bool> doorbellCheck =
+                IsHostReachableByPingAsync(DoorbellCameraIp);
 
             await Task.WhenAll(
                 rycraftCheck,
-                tapoCheck);
+                cheddarCheck,
+                denCheck,
+                doorbellCheck);
 
-            _tapoStatus = tapoCheck.Result
-                ? "Online"
-                : "Offline";
+            string cheddarStatus =
+                cheddarCheck.Result ? "Online" : "Offline";
+            string denStatus =
+                denCheck.Result ? "Online" : "Offline";
+            string doorbellStatus =
+                doorbellCheck.Result ? "Online" : "Offline";
 
-            Debug.WriteLine($"Tapo: {_tapoStatus}");
+            _tapoStatus =
+                $"Cheddar Camera (Backyard): {cheddarStatus} | " +
+                $"Den Camera (Office): {denStatus} | " +
+                $"Doorbell Camera (Front Door): {doorbellStatus}";
+
+            Debug.WriteLine(
+                $"Tapo Cheddar Camera ({CheddarCameraIp}): {cheddarStatus}");
+            Debug.WriteLine(
+                $"Tapo Den Camera ({DenCameraIp}): {denStatus}");
+            Debug.WriteLine(
+                $"Tapo Doorbell Camera ({DoorbellCameraIp}): {doorbellStatus}");
         }
 
         private async void StatusTimer_Tick(
