@@ -41,7 +41,7 @@ namespace InfoDisplayApp.Properties
         private double _scrollX;
         private float _messageWidth;
         private string _renderedMessage = "";
-        private const double ScrollPixelsPerSecond = 625.0;
+        private const double ScrollPixelsPerSecond = 500.0;
         private const int MessageGap = 50;
         private string TickerPath => Path.Combine(AppContext.BaseDirectory, "ticker.txt");
 
