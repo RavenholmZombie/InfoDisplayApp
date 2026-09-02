@@ -54,7 +54,7 @@ namespace InfoDisplayApp
             pboxAppsIcon.MouseLeave += pnlBtnApps_MouseLeave;
             pboxAppsIcon.Click += pnlBtnApps_Click;
 
-            FormClosed += frmMain_FormClosed;
+            FormClosing += frmMain_FormClosing;
         }
 
         private Color RandomColor()
@@ -180,9 +180,6 @@ namespace InfoDisplayApp
 
             UpdateModeButtons(true);
 
-            // Start the browser processes after the native dashboard controls
-            // exist so the clock/weather/ticker become usable immediately even
-            // if Edge needs a few seconds on first launch.
             try
             {
                 await _browserController.InitializeAsync();
@@ -294,9 +291,6 @@ namespace InfoDisplayApp
             }
             else
             {
-                // pnlApps is a WinForms child of pnlTV, while Edge is a separate
-                // owned top-level window. Temporarily hide browser video so the
-                // application selector can genuinely appear above the viewport.
                 if (_activeSource != DisplaySource.Camera && _browserController != null)
                     await _browserController.HideAllAsync();
 
@@ -341,8 +335,10 @@ namespace InfoDisplayApp
             pboxAppsIcon.Image = Resources.controls_icn;
         }
 
-        private void frmMain_FormClosed(object? sender, FormClosedEventArgs e)
+        private void frmMain_FormClosing(object? sender, FormClosingEventArgs e)
         {
+            // Dispose the external browser controller before the top-level
+            // InfoDisplay window disappears so Philo/YouTube cannot be orphaned.
             _browserController?.Dispose();
             _browserController = null;
         }
