@@ -55,21 +55,8 @@ namespace InfoDisplayApp
             _viewport.Resize += OwnerBoundsChanged;
             _viewport.LocationChanged += OwnerBoundsChanged;
 
-            // frmMain is TopMost, so Windows can occasionally put it back above
-            // the external browser after the user clicks another dashboard control.
-            // Keep the currently visible browser in the topmost band and aligned
-            // to pnlTV without stealing focus.
-            _zOrderTimer = new System.Windows.Forms.Timer
-            {
-                Interval = 250
-            };
-            _zOrderTimer.Tick += (_, _) =>
-            {
-                RepositionVisibleWindows();
-                _philo.RefreshZOrderIfVisible();
-                _youtube.RefreshZOrderIfVisible();
-            };
-            _zOrderTimer.Start();
+            _zOrderTimer = new System.Windows.Forms.Timer { Interval = 250 };
+            _zOrderTimer.Tick += (_, _) => RepositionVisibleWindows();
         }
 
         public async Task InitializeAsync()
@@ -84,6 +71,7 @@ namespace InfoDisplayApp
 
             _youtube.Hide();
             _philo.Show();
+            _zOrderTimer.Start();
         }
 
         public async Task ShowPhiloAsync()
@@ -94,6 +82,7 @@ namespace InfoDisplayApp
             _youtube.Hide();
 
             _philo.Show();
+            await _philo.EnsureServicePageAsync();
             await _philo.SetMutedAsync(false);
         }
 
@@ -105,6 +94,7 @@ namespace InfoDisplayApp
             _philo.Hide();
 
             _youtube.Show();
+            await _youtube.EnsureServicePageAsync();
             await _youtube.SetMutedAsync(false);
         }
 
@@ -133,12 +123,8 @@ namespace InfoDisplayApp
         private void OwnerBoundsChanged(object? sender, EventArgs e) =>
             RepositionVisibleWindows();
 
-        private void OwnerActivated(object? sender, EventArgs e)
-        {
+        private void OwnerActivated(object? sender, EventArgs e) =>
             RepositionVisibleWindows();
-            _philo.RefreshZOrderIfVisible();
-            _youtube.RefreshZOrderIfVisible();
-        }
 
         private void ThrowIfDisposed()
         {
@@ -152,7 +138,6 @@ namespace InfoDisplayApp
                 return;
 
             _disposed = true;
-
             _zOrderTimer.Stop();
             _zOrderTimer.Dispose();
 
@@ -174,9 +159,9 @@ namespace InfoDisplayApp
             private readonly int _debugPort;
             private readonly Form _owner;
             private readonly Control _viewport;
+            private readonly HashSet<int> _ownedProcessIds = new();
 
             private Process? _launcherProcess;
-            private int? _windowProcessId;
             private IntPtr _windowHandle;
             private bool _visible;
             private bool _disposed;
@@ -189,7 +174,6 @@ namespace InfoDisplayApp
             private const int GwlStyle = -16;
             private const int GwlExStyle = -20;
             private const int GwlpHwndParent = -8;
-
             private const long WsOverlappedWindow = 0x00CF0000L;
             private const long WsPopup = unchecked((long)0x80000000L);
             private const long WsVisible = 0x10000000L;
@@ -204,7 +188,6 @@ namespace InfoDisplayApp
             private const int SwHide = 0;
             private const int SwShowNoActivate = 8;
             private const uint WmClose = 0x0010;
-
             private static readonly IntPtr HwndTopMost = new(-1);
 
             public BrowserWindow(
@@ -232,14 +215,14 @@ namespace InfoDisplayApp
 
                 string edgePath = FindEdgeExecutable();
                 HashSet<IntPtr> windowsBeforeLaunch = SnapshotVisibleEdgeWindows();
+                HashSet<int> processesBeforeLaunch = SnapshotEdgeProcessIds();
 
-                // Edge kiosk mode removes the browser/title-bar chrome at the
-                // Chromium level. We still resize the resulting kiosk window to
-                // pnlTV immediately after startup, so it behaves like an embedded
-                // viewer instead of taking over the whole display.
+                // Edge kiosk mode deliberately uses InPrivate. We need persistent
+                // cookies/login state, so use normal app mode and ask Chromium to
+                // enter fullscreen instead.
                 string arguments =
-                    $"--kiosk=\"{_url}\" " +
-                    "--edge-kiosk-type=fullscreen " +
+                    $"--app=\"{_url}\" " +
+                    "--start-fullscreen " +
                     $"--user-data-dir=\"{_profileDirectory}\" " +
                     "--remote-debugging-address=127.0.0.1 " +
                     $"--remote-debugging-port={_debugPort} " +
@@ -267,19 +250,44 @@ namespace InfoDisplayApp
                 if (_windowHandle == IntPtr.Zero)
                 {
                     throw new InvalidOperationException(
-                        $"{_name} browser was launched, but InfoDisplay could not locate its Edge kiosk window.");
+                        $"{_name} browser was launched, but InfoDisplay could not locate its Edge app window.");
                 }
 
-                GetWindowThreadProcessId(_windowHandle, out uint actualProcessId);
-                if (actualProcessId != 0)
-                    _windowProcessId = (int)actualProcessId;
+                foreach (int processId in SnapshotEdgeProcessIds())
+                {
+                    if (!processesBeforeLaunch.Contains(processId))
+                        _ownedProcessIds.Add(processId);
+                }
+
+                GetWindowThreadProcessId(_windowHandle, out uint windowPid);
+                if (windowPid != 0)
+                    _ownedProcessIds.Add((int)windowPid);
 
                 ConfigureWindow();
+                await EnsureServicePageAsync();
 
                 Debug.WriteLine(
-                    $"{_name}: external Edge kiosk viewer started. " +
-                    $"Window PID={_windowProcessId?.ToString() ?? "unknown"}, " +
-                    $"DevTools port={_debugPort}.");
+                    $"{_name}: external Edge viewer started on DevTools port {_debugPort}.");
+            }
+
+            public async Task EnsureServicePageAsync()
+            {
+                if (_disposed || _windowHandle == IntPtr.Zero || !IsWindow(_windowHandle))
+                    return;
+
+                try
+                {
+                    string? currentUrl = await GetCurrentUrlAsync();
+                    if (string.IsNullOrWhiteSpace(currentUrl) ||
+                        !currentUrl.StartsWith(_url, StringComparison.OrdinalIgnoreCase))
+                    {
+                        await NavigateAsync(_url);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"{_name}: unable to verify service page: {ex.Message}");
+                }
             }
 
             public async Task SetMutedAsync(bool muted)
@@ -316,7 +324,6 @@ namespace InfoDisplayApp
                 ShowWindow(_windowHandle, SwShowNoActivate);
                 _visible = true;
                 Position();
-                RefreshZOrderIfVisible();
             }
 
             public void Hide()
@@ -332,21 +339,6 @@ namespace InfoDisplayApp
             {
                 if (_visible)
                     Position();
-            }
-
-            public void RefreshZOrderIfVisible()
-            {
-                if (!_visible || _windowHandle == IntPtr.Zero || !IsWindow(_windowHandle))
-                    return;
-
-                SetWindowPos(
-                    _windowHandle,
-                    HwndTopMost,
-                    0,
-                    0,
-                    0,
-                    0,
-                    SwpNoMove | SwpNoSize | SwpNoActivate);
             }
 
             public void Position()
@@ -384,8 +376,6 @@ namespace InfoDisplayApp
                 exStyle &= ~WsExAppWindow;
                 SetWindowLongPtr(_windowHandle, GwlExStyle, new IntPtr(exStyle));
 
-                // Keep the viewer owned by InfoDisplay so it follows the app's
-                // lifetime, then continuously maintain its topmost z-order.
                 SetWindowLongPtr(_windowHandle, GwlpHwndParent, _owner.Handle);
 
                 SetWindowPos(
@@ -404,14 +394,66 @@ namespace InfoDisplayApp
                 Position();
             }
 
+            private async Task<string?> GetCurrentUrlAsync()
+            {
+                JsonElement? target = await GetPageTargetAsync();
+                if (target == null ||
+                    !target.Value.TryGetProperty("url", out JsonElement urlProperty))
+                {
+                    return null;
+                }
+
+                return urlProperty.GetString();
+            }
+
+            private async Task NavigateAsync(string url)
+            {
+                JsonElement? target = await GetPageTargetAsync();
+                if (target == null ||
+                    !target.Value.TryGetProperty("webSocketDebuggerUrl", out JsonElement wsProperty))
+                {
+                    return;
+                }
+
+                string? websocketUrl = wsProperty.GetString();
+                if (string.IsNullOrWhiteSpace(websocketUrl))
+                    return;
+
+                await SendDevToolsCommandAsync(
+                    websocketUrl,
+                    "Page.navigate",
+                    new { url });
+            }
+
             private async Task<bool> EvaluateJavaScriptAsync(string expression)
+            {
+                JsonElement? target = await GetPageTargetAsync();
+                if (target == null ||
+                    !target.Value.TryGetProperty("webSocketDebuggerUrl", out JsonElement wsProperty))
+                {
+                    return false;
+                }
+
+                string? websocketUrl = wsProperty.GetString();
+                if (string.IsNullOrWhiteSpace(websocketUrl))
+                    return false;
+
+                await SendDevToolsCommandAsync(
+                    websocketUrl,
+                    "Runtime.evaluate",
+                    new { expression, returnByValue = true });
+
+                return true;
+            }
+
+            private async Task<JsonElement?> GetPageTargetAsync()
             {
                 string endpoint = $"http://127.0.0.1:{_debugPort}/json";
                 string targetsJson = await DevToolsHttp.GetStringAsync(endpoint);
 
                 using JsonDocument targets = JsonDocument.Parse(targetsJson);
 
-                JsonElement? target = targets.RootElement
+                return targets.RootElement
                     .EnumerateArray()
                     .Where(item =>
                         item.TryGetProperty("type", out JsonElement type) &&
@@ -419,19 +461,16 @@ namespace InfoDisplayApp
                     .OrderByDescending(item =>
                         item.TryGetProperty("url", out JsonElement url) &&
                         url.GetString()?.StartsWith(_url, StringComparison.OrdinalIgnoreCase) == true)
+                    .Select(item => item.Clone())
                     .Cast<JsonElement?>()
                     .FirstOrDefault();
+            }
 
-                if (target == null ||
-                    !target.Value.TryGetProperty("webSocketDebuggerUrl", out JsonElement websocketProperty))
-                {
-                    return false;
-                }
-
-                string? websocketUrl = websocketProperty.GetString();
-                if (string.IsNullOrWhiteSpace(websocketUrl))
-                    return false;
-
+            private static async Task SendDevToolsCommandAsync(
+                string websocketUrl,
+                string method,
+                object parameters)
+            {
                 using ClientWebSocket socket = new();
                 using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(3));
 
@@ -440,12 +479,8 @@ namespace InfoDisplayApp
                 string command = JsonSerializer.Serialize(new
                 {
                     id = 1,
-                    method = "Runtime.evaluate",
-                    @params = new
-                    {
-                        expression,
-                        returnByValue = true
-                    }
+                    method,
+                    @params = parameters
                 });
 
                 byte[] payload = Encoding.UTF8.GetBytes(command);
@@ -457,7 +492,6 @@ namespace InfoDisplayApp
 
                 byte[] responseBuffer = new byte[4096];
                 await socket.ReceiveAsync(responseBuffer, timeout.Token);
-                return true;
             }
 
             private static async Task<IntPtr> WaitForNewEdgeWindowAsync(
@@ -496,6 +530,16 @@ namespace InfoDisplayApp
 
             private static HashSet<IntPtr> SnapshotVisibleEdgeWindows() =>
                 GetVisibleEdgeWindows().Select(window => window.Handle).ToHashSet();
+
+            private static HashSet<int> SnapshotEdgeProcessIds() =>
+                Process.GetProcessesByName("msedge")
+                    .Select(process =>
+                    {
+                        int id = process.Id;
+                        process.Dispose();
+                        return id;
+                    })
+                    .ToHashSet();
 
             private static List<EdgeWindowInfo> GetVisibleEdgeWindows()
             {
@@ -557,8 +601,7 @@ namespace InfoDisplayApp
                         "Microsoft", "Edge", "Application", "msedge.exe")
                 };
 
-                string? found = candidates.FirstOrDefault(File.Exists);
-                return found ?? "msedge.exe";
+                return candidates.FirstOrDefault(File.Exists) ?? "msedge.exe";
             }
 
             public void Dispose()
@@ -573,15 +616,20 @@ namespace InfoDisplayApp
                     if (_windowHandle != IntPtr.Zero && IsWindow(_windowHandle))
                         PostMessage(_windowHandle, WmClose, IntPtr.Zero, IntPtr.Zero);
 
-                    if (_windowProcessId.HasValue)
+                    Thread.Sleep(250);
+
+                    foreach (int processId in _ownedProcessIds.ToArray())
                     {
                         try
                         {
-                            using Process actualProcess = Process.GetProcessById(_windowProcessId.Value);
-                            if (!actualProcess.WaitForExit(1500))
-                                actualProcess.Kill(entireProcessTree: true);
+                            using Process process = Process.GetProcessById(processId);
+                            if (!process.HasExited)
+                                process.Kill(entireProcessTree: true);
                         }
                         catch (ArgumentException)
+                        {
+                        }
+                        catch (InvalidOperationException)
                         {
                         }
                     }
@@ -592,9 +640,9 @@ namespace InfoDisplayApp
                 }
                 finally
                 {
+                    _ownedProcessIds.Clear();
                     _launcherProcess?.Dispose();
                     _launcherProcess = null;
-                    _windowProcessId = null;
                     _windowHandle = IntPtr.Zero;
                 }
             }
