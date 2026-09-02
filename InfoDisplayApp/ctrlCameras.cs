@@ -1,12 +1,9 @@
 ﻿using LibVLCSharp.Shared;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Drawing;
-using System.Text;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace InfoDisplayApp
@@ -15,7 +12,10 @@ namespace InfoDisplayApp
     {
         private LibVLC? _libVLC;
         private MediaPlayer? _mediaPlayer;
+        private Media? _media;
+        private CancellationTokenSource? _cameraStartCancellation;
         private bool _cameraConfigured;
+        private bool _cameraStarting;
 
         private string _cameraIp = "";
         private string _cameraUsername = "";
@@ -40,9 +40,23 @@ namespace InfoDisplayApp
             _libVLC = new LibVLC(
                 "--rtsp-tcp",
                 "--network-caching=300",
-                "--live-caching=300");
+                "--live-caching=300",
+                "--no-video-title-show");
 
             _mediaPlayer = new MediaPlayer(_libVLC);
+
+            _mediaPlayer.Opening += (_, _) =>
+                Debug.WriteLine("Tapo camera: VLC opening RTSP stream.");
+            _mediaPlayer.Playing += (_, _) =>
+                Debug.WriteLine("Tapo camera: VLC playback started.");
+            _mediaPlayer.EncounteredError += (_, _) =>
+            {
+                const string message = "Tapo camera: VLC encountered a playback error.";
+                Debug.WriteLine(message);
+                AppMessages.Error(message);
+            };
+            _mediaPlayer.Stopped += (_, _) =>
+                Debug.WriteLine("Tapo camera: VLC playback stopped.");
 
             vlcPlayer.MediaPlayer = _mediaPlayer;
             vlcPlayer.Dock = DockStyle.Fill;
@@ -57,9 +71,9 @@ namespace InfoDisplayApp
 
             if (!File.Exists(configPath))
             {
-                Debug.WriteLine(
-                    $"Camera configuration file not found: {configPath}");
-
+                string message = $"Camera configuration file not found: {configPath}";
+                Debug.WriteLine(message);
+                AppMessages.Warning(message);
                 return false;
             }
 
@@ -110,9 +124,9 @@ namespace InfoDisplayApp
                     string.IsNullOrWhiteSpace(_cameraUsername) ||
                     string.IsNullOrWhiteSpace(_cameraPassword))
                 {
-                    Debug.WriteLine(
-                        "camera.conf is missing required settings.");
-
+                    const string message = "camera.conf is missing required settings.";
+                    Debug.WriteLine(message);
+                    AppMessages.Warning(message);
                     return false;
                 }
 
@@ -120,9 +134,9 @@ namespace InfoDisplayApp
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"Failed to read camera.conf: {ex}");
-
+                const string message = "Failed to read camera.conf.";
+                Debug.WriteLine($"{message} {ex}");
+                AppMessages.Error(message, ex);
                 return false;
             }
         }
@@ -130,6 +144,7 @@ namespace InfoDisplayApp
         private void ctrlCameras_Load(object sender, EventArgs e)
         {
         }
+
         public void SetMuted(bool muted)
         {
             if (_mediaPlayer == null)
@@ -142,31 +157,90 @@ namespace InfoDisplayApp
         {
             if (!_cameraConfigured)
             {
-                Debug.WriteLine(
-                    "Camera cannot start because camera.conf is missing or invalid.");
-
+                const string message = "Camera cannot start because camera.conf is missing or invalid.";
+                Debug.WriteLine(message);
+                AppMessages.Warning(message);
                 return;
             }
 
             if (_libVLC == null || _mediaPlayer == null)
                 return;
 
-            if (_mediaPlayer.IsPlaying)
+            if (_cameraStarting || _mediaPlayer.IsPlaying)
                 return;
 
-            using var media =
-                new Media(_libVLC, new Uri(RtspUrl));
+            _cameraStartCancellation?.Cancel();
+            _cameraStartCancellation?.Dispose();
+            _cameraStartCancellation = new CancellationTokenSource();
 
-            _mediaPlayer.Play(media);
+            _ = StartCameraAsync(_cameraStartCancellation.Token);
+        }
+
+        private async Task StartCameraAsync(CancellationToken cancellationToken)
+        {
+            if (_libVLC == null || _mediaPlayer == null)
+                return;
+
+            _cameraStarting = true;
+
+            try
+            {
+                Debug.WriteLine($"Tapo camera: starting RTSP stream at {_cameraIp}/{_cameraStream}.");
+
+                await Task.Yield();
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                _media?.Dispose();
+                _media = new Media(_libVLC, new Uri(RtspUrl));
+
+                MediaPlayer player = _mediaPlayer;
+                Media media = _media;
+
+                bool started = await Task.Run(
+                    () => player.Play(media),
+                    cancellationToken);
+
+                Debug.WriteLine(
+                    $"Tapo camera: VLC Play returned {(started ? "success" : "failure")}.");
+
+                if (!started)
+                    AppMessages.Error("Tapo camera: VLC could not start the RTSP stream.");
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("Tapo camera: start cancelled.");
+            }
+            catch (Exception ex)
+            {
+                const string message = "Tapo camera: failed to start stream.";
+                Debug.WriteLine($"{message} {ex}");
+                AppMessages.Error(message, ex);
+            }
+            finally
+            {
+                _cameraStarting = false;
+            }
         }
 
         public void StopCamera()
         {
+            _cameraStartCancellation?.Cancel();
+
             if (_mediaPlayer == null)
                 return;
 
-            if (_mediaPlayer.IsPlaying)
-                _mediaPlayer.Stop();
+            try
+            {
+                if (_mediaPlayer.IsPlaying)
+                    _mediaPlayer.Stop();
+            }
+            catch (Exception ex)
+            {
+                const string message = "Tapo camera: failed to stop stream.";
+                Debug.WriteLine($"{message} {ex}");
+                AppMessages.Warning($"{message} {ex.Message}");
+            }
         }
 
         public void RestartCamera()
@@ -177,12 +251,27 @@ namespace InfoDisplayApp
 
         private void CtrlCameras_Disposed(object? sender, EventArgs e)
         {
+            _cameraStartCancellation?.Cancel();
+            _cameraStartCancellation?.Dispose();
+            _cameraStartCancellation = null;
+
             if (_mediaPlayer != null)
             {
-                _mediaPlayer.Stop();
+                try
+                {
+                    _mediaPlayer.Stop();
+                }
+                catch
+                {
+                    // Best effort during shutdown.
+                }
+
                 _mediaPlayer.Dispose();
                 _mediaPlayer = null;
             }
+
+            _media?.Dispose();
+            _media = null;
 
             if (_libVLC != null)
             {
@@ -193,7 +282,6 @@ namespace InfoDisplayApp
 
         private void vlcPlayer_Click(object sender, EventArgs e)
         {
-
         }
     }
 }
