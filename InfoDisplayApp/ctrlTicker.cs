@@ -1086,7 +1086,7 @@ namespace InfoDisplayApp.Properties
             string denStatus =
                 denCheck.Result ? "Online" : "Offline";
             string doorbellStatus =
-                doorbellCheck.Result ? "Online" : "Offline";
+                doorbellCheck.Result ? "Online" : "Offline, Possibly Asleep";
 
             _tapoStatus =
                 $"Cheddar Camera (Backyard): {cheddarStatus} | " +
