@@ -5,9 +5,17 @@ namespace InfoDisplayApp
 {
     public partial class frmMain : Form
     {
+        private enum DisplaySource
+        {
+            Philo,
+            YouTube,
+            Camera
+        }
+
         private ctrlCameras? _cameraView;
         private ExternalBrowserController? _browserController;
         private ctrlAppsPanel? _appsPanel;
+        private DisplaySource _activeSource = DisplaySource.Philo;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -129,18 +137,6 @@ namespace InfoDisplayApp
 
             _browserController = new ExternalBrowserController(this, pnlTV);
 
-            try
-            {
-                await _browserController.InitializeAsync();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"External browser viewer initialization failed: {ex}");
-                AppMessages.Error(
-                    "Philo/YouTube browser viewer could not be started.",
-                    ex);
-            }
-
             // -----------------------------
             // DATE / TIME
             // -----------------------------
@@ -174,21 +170,38 @@ namespace InfoDisplayApp
             // -----------------------------
             // APP PANEL
             // -----------------------------
-            ctrlAppsPanel ctrlAppsPanel = new ctrlAppsPanel
+            _appsPanel = new ctrlAppsPanel
             {
                 Dock = DockStyle.Fill
             };
 
-            pnlApps.Controls.Add(ctrlAppsPanel);
+            pnlApps.Controls.Add(_appsPanel);
             pnlApps.Visible = false;
 
             UpdateModeButtons(true);
+
+            // Start the browser processes after the native dashboard controls
+            // exist so the clock/weather/ticker become usable immediately even
+            // if Edge needs a few seconds on first launch.
+            try
+            {
+                await _browserController.InitializeAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"External browser viewer initialization failed: {ex}");
+                AppMessages.Error(
+                    "Philo/YouTube browser viewer could not be started.",
+                    ex);
+            }
         }
 
         public async void ShowPhiloMode()
         {
             if (_cameraView == null || _browserController == null)
                 return;
+
+            _activeSource = DisplaySource.Philo;
 
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
@@ -212,6 +225,8 @@ namespace InfoDisplayApp
         {
             if (_cameraView == null)
                 return;
+
+            _activeSource = DisplaySource.Camera;
 
             if (_browserController != null)
             {
@@ -238,6 +253,8 @@ namespace InfoDisplayApp
         {
             if (_cameraView == null || _browserController == null)
                 return;
+
+            _activeSource = DisplaySource.YouTube;
 
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
@@ -268,16 +285,47 @@ namespace InfoDisplayApp
         {
         }
 
-        private void pnlBtnApps_Click(object sender, EventArgs e)
+        private async void pnlBtnApps_Click(object sender, EventArgs e)
         {
             if (pnlApps.Visible)
             {
                 pnlApps.Visible = false;
+                await RestoreActiveSourceAsync();
             }
             else
             {
+                // pnlApps is a WinForms child of pnlTV, while Edge is a separate
+                // owned top-level window. Temporarily hide browser video so the
+                // application selector can genuinely appear above the viewport.
+                if (_activeSource != DisplaySource.Camera && _browserController != null)
+                    await _browserController.HideAllAsync();
+
                 pnlApps.Visible = true;
                 pnlApps.BringToFront();
+            }
+        }
+
+        private async Task RestoreActiveSourceAsync()
+        {
+            if (_browserController == null)
+                return;
+
+            try
+            {
+                switch (_activeSource)
+                {
+                    case DisplaySource.Philo:
+                        await _browserController.ShowPhiloAsync();
+                        break;
+
+                    case DisplaySource.YouTube:
+                        await _browserController.ShowYouTubeAsync();
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to restore browser viewer: {ex.Message}");
             }
         }
 
