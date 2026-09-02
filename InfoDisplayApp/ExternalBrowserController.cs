@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -64,11 +65,12 @@ namespace InfoDisplayApp
         {
             ThrowIfDisposed();
 
-            // Launch both services up front. With separate profiles, Philo and
-            // YouTube keep independent cookies/login state and renderer processes.
-            await Task.WhenAll(
-                _philo.StartAsync(),
-                _youtube.StartAsync());
+            // Start these sequentially. Edge's launcher process often hands the
+            // window off to another msedge.exe process and exits immediately.
+            // Sequential startup also lets each BrowserWindow reliably identify
+            // the new top-level window that belongs to its own app-mode launch.
+            await _philo.StartAsync();
+            await _youtube.StartAsync();
 
             await _philo.SetMutedAsync(false);
             await _youtube.SetMutedAsync(true);
@@ -128,8 +130,6 @@ namespace InfoDisplayApp
 
         private void OwnerActivated(object? sender, EventArgs e)
         {
-            // Owned browser windows normally stay above the owner, but nudging
-            // their z-order here keeps them over pnlTV after task switching.
             RepositionVisibleWindows();
             _philo.RefreshZOrderIfVisible();
             _youtube.RefreshZOrderIfVisible();
@@ -166,7 +166,9 @@ namespace InfoDisplayApp
             private readonly int _debugPort;
             private readonly Form _owner;
             private readonly Control _viewport;
-            private Process? _process;
+
+            private Process? _launcherProcess;
+            private int? _windowProcessId;
             private IntPtr _windowHandle;
             private bool _visible;
             private bool _disposed;
@@ -191,10 +193,13 @@ namespace InfoDisplayApp
             private const uint SwpNoActivate = 0x0010;
             private const uint SwpFrameChanged = 0x0020;
             private const uint SwpShowWindow = 0x0040;
+            private const uint SwpNoMove = 0x0002;
+            private const uint SwpNoSize = 0x0001;
             private const int SwHide = 0;
             private const int SwShowNoActivate = 8;
+            private const uint WmClose = 0x0010;
 
-            private static readonly IntPtr HwndTop = new(0);
+            private static readonly IntPtr HwndTop = IntPtr.Zero;
 
             public BrowserWindow(
                 string name,
@@ -220,10 +225,12 @@ namespace InfoDisplayApp
                 Directory.CreateDirectory(_profileDirectory);
 
                 string edgePath = FindEdgeExecutable();
+                HashSet<IntPtr> windowsBeforeLaunch = SnapshotVisibleEdgeWindows();
+
                 string arguments =
                     $"--app=\"{_url}\" " +
                     $"--user-data-dir=\"{_profileDirectory}\" " +
-                    $"--remote-debugging-address=127.0.0.1 " +
+                    "--remote-debugging-address=127.0.0.1 " +
                     $"--remote-debugging-port={_debugPort} " +
                     "--no-first-run " +
                     "--no-default-browser-check " +
@@ -238,34 +245,42 @@ namespace InfoDisplayApp
                     WorkingDirectory = Path.GetDirectoryName(edgePath) ?? AppContext.BaseDirectory
                 };
 
-                _process = Process.Start(startInfo)
+                _launcherProcess = Process.Start(startInfo)
                     ?? throw new InvalidOperationException($"Unable to start {_name} browser.");
 
-                _windowHandle = await WaitForWindowAsync(_process, TimeSpan.FromSeconds(15));
+                _windowHandle = await WaitForNewEdgeWindowAsync(
+                    windowsBeforeLaunch,
+                    _name,
+                    TimeSpan.FromSeconds(20));
 
                 if (_windowHandle == IntPtr.Zero)
                 {
                     throw new InvalidOperationException(
-                        $"{_name} browser started but no visible app window was found.");
+                        $"{_name} browser was launched, but InfoDisplay could not locate its Edge app window.");
                 }
+
+                GetWindowThreadProcessId(_windowHandle, out uint actualProcessId);
+                if (actualProcessId != 0)
+                    _windowProcessId = (int)actualProcessId;
 
                 ConfigureWindow();
                 Position();
 
-                Debug.WriteLine($"{_name}: external Edge viewer started on DevTools port {_debugPort}.");
+                Debug.WriteLine(
+                    $"{_name}: external Edge viewer started. " +
+                    $"Window PID={_windowProcessId?.ToString() ?? "unknown"}, " +
+                    $"DevTools port={_debugPort}.");
             }
 
             public async Task SetMutedAsync(bool muted)
             {
-                if (_disposed || _process == null || _process.HasExited)
+                if (_disposed || _windowHandle == IntPtr.Zero || !IsWindow(_windowHandle))
                     return;
 
                 string value = muted ? "true" : "false";
                 string expression =
                     $"document.querySelectorAll('video,audio').forEach(m => m.muted = {value});";
 
-                // Chromium pages may not expose the media element immediately after
-                // startup/navigation. A few short attempts make switching reliable.
                 for (int attempt = 0; attempt < 4; attempt++)
                 {
                     try
@@ -285,7 +300,7 @@ namespace InfoDisplayApp
 
             public void Show()
             {
-                if (_windowHandle == IntPtr.Zero || _disposed)
+                if (_windowHandle == IntPtr.Zero || _disposed || !IsWindow(_windowHandle))
                     return;
 
                 Position();
@@ -296,7 +311,7 @@ namespace InfoDisplayApp
 
             public void Hide()
             {
-                if (_windowHandle == IntPtr.Zero || _disposed)
+                if (_windowHandle == IntPtr.Zero || _disposed || !IsWindow(_windowHandle))
                     return;
 
                 ShowWindow(_windowHandle, SwHide);
@@ -311,7 +326,7 @@ namespace InfoDisplayApp
 
             public void RefreshZOrderIfVisible()
             {
-                if (!_visible || _windowHandle == IntPtr.Zero)
+                if (!_visible || _windowHandle == IntPtr.Zero || !IsWindow(_windowHandle))
                     return;
 
                 SetWindowPos(
@@ -321,13 +336,18 @@ namespace InfoDisplayApp
                     0,
                     0,
                     0,
-                    0x0001 | 0x0002 | SwpNoActivate);
+                    SwpNoMove | SwpNoSize | SwpNoActivate);
             }
 
             public void Position()
             {
-                if (_windowHandle == IntPtr.Zero || _disposed || !_viewport.IsHandleCreated)
+                if (_windowHandle == IntPtr.Zero ||
+                    _disposed ||
+                    !IsWindow(_windowHandle) ||
+                    !_viewport.IsHandleCreated)
+                {
                     return;
+                }
 
                 Point screenLocation = _viewport.PointToScreen(Point.Empty);
                 Size size = _viewport.ClientSize;
@@ -353,9 +373,8 @@ namespace InfoDisplayApp
                 exStyle &= ~WsExAppWindow;
                 SetWindowLongPtr(_windowHandle, GwlExStyle, new IntPtr(exStyle));
 
-                // Make the browser a top-level owned window, not a child window.
-                // This keeps Chromium happy while tying its z-order/minimize state
-                // to InfoDisplayApp.
+                // Keep Chromium as a real top-level window, but make InfoDisplay
+                // its owner so minimizing/activation behaves like one application.
                 SetWindowLongPtr(_windowHandle, GwlpHwndParent, _owner.Handle);
 
                 SetWindowPos(
@@ -365,7 +384,7 @@ namespace InfoDisplayApp
                     0,
                     0,
                     0,
-                    0x0001 | 0x0002 | SwpNoActivate | SwpFrameChanged);
+                    SwpNoMove | SwpNoSize | SwpNoActivate | SwpFrameChanged);
             }
 
             private async Task<bool> EvaluateJavaScriptAsync(string expression)
@@ -419,31 +438,45 @@ namespace InfoDisplayApp
                     true,
                     timeout.Token);
 
-                // Receiving the acknowledgement ensures Chromium accepted the
-                // command before the short-lived DevTools connection is closed.
                 byte[] responseBuffer = new byte[4096];
                 await socket.ReceiveAsync(responseBuffer, timeout.Token);
                 return true;
             }
 
-            private static async Task<IntPtr> WaitForWindowAsync(
-                Process process,
+            private static async Task<IntPtr> WaitForNewEdgeWindowAsync(
+                HashSet<IntPtr> windowsBeforeLaunch,
+                string preferredTitle,
                 TimeSpan timeout)
             {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
                 while (stopwatch.Elapsed < timeout)
                 {
-                    if (process.HasExited)
-                        return IntPtr.Zero;
+                    List<EdgeWindowInfo> candidates = GetVisibleEdgeWindows()
+                        .Where(window => !windowsBeforeLaunch.Contains(window.Handle))
+                        .ToList();
 
-                    process.Refresh();
-                    if (process.MainWindowHandle != IntPtr.Zero)
-                        return process.MainWindowHandle;
+                    EdgeWindowInfo preferred = candidates.FirstOrDefault(window =>
+                        window.Title.Contains(
+                            preferredTitle,
+                            StringComparison.OrdinalIgnoreCase));
 
-                    IntPtr enumerated = FindTopLevelWindowForProcess(process.Id);
-                    if (enumerated != IntPtr.Zero)
-                        return enumerated;
+                    if (preferred.Handle != IntPtr.Zero)
+                        return preferred.Handle;
+
+                    if (candidates.Count == 1)
+                        return candidates[0].Handle;
+
+                    // Some Edge builds create the window before our initial
+                    // snapshot completes. As a fallback, accept a title match
+                    // even if its HWND was already present in that snapshot.
+                    EdgeWindowInfo fallback = GetVisibleEdgeWindows().FirstOrDefault(window =>
+                        window.Title.Contains(
+                            preferredTitle,
+                            StringComparison.OrdinalIgnoreCase));
+
+                    if (fallback.Handle != IntPtr.Zero)
+                        return fallback.Handle;
 
                     await Task.Delay(150);
                 }
@@ -451,24 +484,57 @@ namespace InfoDisplayApp
                 return IntPtr.Zero;
             }
 
-            private static IntPtr FindTopLevelWindowForProcess(int processId)
+            private static HashSet<IntPtr> SnapshotVisibleEdgeWindows() =>
+                GetVisibleEdgeWindows()
+                    .Select(window => window.Handle)
+                    .ToHashSet();
+
+            private static List<EdgeWindowInfo> GetVisibleEdgeWindows()
             {
-                IntPtr result = IntPtr.Zero;
+                List<EdgeWindowInfo> windows = new();
 
                 EnumWindows((handle, _) =>
                 {
-                    GetWindowThreadProcessId(handle, out uint windowProcessId);
+                    if (!IsWindowVisible(handle))
+                        return true;
 
-                    if (windowProcessId == processId && IsWindowVisible(handle))
-                    {
-                        result = handle;
-                        return false;
-                    }
+                    GetWindowThreadProcessId(handle, out uint processId);
+                    if (processId == 0 || !IsEdgeProcess((int)processId))
+                        return true;
+
+                    windows.Add(new EdgeWindowInfo(
+                        handle,
+                        (int)processId,
+                        GetWindowTitle(handle)));
 
                     return true;
                 }, IntPtr.Zero);
 
-                return result;
+                return windows;
+            }
+
+            private static bool IsEdgeProcess(int processId)
+            {
+                try
+                {
+                    using Process process = Process.GetProcessById(processId);
+                    return process.ProcessName.Equals("msedge", StringComparison.OrdinalIgnoreCase);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            private static string GetWindowTitle(IntPtr handle)
+            {
+                int length = GetWindowTextLength(handle);
+                if (length <= 0)
+                    return string.Empty;
+
+                StringBuilder title = new(length + 1);
+                GetWindowText(handle, title, title.Capacity);
+                return title.ToString();
             }
 
             private static string FindEdgeExecutable()
@@ -496,14 +562,23 @@ namespace InfoDisplayApp
 
                 try
                 {
-                    Hide();
-
-                    if (_process != null && !_process.HasExited)
+                    if (_windowHandle != IntPtr.Zero && IsWindow(_windowHandle))
                     {
-                        _process.CloseMainWindow();
+                        PostMessage(_windowHandle, WmClose, IntPtr.Zero, IntPtr.Zero);
+                    }
 
-                        if (!_process.WaitForExit(1500))
-                            _process.Kill(entireProcessTree: true);
+                    if (_windowProcessId.HasValue)
+                    {
+                        try
+                        {
+                            using Process actualProcess = Process.GetProcessById(_windowProcessId.Value);
+                            if (!actualProcess.WaitForExit(1500))
+                                actualProcess.Kill(entireProcessTree: true);
+                        }
+                        catch (ArgumentException)
+                        {
+                            // The browser already exited normally.
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -512,11 +587,17 @@ namespace InfoDisplayApp
                 }
                 finally
                 {
-                    _process?.Dispose();
-                    _process = null;
+                    _launcherProcess?.Dispose();
+                    _launcherProcess = null;
+                    _windowProcessId = null;
                     _windowHandle = IntPtr.Zero;
                 }
             }
+
+            private readonly record struct EdgeWindowInfo(
+                IntPtr Handle,
+                int ProcessId,
+                string Title);
 
             private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
@@ -530,7 +611,19 @@ namespace InfoDisplayApp
             private static extern bool IsWindowVisible(IntPtr hWnd);
 
             [DllImport("user32.dll")]
+            private static extern bool IsWindow(IntPtr hWnd);
+
+            [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+            private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+            [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+            private static extern int GetWindowTextLength(IntPtr hWnd);
+
+            [DllImport("user32.dll")]
             private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+            [DllImport("user32.dll")]
+            private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
             [DllImport("user32.dll", SetLastError = true)]
             private static extern bool SetWindowPos(
