@@ -16,61 +16,55 @@ namespace InfoDisplayApp
 {
     internal sealed class ExternalBrowserController : IDisposable
     {
-        private readonly Form _owner;
-        private readonly Control _viewport;
-        private readonly BrowserWindow _philo;
-        private readonly BrowserWindow _youtube;
+        private const string PhiloUrl = "https://www.philo.com/";
+        private const string YouTubeUrl = "https://www.youtube.com/";
+
+        private readonly BrowserWindow _browser;
         private readonly System.Windows.Forms.Timer _zOrderTimer;
         private bool _disposed;
 
         public ExternalBrowserController(Form owner, Control viewport)
         {
-            _owner = owner;
-            _viewport = viewport;
-
-            string profileRoot = Path.Combine(
+            // Reuse the existing Philo profile so the login/cookies already created
+            // while testing this branch are preserved. YouTube will share this same
+            // normal Edge profile from now on.
+            string profileDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "InfoDisplayApp",
-                "BrowserProfiles");
+                "BrowserProfiles",
+                "Philo");
 
-            _philo = new BrowserWindow(
-                "Philo",
-                "https://www.philo.com/",
-                Path.Combine(profileRoot, "Philo"),
+            _browser = new BrowserWindow(
+                PhiloUrl,
+                profileDirectory,
                 9222,
                 owner,
                 viewport);
 
-            _youtube = new BrowserWindow(
-                "YouTube",
-                "https://www.youtube.com/",
-                Path.Combine(profileRoot, "YouTube"),
-                9223,
-                owner,
-                viewport);
+            owner.Move += OwnerBoundsChanged;
+            owner.Resize += OwnerBoundsChanged;
+            owner.Activated += OwnerActivated;
+            viewport.Resize += OwnerBoundsChanged;
+            viewport.LocationChanged += OwnerBoundsChanged;
 
-            _owner.Move += OwnerBoundsChanged;
-            _owner.Resize += OwnerBoundsChanged;
-            _owner.Activated += OwnerActivated;
-            _viewport.Resize += OwnerBoundsChanged;
-            _viewport.LocationChanged += OwnerBoundsChanged;
+            _owner = owner;
+            _viewport = viewport;
 
             _zOrderTimer = new System.Windows.Forms.Timer { Interval = 250 };
             _zOrderTimer.Tick += (_, _) => RepositionVisibleWindows();
         }
 
+        private readonly Form _owner;
+        private readonly Control _viewport;
+
         public async Task InitializeAsync()
         {
             ThrowIfDisposed();
 
-            await _philo.StartAsync();
-            await _youtube.StartAsync();
-
-            await _philo.SetMutedAsync(false);
-            await _youtube.SetMutedAsync(true);
-
-            _youtube.Hide();
-            _philo.Show();
+            await _browser.StartAsync();
+            await _browser.NavigateAsync(PhiloUrl);
+            await _browser.SetMutedAsync(false);
+            _browser.Show();
             _zOrderTimer.Start();
         }
 
@@ -78,24 +72,18 @@ namespace InfoDisplayApp
         {
             ThrowIfDisposed();
 
-            await _youtube.SetMutedAsync(true);
-            _youtube.Hide();
-
-            _philo.Show();
-            await _philo.EnsureServicePageAsync();
-            await _philo.SetMutedAsync(false);
+            _browser.Show();
+            await _browser.NavigateAsync(PhiloUrl);
+            await _browser.SetMutedAsync(false);
         }
 
         public async Task ShowYouTubeAsync()
         {
             ThrowIfDisposed();
 
-            await _philo.SetMutedAsync(true);
-            _philo.Hide();
-
-            _youtube.Show();
-            await _youtube.EnsureServicePageAsync();
-            await _youtube.SetMutedAsync(false);
+            _browser.Show();
+            await _browser.NavigateAsync(YouTubeUrl);
+            await _browser.SetMutedAsync(false);
         }
 
         public async Task HideAllAsync()
@@ -103,12 +91,8 @@ namespace InfoDisplayApp
             if (_disposed)
                 return;
 
-            await Task.WhenAll(
-                _philo.SetMutedAsync(true),
-                _youtube.SetMutedAsync(true));
-
-            _philo.Hide();
-            _youtube.Hide();
+            await _browser.SetMutedAsync(true);
+            _browser.Hide();
         }
 
         public void RepositionVisibleWindows()
@@ -116,8 +100,7 @@ namespace InfoDisplayApp
             if (_disposed)
                 return;
 
-            _philo.PositionIfVisible();
-            _youtube.PositionIfVisible();
+            _browser.PositionIfVisible();
         }
 
         private void OwnerBoundsChanged(object? sender, EventArgs e) =>
@@ -147,14 +130,12 @@ namespace InfoDisplayApp
             _viewport.Resize -= OwnerBoundsChanged;
             _viewport.LocationChanged -= OwnerBoundsChanged;
 
-            _philo.Dispose();
-            _youtube.Dispose();
+            _browser.Dispose();
         }
 
         private sealed class BrowserWindow : IDisposable
         {
-            private readonly string _name;
-            private readonly string _url;
+            private readonly string _initialUrl;
             private readonly string _profileDirectory;
             private readonly int _debugPort;
             private readonly Form _owner;
@@ -191,15 +172,13 @@ namespace InfoDisplayApp
             private static readonly IntPtr HwndTopMost = new(-1);
 
             public BrowserWindow(
-                string name,
-                string url,
+                string initialUrl,
                 string profileDirectory,
                 int debugPort,
                 Form owner,
                 Control viewport)
             {
-                _name = name;
-                _url = url;
+                _initialUrl = initialUrl;
                 _profileDirectory = profileDirectory;
                 _debugPort = debugPort;
                 _owner = owner;
@@ -217,11 +196,8 @@ namespace InfoDisplayApp
                 HashSet<IntPtr> windowsBeforeLaunch = SnapshotVisibleEdgeWindows();
                 HashSet<int> processesBeforeLaunch = SnapshotEdgeProcessIds();
 
-                // Edge kiosk mode deliberately uses InPrivate. We need persistent
-                // cookies/login state, so use normal app mode and ask Chromium to
-                // enter fullscreen instead.
                 string arguments =
-                    $"--app=\"{_url}\" " +
+                    $"--app=\"{_initialUrl}\" " +
                     "--start-fullscreen " +
                     $"--user-data-dir=\"{_profileDirectory}\" " +
                     "--remote-debugging-address=127.0.0.1 " +
@@ -240,17 +216,16 @@ namespace InfoDisplayApp
                 };
 
                 _launcherProcess = Process.Start(startInfo)
-                    ?? throw new InvalidOperationException($"Unable to start {_name} browser.");
+                    ?? throw new InvalidOperationException("Unable to start external Edge viewer.");
 
                 _windowHandle = await WaitForNewEdgeWindowAsync(
                     windowsBeforeLaunch,
-                    _name,
                     TimeSpan.FromSeconds(20));
 
                 if (_windowHandle == IntPtr.Zero)
                 {
                     throw new InvalidOperationException(
-                        $"{_name} browser was launched, but InfoDisplay could not locate its Edge app window.");
+                        "Edge was launched, but InfoDisplay could not locate its viewer window.");
                 }
 
                 foreach (int processId in SnapshotEdgeProcessIds())
@@ -264,13 +239,10 @@ namespace InfoDisplayApp
                     _ownedProcessIds.Add((int)windowPid);
 
                 ConfigureWindow();
-                await EnsureServicePageAsync();
-
-                Debug.WriteLine(
-                    $"{_name}: external Edge viewer started on DevTools port {_debugPort}.");
+                Debug.WriteLine($"External Edge viewer started on DevTools port {_debugPort}.");
             }
 
-            public async Task EnsureServicePageAsync()
+            public async Task NavigateAsync(string url)
             {
                 if (_disposed || _windowHandle == IntPtr.Zero || !IsWindow(_windowHandle))
                     return;
@@ -278,16 +250,47 @@ namespace InfoDisplayApp
                 try
                 {
                     string? currentUrl = await GetCurrentUrlAsync();
-                    if (string.IsNullOrWhiteSpace(currentUrl) ||
-                        !currentUrl.StartsWith(_url, StringComparison.OrdinalIgnoreCase))
+                    if (!string.IsNullOrWhiteSpace(currentUrl) &&
+                        UrlMatchesService(currentUrl, url))
                     {
-                        await NavigateAsync(_url);
+                        return;
                     }
+
+                    JsonElement? target = await GetPageTargetAsync();
+                    if (target == null ||
+                        !target.Value.TryGetProperty("webSocketDebuggerUrl", out JsonElement wsProperty))
+                    {
+                        throw new InvalidOperationException("No controllable Edge page target was found.");
+                    }
+
+                    string? websocketUrl = wsProperty.GetString();
+                    if (string.IsNullOrWhiteSpace(websocketUrl))
+                        throw new InvalidOperationException("Edge did not expose a DevTools websocket URL.");
+
+                    await SendDevToolsCommandAsync(
+                        websocketUrl,
+                        "Page.navigate",
+                        new { url });
+
+                    Debug.WriteLine($"External Edge viewer navigated to {url}");
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"{_name}: unable to verify service page: {ex.Message}");
+                    Debug.WriteLine($"External Edge viewer navigation failed: {ex.Message}");
+                    throw;
                 }
+            }
+
+            private static bool UrlMatchesService(string currentUrl, string requestedUrl)
+            {
+                if (!Uri.TryCreate(currentUrl, UriKind.Absolute, out Uri? current) ||
+                    !Uri.TryCreate(requestedUrl, UriKind.Absolute, out Uri? requested))
+                {
+                    return currentUrl.StartsWith(requestedUrl, StringComparison.OrdinalIgnoreCase);
+                }
+
+                return current.Host.Equals(requested.Host, StringComparison.OrdinalIgnoreCase) ||
+                    current.Host.EndsWith("." + requested.Host, StringComparison.OrdinalIgnoreCase);
             }
 
             public async Task SetMutedAsync(bool muted)
@@ -309,7 +312,7 @@ namespace InfoDisplayApp
                     catch (Exception ex)
                     {
                         if (attempt == 3)
-                            Debug.WriteLine($"{_name}: unable to update mute state: {ex.Message}");
+                            Debug.WriteLine($"External Edge viewer mute update failed: {ex.Message}");
                     }
 
                     await Task.Delay(350);
@@ -406,25 +409,6 @@ namespace InfoDisplayApp
                 return urlProperty.GetString();
             }
 
-            private async Task NavigateAsync(string url)
-            {
-                JsonElement? target = await GetPageTargetAsync();
-                if (target == null ||
-                    !target.Value.TryGetProperty("webSocketDebuggerUrl", out JsonElement wsProperty))
-                {
-                    return;
-                }
-
-                string? websocketUrl = wsProperty.GetString();
-                if (string.IsNullOrWhiteSpace(websocketUrl))
-                    return;
-
-                await SendDevToolsCommandAsync(
-                    websocketUrl,
-                    "Page.navigate",
-                    new { url });
-            }
-
             private async Task<bool> EvaluateJavaScriptAsync(string expression)
             {
                 JsonElement? target = await GetPageTargetAsync();
@@ -458,9 +442,6 @@ namespace InfoDisplayApp
                     .Where(item =>
                         item.TryGetProperty("type", out JsonElement type) &&
                         type.GetString() == "page")
-                    .OrderByDescending(item =>
-                        item.TryGetProperty("url", out JsonElement url) &&
-                        url.GetString()?.StartsWith(_url, StringComparison.OrdinalIgnoreCase) == true)
                     .Select(item => item.Clone())
                     .Cast<JsonElement?>()
                     .FirstOrDefault();
@@ -496,7 +477,6 @@ namespace InfoDisplayApp
 
             private static async Task<IntPtr> WaitForNewEdgeWindowAsync(
                 HashSet<IntPtr> windowsBeforeLaunch,
-                string preferredTitle,
                 TimeSpan timeout)
             {
                 Stopwatch stopwatch = Stopwatch.StartNew();
@@ -507,20 +487,8 @@ namespace InfoDisplayApp
                         .Where(window => !windowsBeforeLaunch.Contains(window.Handle))
                         .ToList();
 
-                    EdgeWindowInfo preferred = candidates.FirstOrDefault(window =>
-                        window.Title.Contains(preferredTitle, StringComparison.OrdinalIgnoreCase));
-
-                    if (preferred.Handle != IntPtr.Zero)
-                        return preferred.Handle;
-
-                    if (candidates.Count == 1)
+                    if (candidates.Count > 0)
                         return candidates[0].Handle;
-
-                    EdgeWindowInfo fallback = GetVisibleEdgeWindows().FirstOrDefault(window =>
-                        window.Title.Contains(preferredTitle, StringComparison.OrdinalIgnoreCase));
-
-                    if (fallback.Handle != IntPtr.Zero)
-                        return fallback.Handle;
 
                     await Task.Delay(150);
                 }
@@ -636,7 +604,7 @@ namespace InfoDisplayApp
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"{_name}: browser shutdown issue: {ex.Message}");
+                    Debug.WriteLine($"External Edge viewer shutdown issue: {ex.Message}");
                 }
                 finally
                 {
