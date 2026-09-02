@@ -50,7 +50,11 @@ namespace InfoDisplayApp
             _mediaPlayer.Playing += (_, _) =>
                 Debug.WriteLine("Tapo camera: VLC playback started.");
             _mediaPlayer.EncounteredError += (_, _) =>
-                Debug.WriteLine("Tapo camera: VLC encountered a playback error.");
+            {
+                const string message = "Tapo camera: VLC encountered a playback error.";
+                Debug.WriteLine(message);
+                AppMessages.Error(message);
+            };
             _mediaPlayer.Stopped += (_, _) =>
                 Debug.WriteLine("Tapo camera: VLC playback stopped.");
 
@@ -67,9 +71,9 @@ namespace InfoDisplayApp
 
             if (!File.Exists(configPath))
             {
-                Debug.WriteLine(
-                    $"Camera configuration file not found: {configPath}");
-
+                string message = $"Camera configuration file not found: {configPath}";
+                Debug.WriteLine(message);
+                AppMessages.Warning(message);
                 return false;
             }
 
@@ -120,9 +124,9 @@ namespace InfoDisplayApp
                     string.IsNullOrWhiteSpace(_cameraUsername) ||
                     string.IsNullOrWhiteSpace(_cameraPassword))
                 {
-                    Debug.WriteLine(
-                        "camera.conf is missing required settings.");
-
+                    const string message = "camera.conf is missing required settings.";
+                    Debug.WriteLine(message);
+                    AppMessages.Warning(message);
                     return false;
                 }
 
@@ -130,9 +134,9 @@ namespace InfoDisplayApp
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"Failed to read camera.conf: {ex}");
-
+                const string message = "Failed to read camera.conf.";
+                Debug.WriteLine($"{message} {ex}");
+                AppMessages.Error(message, ex);
                 return false;
             }
         }
@@ -153,9 +157,9 @@ namespace InfoDisplayApp
         {
             if (!_cameraConfigured)
             {
-                Debug.WriteLine(
-                    "Camera cannot start because camera.conf is missing or invalid.");
-
+                const string message = "Camera cannot start because camera.conf is missing or invalid.";
+                Debug.WriteLine(message);
+                AppMessages.Warning(message);
                 return;
             }
 
@@ -183,8 +187,6 @@ namespace InfoDisplayApp
             {
                 Debug.WriteLine($"Tapo camera: starting RTSP stream at {_cameraIp}/{_cameraStream}.");
 
-                // Let the VideoView become visible and finish its layout before asking
-                // LibVLC to attach/start the native video output.
                 await Task.Yield();
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -195,15 +197,15 @@ namespace InfoDisplayApp
                 MediaPlayer player = _mediaPlayer;
                 Media media = _media;
 
-                // LibVLC normally returns from Play immediately, but keeping the native
-                // start call off the WinForms UI thread prevents a stalled RTSP/native
-                // VLC call from freezing the entire dashboard.
                 bool started = await Task.Run(
                     () => player.Play(media),
                     cancellationToken);
 
                 Debug.WriteLine(
                     $"Tapo camera: VLC Play returned {(started ? "success" : "failure")}.");
+
+                if (!started)
+                    AppMessages.Error("Tapo camera: VLC could not start the RTSP stream.");
             }
             catch (OperationCanceledException)
             {
@@ -211,7 +213,9 @@ namespace InfoDisplayApp
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Tapo camera: failed to start stream: {ex}");
+                const string message = "Tapo camera: failed to start stream.";
+                Debug.WriteLine($"{message} {ex}");
+                AppMessages.Error(message, ex);
             }
             finally
             {
@@ -233,7 +237,9 @@ namespace InfoDisplayApp
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Tapo camera: failed to stop stream: {ex}");
+                const string message = "Tapo camera: failed to stop stream.";
+                Debug.WriteLine($"{message} {ex}");
+                AppMessages.Warning($"{message} {ex.Message}");
             }
         }
 
