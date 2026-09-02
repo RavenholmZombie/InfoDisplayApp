@@ -20,6 +20,7 @@ namespace InfoDisplayApp
         private readonly Control _viewport;
         private readonly BrowserWindow _philo;
         private readonly BrowserWindow _youtube;
+        private readonly System.Windows.Forms.Timer _zOrderTimer;
         private bool _disposed;
 
         public ExternalBrowserController(Form owner, Control viewport)
@@ -53,6 +54,22 @@ namespace InfoDisplayApp
             _owner.Activated += OwnerActivated;
             _viewport.Resize += OwnerBoundsChanged;
             _viewport.LocationChanged += OwnerBoundsChanged;
+
+            // frmMain is TopMost, so Windows can occasionally put it back above
+            // the external browser after the user clicks another dashboard control.
+            // Keep the currently visible browser in the topmost band and aligned
+            // to pnlTV without stealing focus.
+            _zOrderTimer = new System.Windows.Forms.Timer
+            {
+                Interval = 250
+            };
+            _zOrderTimer.Tick += (_, _) =>
+            {
+                RepositionVisibleWindows();
+                _philo.RefreshZOrderIfVisible();
+                _youtube.RefreshZOrderIfVisible();
+            };
+            _zOrderTimer.Start();
         }
 
         public async Task InitializeAsync()
@@ -136,6 +153,9 @@ namespace InfoDisplayApp
 
             _disposed = true;
 
+            _zOrderTimer.Stop();
+            _zOrderTimer.Dispose();
+
             _owner.Move -= OwnerBoundsChanged;
             _owner.Resize -= OwnerBoundsChanged;
             _owner.Activated -= OwnerActivated;
@@ -170,9 +190,6 @@ namespace InfoDisplayApp
             private const int GwlExStyle = -20;
             private const int GwlpHwndParent = -8;
 
-            // Replace Edge's normal overlapped-window frame with a popup-style
-            // top-level window. Clearing only WS_CAPTION was not enough on some
-            // Edge builds, which could recreate the standard blue title bar.
             private const long WsOverlappedWindow = 0x00CF0000L;
             private const long WsPopup = unchecked((long)0x80000000L);
             private const long WsVisible = 0x10000000L;
@@ -188,8 +205,6 @@ namespace InfoDisplayApp
             private const int SwShowNoActivate = 8;
             private const uint WmClose = 0x0010;
 
-            // frmMain itself is TopMost. HWND_TOP only moves a window within its
-            // current z-order band, so Edge could remain underneath frmMain.
             private static readonly IntPtr HwndTopMost = new(-1);
 
             public BrowserWindow(
@@ -218,8 +233,13 @@ namespace InfoDisplayApp
                 string edgePath = FindEdgeExecutable();
                 HashSet<IntPtr> windowsBeforeLaunch = SnapshotVisibleEdgeWindows();
 
+                // Edge kiosk mode removes the browser/title-bar chrome at the
+                // Chromium level. We still resize the resulting kiosk window to
+                // pnlTV immediately after startup, so it behaves like an embedded
+                // viewer instead of taking over the whole display.
                 string arguments =
-                    $"--app=\"{_url}\" " +
+                    $"--kiosk=\"{_url}\" " +
+                    "--edge-kiosk-type=fullscreen " +
                     $"--user-data-dir=\"{_profileDirectory}\" " +
                     "--remote-debugging-address=127.0.0.1 " +
                     $"--remote-debugging-port={_debugPort} " +
@@ -247,7 +267,7 @@ namespace InfoDisplayApp
                 if (_windowHandle == IntPtr.Zero)
                 {
                     throw new InvalidOperationException(
-                        $"{_name} browser was launched, but InfoDisplay could not locate its Edge app window.");
+                        $"{_name} browser was launched, but InfoDisplay could not locate its Edge kiosk window.");
                 }
 
                 GetWindowThreadProcessId(_windowHandle, out uint actualProcessId);
@@ -257,7 +277,7 @@ namespace InfoDisplayApp
                 ConfigureWindow();
 
                 Debug.WriteLine(
-                    $"{_name}: external Edge viewer started. " +
+                    $"{_name}: external Edge kiosk viewer started. " +
                     $"Window PID={_windowProcessId?.ToString() ?? "unknown"}, " +
                     $"DevTools port={_debugPort}.");
             }
@@ -364,8 +384,8 @@ namespace InfoDisplayApp
                 exStyle &= ~WsExAppWindow;
                 SetWindowLongPtr(_windowHandle, GwlExStyle, new IntPtr(exStyle));
 
-                // Keep the external viewer tied to InfoDisplay's lifetime/z-order,
-                // while leaving it a genuine top-level Chromium window.
+                // Keep the viewer owned by InfoDisplay so it follows the app's
+                // lifetime, then continuously maintain its topmost z-order.
                 SetWindowLongPtr(_windowHandle, GwlpHwndParent, _owner.Handle);
 
                 SetWindowPos(
