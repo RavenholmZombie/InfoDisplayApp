@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -10,8 +13,8 @@ namespace InfoDisplayApp.Infrastructure
 {
     /// <summary>
     /// Small resilience wrapper used by the weather controls.
-    /// Retries transient failures and briefly falls back to the last
-    /// successful response instead of blanking the dashboard.
+    /// Retries transient failures and falls back to the last known-good
+    /// weather response when the upstream service is temporarily unavailable.
     /// </summary>
     internal sealed class ResilientHttpClient
     {
@@ -21,8 +24,12 @@ namespace InfoDisplayApp.Infrastructure
         };
 
         private static readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
+        private static readonly TimeSpan MaxCachedAge = TimeSpan.FromHours(12);
+        private static readonly string CacheDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "InfoDisplayApp",
+            "WeatherCache");
 
-        private static readonly TimeSpan MaxCachedAge = TimeSpan.FromHours(2);
         private const int MaxAttempts = 4;
 
         public async Task<string> GetStringAsync(string requestUri)
@@ -50,16 +57,16 @@ namespace InfoDisplayApp.Infrastructure
                         }
                         else
                         {
-                            _cache[requestUri] = new CacheEntry(content, DateTimeOffset.UtcNow);
+                            CacheEntry entry = new(content, DateTimeOffset.UtcNow);
+                            _cache[requestUri] = entry;
+                            await SaveDiskCacheAsync(requestUri, entry).ConfigureAwait(false);
                             return content;
                         }
                     }
                     else
                     {
                         if (!IsTransient(response.StatusCode))
-                        {
                             response.EnsureSuccessStatusCode();
-                        }
 
                         lastException = new HttpRequestException(
                             $"Weather service returned HTTP {(int)response.StatusCode} ({response.StatusCode}).",
@@ -83,19 +90,85 @@ namespace InfoDisplayApp.Infrastructure
                 }
             }
 
-            if (_cache.TryGetValue(requestUri, out CacheEntry cached) &&
-                DateTimeOffset.UtcNow - cached.Timestamp <= MaxCachedAge &&
-                TryValidateJson(cached.Content, out _))
+            CacheEntry? cached = await GetUsableCacheEntryAsync(requestUri).ConfigureAwait(false);
+            if (cached.HasValue)
             {
                 Debug.WriteLine(
-                    $"Weather request had a transient issue; using cached data from " +
-                    $"{cached.Timestamp.LocalDateTime:t}.");
+                    $"Weather service is temporarily unavailable; using cached data from " +
+                    $"{cached.Value.Timestamp.LocalDateTime:t}.");
 
-                return cached.Content;
+                return cached.Value.Content;
             }
 
             throw lastException ??
                 new HttpRequestException("Weather request could not be completed.");
+        }
+
+        private static async Task<CacheEntry?> GetUsableCacheEntryAsync(string requestUri)
+        {
+            if (_cache.TryGetValue(requestUri, out CacheEntry memoryEntry) &&
+                IsUsable(memoryEntry))
+            {
+                return memoryEntry;
+            }
+
+            CacheEntry? diskEntry = await LoadDiskCacheAsync(requestUri).ConfigureAwait(false);
+            if (diskEntry.HasValue && IsUsable(diskEntry.Value))
+            {
+                _cache[requestUri] = diskEntry.Value;
+                return diskEntry.Value;
+            }
+
+            return null;
+        }
+
+        private static bool IsUsable(CacheEntry entry) =>
+            DateTimeOffset.UtcNow - entry.Timestamp <= MaxCachedAge &&
+            TryValidateJson(entry.Content, out _);
+
+        private static async Task SaveDiskCacheAsync(string requestUri, CacheEntry entry)
+        {
+            try
+            {
+                Directory.CreateDirectory(CacheDirectory);
+                string path = GetCachePath(requestUri);
+                string json = JsonSerializer.Serialize(new DiskCacheEntry(entry.Content, entry.Timestamp));
+                await File.WriteAllTextAsync(path, json).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to save weather cache: {ex.Message}");
+            }
+        }
+
+        private static async Task<CacheEntry?> LoadDiskCacheAsync(string requestUri)
+        {
+            try
+            {
+                string path = GetCachePath(requestUri);
+                if (!File.Exists(path))
+                    return null;
+
+                string json = await File.ReadAllTextAsync(path).ConfigureAwait(false);
+                DiskCacheEntry? diskEntry = JsonSerializer.Deserialize<DiskCacheEntry>(json);
+
+                if (diskEntry == null || string.IsNullOrWhiteSpace(diskEntry.Content))
+                    return null;
+
+                return new CacheEntry(diskEntry.Content, diskEntry.Timestamp);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to read weather cache: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string GetCachePath(string requestUri)
+        {
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(requestUri));
+            string fileName = Convert.ToHexString(hash) + ".json";
+            return Path.Combine(CacheDirectory, fileName);
         }
 
         private static bool TryValidateJson(string content, out JsonException? exception)
@@ -138,6 +211,10 @@ namespace InfoDisplayApp.Infrastructure
         }
 
         private readonly record struct CacheEntry(
+            string Content,
+            DateTimeOffset Timestamp);
+
+        private sealed record DiskCacheEntry(
             string Content,
             DateTimeOffset Timestamp);
     }
