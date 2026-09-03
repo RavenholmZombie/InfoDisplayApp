@@ -41,6 +41,7 @@ namespace InfoDisplayApp.Properties
         private string _princetonForecast = "Weather unavailable";
         private string _baileyvilleForecast = "Weather unavailable";
         private string _calaisForecast = "Weather unavailable";
+        private string _weatherForecast = "Weather unavailable";
 
         private string _rycraftHost = "";
         private int _rycraftPort = 25565;
@@ -235,6 +236,10 @@ namespace InfoDisplayApp.Properties
                 .Replace(
                     "{TAPO_STATUS}",
                     _tapoStatus,
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "{WEATHER_FORECAST}",
+                    _weatherForecast,
                     StringComparison.OrdinalIgnoreCase)
                 .Replace(
                     "{LOCAL_FORECAST}",
@@ -435,33 +440,28 @@ namespace InfoDisplayApp.Properties
 
             try
             {
-                Task<string> princetonTask = GetForecastAsync(Princeton);
-                Task<string> baileyvilleTask = GetForecastAsync(Baileyville);
-                Task<string> calaisTask = GetForecastAsync(Calais);
+                Task<ForecastResult> princetonTask = GetForecastSafeAsync(Princeton);
+                Task<ForecastResult> baileyvilleTask = GetForecastSafeAsync(Baileyville);
+                Task<ForecastResult> calaisTask = GetForecastSafeAsync(Calais);
 
                 await Task.WhenAll(
                     princetonTask,
                     baileyvilleTask,
                     calaisTask);
 
-                _princetonForecast = princetonTask.Result;
-                _baileyvilleForecast = baileyvilleTask.Result;
-                _calaisForecast = calaisTask.Result;
+                ForecastResult princeton = princetonTask.Result;
+                ForecastResult baileyville = baileyvilleTask.Result;
+                ForecastResult calais = calaisTask.Result;
 
-                Debug.WriteLine($"Ticker forecast: {_princetonForecast}");
-                Debug.WriteLine($"Ticker forecast: {_baileyvilleForecast}");
-                Debug.WriteLine($"Ticker forecast: {_calaisForecast}");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Ticker weather update failed: {ex}");
+                _princetonForecast = princeton.Text;
+                _baileyvilleForecast = baileyville.Text;
+                _calaisForecast = calais.Text;
+                _weatherForecast = BuildCombinedWeatherForecast(
+                    princeton,
+                    baileyville,
+                    calais);
 
-                const string unavailable =
-                    "Weather is temporarily unavailable | Source: Open-Meteo";
-
-                _princetonForecast = $"Princeton, ME: {unavailable}";
-                _baileyvilleForecast = $"Baileyville, ME: {unavailable}";
-                _calaisForecast = $"Calais, ME: {unavailable}";
+                Debug.WriteLine($"Ticker weather: {_weatherForecast}");
             }
             finally
             {
@@ -469,7 +469,79 @@ namespace InfoDisplayApp.Properties
             }
         }
 
-        private static async Task<string> GetForecastAsync(
+        private static async Task<ForecastResult> GetForecastSafeAsync(
+            WeatherLocation location)
+        {
+            try
+            {
+                return await GetForecastAsync(location);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"Ticker weather update failed for {location.Name}: {ex}");
+
+                return new ForecastResult(
+                    $"Currently in {location.Name}: Weather temporarily unavailable",
+                    "Unavailable",
+                    false,
+                    false,
+                    location.Name);
+            }
+        }
+
+        private static string BuildCombinedWeatherForecast(
+            ForecastResult princeton,
+            ForecastResult baileyville,
+            ForecastResult calais)
+        {
+            ForecastResult[] results = { princeton, baileyville, calais };
+            ForecastResult[] successful = results.Where(result => result.Success).ToArray();
+
+            string sourceHeader;
+
+            if (successful.Length == 0)
+            {
+                sourceHeader = "[Weather providers unavailable]";
+            }
+            else
+            {
+                bool sameProvider = successful
+                    .Select(result => result.Source)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count() == 1;
+
+                bool sameCacheState = successful
+                    .Select(result => result.IsCached)
+                    .Distinct()
+                    .Count() == 1;
+
+                if (sameProvider && sameCacheState)
+                {
+                    string provider = successful[0].Source;
+                    sourceHeader = successful[0].IsCached
+                        ? $"[Weather, cached from {provider}]"
+                        : $"[Weather, provided by {provider}]";
+                }
+                else
+                {
+                    string sources = string.Join(
+                        "; ",
+                        successful.Select(result =>
+                            $"{result.LocationName}: " +
+                            (result.IsCached
+                                ? $"cached {result.Source}"
+                                : result.Source)));
+
+                    sourceHeader = $"[Weather, mixed sources: {sources}]";
+                }
+            }
+
+            return sourceHeader + " " +
+                string.Join(" || ", results.Select(result => result.Text));
+        }
+
+        private static async Task<ForecastResult> GetForecastAsync(
             WeatherLocation location)
         {
             string url =
@@ -491,6 +563,17 @@ namespace InfoDisplayApp.Properties
             JsonElement current = root.GetProperty("current");
             JsonElement daily = root.GetProperty("daily");
             JsonElement hourly = root.GetProperty("hourly");
+
+            string source = root.TryGetProperty(
+                    "_infoDisplayWeatherSource",
+                    out JsonElement sourceElement)
+                ? sourceElement.GetString() ?? "Unknown weather provider"
+                : "Unknown weather provider";
+
+            bool isCached = root.TryGetProperty(
+                    "_infoDisplayWeatherCached",
+                    out JsonElement cachedElement) &&
+                cachedElement.ValueKind == JsonValueKind.True;
 
             double currentTemperature =
                 current.GetProperty("temperature_2m").GetDouble();
@@ -521,15 +604,20 @@ namespace InfoDisplayApp.Properties
                     todayDate,
                     todayWeatherCode);
 
-            return
+            string text =
                 $"Currently in {location.Name}: " +
-                $"{GetWeatherDescription(currentWeatherCode)}, " +
-                $"{Math.Round(currentTemperature):0}°F | " +
-                $"Today's Forecast: {GetWeatherDescription(todayWeatherCode)}, " +
+                $"{Math.Round(currentTemperature):0}°F with {GetWeatherDescription(currentWeatherCode)} | " +
+                $"Today: {GetWeatherDescription(todayWeatherCode)}, " +
                 $"High: {Math.Round(todayHigh):0}°F | " +
                 $"Tonight: {GetWeatherDescription(tonightWeatherCode)}, " +
-                $"Low: {Math.Round(tonightLow):0}°F | " +
-                "Source: Open-Meteo";
+                $"Low: {Math.Round(tonightLow):0}°F";
+
+            return new ForecastResult(
+                text,
+                source,
+                isCached,
+                true,
+                location.Name);
         }
 
         private static int GetTonightWeatherCode(
@@ -651,6 +739,13 @@ namespace InfoDisplayApp.Properties
             string Name,
             double Latitude,
             double Longitude);
+
+        private readonly record struct ForecastResult(
+            string Text,
+            string Source,
+            bool IsCached,
+            bool Success,
+            string LocationName);
 
         private void LoadStatusConfiguration()
         {
