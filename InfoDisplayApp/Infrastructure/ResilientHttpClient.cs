@@ -102,7 +102,6 @@ namespace InfoDisplayApp.Infrastructure
                 try
                 {
                     string nwsContent = await GetNwsFallbackAsync(
-                        requestUri,
                         latitude,
                         longitude).ConfigureAwait(false);
 
@@ -155,7 +154,6 @@ namespace InfoDisplayApp.Infrastructure
         }
 
         private static async Task<string> GetNwsFallbackAsync(
-            string originalRequestUri,
             double latitude,
             double longitude)
         {
@@ -179,7 +177,6 @@ namespace InfoDisplayApp.Infrastructure
             await Task.WhenAll(forecastTask, hourlyTask).ConfigureAwait(false);
 
             return BuildOpenMeteoCompatiblePayload(
-                originalRequestUri,
                 forecastTask.Result,
                 hourlyTask.Result);
         }
@@ -226,7 +223,6 @@ namespace InfoDisplayApp.Infrastructure
         }
 
         private static string BuildOpenMeteoCompatiblePayload(
-            string originalRequestUri,
             string forecastJson,
             string hourlyJson)
         {
@@ -255,10 +251,8 @@ namespace InfoDisplayApp.Infrastructure
             NwsPeriod? today = periods.FirstOrDefault(period => period.IsDaytime);
             NwsPeriod? tonight = periods.FirstOrDefault(period => !period.IsDaytime);
 
-            if (today == null)
-                today = periods.FirstOrDefault();
-            if (tonight == null)
-                tonight = periods.Skip(1).FirstOrDefault() ?? periods.FirstOrDefault();
+            today ??= periods.FirstOrDefault();
+            tonight ??= periods.Skip(1).FirstOrDefault() ?? periods.FirstOrDefault();
 
             List<string> hourlyTimes = new();
             List<int> hourlyCodes = new();
@@ -273,13 +267,21 @@ namespace InfoDisplayApp.Infrastructure
                     continue;
 
                 string shortForecast = period.GetProperty("shortForecast").GetString() ?? "Cloudy";
-                hourlyTimes.Add(parsedTime.DateTime.ToString("yyyy-MM-dd'T'HH:mm"));
+                hourlyTimes.Add(parsedTime.ToString("yyyy-MM-dd'T'HH:mm"));
                 hourlyCodes.Add(MapNwsConditionToWmo(shortForecast));
             }
 
-            DateTime localToday = DateTime.Now.Date;
-            string todayDate = localToday.ToString("yyyy-MM-dd");
-            string tomorrowDate = localToday.AddDays(1).ToString("yyyy-MM-dd");
+            if (hourlyTimes.Count == 0)
+                throw new InvalidOperationException("NWS returned no usable hourly forecast periods.");
+
+            DateTimeOffset todayAnchor = DateTimeOffset.TryParse(
+                currentPeriod.GetProperty("startTime").GetString(),
+                out DateTimeOffset parsedCurrentTime)
+                    ? parsedCurrentTime
+                    : DateTimeOffset.Now;
+
+            string todayDate = todayAnchor.ToString("yyyy-MM-dd");
+            string tomorrowDate = todayAnchor.AddDays(1).ToString("yyyy-MM-dd");
 
             int todayCode = MapNwsConditionToWmo(today?.ShortForecast ?? currentCondition);
             int tonightCode = MapNwsConditionToWmo(tonight?.ShortForecast ?? currentCondition);
