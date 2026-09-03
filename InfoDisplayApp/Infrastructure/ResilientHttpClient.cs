@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 namespace InfoDisplayApp.Infrastructure
@@ -62,6 +63,7 @@ namespace InfoDisplayApp.Infrastructure
                         }
                         else
                         {
+                            content = AddWeatherMetadata(content, "Open-Meteo", false);
                             CacheSuccessfulResponse(requestUri, content);
                             return content;
                         }
@@ -107,6 +109,11 @@ namespace InfoDisplayApp.Infrastructure
 
                     if (TryValidateJson(nwsContent, out _))
                     {
+                        nwsContent = AddWeatherMetadata(
+                            nwsContent,
+                            "National Weather Service",
+                            false);
+
                         CacheSuccessfulResponse(requestUri, nwsContent);
                         Debug.WriteLine(
                             $"Open-Meteo was unavailable; using National Weather Service fallback for " +
@@ -133,11 +140,47 @@ namespace InfoDisplayApp.Infrastructure
                     $"Weather providers had a transient issue; using cached data from " +
                     $"{cached.Timestamp.LocalDateTime:t}.");
 
-                return cached.Content;
+                return AddWeatherMetadata(
+                    cached.Content,
+                    GetWeatherProvider(cached.Content),
+                    true);
             }
 
             throw lastException ??
                 new HttpRequestException("Weather request could not be completed.");
+        }
+
+        private static string AddWeatherMetadata(
+            string content,
+            string provider,
+            bool isCached)
+        {
+            JsonNode? parsed = JsonNode.Parse(content);
+            if (parsed is not JsonObject root)
+                return content;
+
+            root["_infoDisplayWeatherSource"] = provider;
+            root["_infoDisplayWeatherCached"] = isCached;
+            return root.ToJsonString();
+        }
+
+        private static string GetWeatherProvider(string content)
+        {
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(content);
+                if (document.RootElement.TryGetProperty(
+                        "_infoDisplayWeatherSource",
+                        out JsonElement providerElement))
+                {
+                    return providerElement.GetString() ?? "Unknown weather provider";
+                }
+            }
+            catch (JsonException)
+            {
+            }
+
+            return "Unknown weather provider";
         }
 
         private static System.Net.Http.HttpClient CreateNwsClient()
@@ -288,8 +331,6 @@ namespace InfoDisplayApp.Infrastructure
             int todayHigh = today?.Temperature ?? currentTemperature;
             int tonightLow = tonight?.Temperature ?? currentTemperature;
 
-            // The existing ticker reads lows[1] as tonight's low. Duplicate the
-            // same NWS nighttime value into both slots so its parser stays valid.
             var payload = new
             {
                 current = new
