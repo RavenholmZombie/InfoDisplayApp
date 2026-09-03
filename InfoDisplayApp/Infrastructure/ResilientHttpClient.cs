@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace InfoDisplayApp.Infrastructure
@@ -40,19 +41,31 @@ namespace InfoDisplayApp.Infrastructure
                         string content =
                             await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-                        _cache[requestUri] = new CacheEntry(content, DateTimeOffset.UtcNow);
-                        return content;
+                        if (!TryValidateJson(content, out JsonException? jsonException))
+                        {
+                            lastException = new HttpRequestException(
+                                "Weather service returned a successful HTTP response containing invalid JSON.",
+                                jsonException,
+                                response.StatusCode);
+                        }
+                        else
+                        {
+                            _cache[requestUri] = new CacheEntry(content, DateTimeOffset.UtcNow);
+                            return content;
+                        }
                     }
-
-                    if (!IsTransient(response.StatusCode))
+                    else
                     {
-                        response.EnsureSuccessStatusCode();
-                    }
+                        if (!IsTransient(response.StatusCode))
+                        {
+                            response.EnsureSuccessStatusCode();
+                        }
 
-                    lastException = new HttpRequestException(
-                        $"Weather service returned HTTP {(int)response.StatusCode} ({response.StatusCode}).",
-                        null,
-                        response.StatusCode);
+                        lastException = new HttpRequestException(
+                            $"Weather service returned HTTP {(int)response.StatusCode} ({response.StatusCode}).",
+                            null,
+                            response.StatusCode);
+                    }
                 }
                 catch (TaskCanceledException ex)
                 {
@@ -71,7 +84,8 @@ namespace InfoDisplayApp.Infrastructure
             }
 
             if (_cache.TryGetValue(requestUri, out CacheEntry cached) &&
-                DateTimeOffset.UtcNow - cached.Timestamp <= MaxCachedAge)
+                DateTimeOffset.UtcNow - cached.Timestamp <= MaxCachedAge &&
+                TryValidateJson(cached.Content, out _))
             {
                 Debug.WriteLine(
                     $"Weather request had a transient issue; using cached data from " +
@@ -82,6 +96,36 @@ namespace InfoDisplayApp.Infrastructure
 
             throw lastException ??
                 new HttpRequestException("Weather request could not be completed.");
+        }
+
+        private static bool TryValidateJson(string content, out JsonException? exception)
+        {
+            exception = null;
+
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                exception = new JsonException("Weather service returned an empty response body.");
+                return false;
+            }
+
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(content);
+
+                if (document.RootElement.ValueKind != JsonValueKind.Object)
+                {
+                    exception = new JsonException(
+                        $"Weather service returned JSON with an unexpected root type: {document.RootElement.ValueKind}.");
+                    return false;
+                }
+
+                return true;
+            }
+            catch (JsonException ex)
+            {
+                exception = ex;
+                return false;
+            }
         }
 
         private static bool IsTransient(HttpStatusCode statusCode)
