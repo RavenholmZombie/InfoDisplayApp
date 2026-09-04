@@ -120,7 +120,9 @@ namespace InfoDisplayApp
         {
             if (AppMessages.AskYesNo("Do you wish to close InfoScreen?"))
             {
-                Application.Exit();
+                frmClosing frmClosing = new frmClosing();
+                frmClosing.setRestarting(false);
+                frmClosing.ShowDialog(this);
             }
         }
 
@@ -138,7 +140,9 @@ namespace InfoDisplayApp
         {
             if (AppMessages.AskYesNo("Do you wish to restart InfoScreen?"))
             {
-                Application.Restart();
+                frmClosing frmClosing = new frmClosing();
+                frmClosing.setRestarting(true);
+                frmClosing.ShowDialog(this);
             }
         }
     }

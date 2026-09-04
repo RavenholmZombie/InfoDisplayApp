@@ -262,6 +262,16 @@ namespace InfoDisplayApp.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap loading {
+            get {
+                object obj = ResourceManager.GetObject("loading", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap logo_philo {
             get {
                 object obj = ResourceManager.GetObject("logo_philo", resourceCulture);
@@ -363,6 +373,24 @@ namespace InfoDisplayApp.Properties {
         internal static System.IO.UnmanagedMemoryStream sfx_exit {
             get {
                 return ResourceManager.GetStream("sfx_exit", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        /// </summary>
+        internal static System.IO.UnmanagedMemoryStream sfx_information {
+            get {
+                return ResourceManager.GetStream("sfx_information", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        /// </summary>
+        internal static System.IO.UnmanagedMemoryStream sfx_question {
+            get {
+                return ResourceManager.GetStream("sfx_question", resourceCulture);
             }
         }
         
