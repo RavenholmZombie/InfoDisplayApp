@@ -127,10 +127,8 @@ namespace InfoDisplayApp
                 }
                 catch (InvalidOperationException)
                 {
-                    return DialogResult.No;
-                }
-                catch (ObjectDisposedException)
-                {
+                    // ObjectDisposedException derives from InvalidOperationException,
+                    // so this covers both a disposed owner and an invalid invoke state.
                     return DialogResult.No;
                 }
             }
