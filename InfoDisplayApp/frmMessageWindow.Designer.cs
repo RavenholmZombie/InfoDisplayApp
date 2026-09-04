@@ -29,6 +29,8 @@
         private void InitializeComponent()
         {
             btnClose = new Button();
+            btnYes = new Button();
+            btnNo = new Button();
             doubleBufferedPanel1 = new DoubleBufferedPanel();
             pboxIcn = new PictureBox();
             doubleBufferedPanel2 = new DoubleBufferedPanel();
@@ -48,6 +50,30 @@
             btnClose.Text = "Dismiss";
             btnClose.UseVisualStyleBackColor = true;
             btnClose.Click += btnClose_Click;
+            // 
+            // btnYes
+            // 
+            btnYes.Font = new Font("Segoe UI", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            btnYes.Location = new Point(145, 275);
+            btnYes.Name = "btnYes";
+            btnYes.Size = new Size(120, 41);
+            btnYes.TabIndex = 4;
+            btnYes.Text = "Yes";
+            btnYes.UseVisualStyleBackColor = true;
+            btnYes.Visible = false;
+            btnYes.Click += btnYes_Click;
+            // 
+            // btnNo
+            // 
+            btnNo.Font = new Font("Segoe UI", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            btnNo.Location = new Point(285, 275);
+            btnNo.Name = "btnNo";
+            btnNo.Size = new Size(120, 41);
+            btnNo.TabIndex = 5;
+            btnNo.Text = "No";
+            btnNo.UseVisualStyleBackColor = true;
+            btnNo.Visible = false;
+            btnNo.Click += btnNo_Click;
             // 
             // doubleBufferedPanel1
             // 
@@ -99,6 +125,8 @@
             BackgroundImage = Properties.Resources.glass_bl;
             BackgroundImageLayout = ImageLayout.Stretch;
             ClientSize = new Size(550, 332);
+            Controls.Add(btnNo);
+            Controls.Add(btnYes);
             Controls.Add(btnClose);
             Controls.Add(doubleBufferedPanel1);
             DoubleBuffered = true;
@@ -120,6 +148,8 @@
         #endregion
 
         private Button btnClose;
+        private Button btnYes;
+        private Button btnNo;
         private DoubleBufferedPanel doubleBufferedPanel1;
         private PictureBox pboxIcn;
         private DoubleBufferedPanel doubleBufferedPanel2;
