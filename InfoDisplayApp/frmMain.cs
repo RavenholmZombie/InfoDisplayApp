@@ -1,4 +1,5 @@
 using InfoDisplayApp.Properties;
+using System.Media;
 
 namespace InfoDisplayApp
 {
@@ -83,7 +84,7 @@ namespace InfoDisplayApp
 
         public void ToggleTickerMode(string mode)
         {
-            if(mode == "normal")
+            if (mode == "normal")
             {
                 ctrlTicker ctrlTicker = new ctrlTicker
                 {
@@ -105,6 +106,16 @@ namespace InfoDisplayApp
 
         private void frmMain_Load(object sender, EventArgs e)
         {
+            // -------------------------------
+            // PLAY OUR AWESOME STARTUP SOUND
+            // -------------------------------
+            using (SoundPlayer player = new SoundPlayer(Resources.sfx_startup))
+            {
+                player.Load();
+                player.Play();
+            }
+
+
             // -----------------------------
             // EAS TEXT TICKER - WIP
             // -----------------------------
@@ -287,6 +298,11 @@ namespace InfoDisplayApp
         {
             pnlBtnApps.BackgroundImage = Resources.glass;
             pboxAppsIcon.Image = Resources.controls_icn;
+        }
+
+        private void frmMain_FormClosing(object sender, FormClosingEventArgs e)
+        {
+
         }
     }
 }

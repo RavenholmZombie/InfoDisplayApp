@@ -137,6 +137,7 @@
             Text = "InfoDisplay Home";
             TopMost = true;
             WindowState = FormWindowState.Maximized;
+            FormClosing += frmMain_FormClosing;
             Load += frmMain_Load;
             pnlTV.ResumeLayout(false);
             pnlBtnApps.ResumeLayout(false);
