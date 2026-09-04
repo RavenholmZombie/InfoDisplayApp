@@ -10,7 +10,8 @@ namespace InfoDisplayApp
     {
         Info,
         Warning,
-        Error
+        Error,
+        Question
     }
 
     public sealed class AppMessageEventArgs : EventArgs
@@ -78,6 +79,70 @@ namespace InfoDisplayApp
 
         public static void Error(string message, Exception? exception = null) =>
             Raise(AppMessageType.Error, message, exception);
+
+        /// <summary>
+        /// Shows a modal Yes/No question using InfoDisplay's custom message
+        /// window and returns the user's choice. The call is marshalled to the
+        /// UI thread when invoked from background work.
+        /// </summary>
+        public static DialogResult Question(
+            string message,
+            string yesText = "Yes",
+            string noText = "No")
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return DialogResult.No;
+
+            if (_owner == null || _owner.IsDisposed)
+                return DialogResult.No;
+
+            DialogResult ShowQuestion()
+            {
+                try
+                {
+                    frmMessageWindow window = new();
+                    window.SetMessage(message);
+                    window.SetQuestionMode(yesText, noText);
+                    window.TopMost = true;
+
+                    MessageRaised?.Invoke(
+                        null,
+                        new AppMessageEventArgs(AppMessageType.Question, message));
+
+                    Debug.WriteLine($"[Question] {message}");
+                    return window.ShowDialog(_owner);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to show in-app question window: {ex}");
+                    return DialogResult.No;
+                }
+            }
+
+            if (_owner.InvokeRequired)
+            {
+                try
+                {
+                    return (DialogResult)_owner.Invoke(new Func<DialogResult>(ShowQuestion));
+                }
+                catch (InvalidOperationException)
+                {
+                    return DialogResult.No;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return DialogResult.No;
+                }
+            }
+
+            return ShowQuestion();
+        }
+
+        public static bool AskYesNo(
+            string message,
+            string yesText = "Yes",
+            string noText = "No") =>
+            Question(message, yesText, noText) == DialogResult.Yes;
 
         public static void ReportException(Exception exception, string? context = null)
         {
@@ -174,6 +239,7 @@ namespace InfoDisplayApp
                         {
                             AppMessageType.Warning => "warning",
                             AppMessageType.Error => "error",
+                            AppMessageType.Question => "question",
                             _ => "info"
                         });
                         window.SetMessage(detail);
