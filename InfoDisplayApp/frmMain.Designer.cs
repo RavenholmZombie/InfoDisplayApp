@@ -82,9 +82,9 @@
             // 
             pnlApps.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             pnlApps.BackColor = Color.Transparent;
-            pnlApps.Location = new Point(546, 279);
+            pnlApps.Location = new Point(546, 231);
             pnlApps.Name = "pnlApps";
-            pnlApps.Size = new Size(297, 251);
+            pnlApps.Size = new Size(297, 304);
             pnlApps.TabIndex = 0;
             // 
             // pnlBtnApps

@@ -42,6 +42,10 @@
             appPnlEAS = new Panel();
             lblEAS = new Label();
             icnEAS = new PictureBox();
+            dbpBtnClose = new DoubleBufferedPanel();
+            lblBtnClose = new Label();
+            dbpBtnRestart = new DoubleBufferedPanel();
+            lblBtnRestart = new Label();
             panel1.SuspendLayout();
             flowLayoutPanel1.SuspendLayout();
             appPnlTapo.SuspendLayout();
@@ -52,6 +56,8 @@
             ((System.ComponentModel.ISupportInitialize)icnYouTube).BeginInit();
             appPnlEAS.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)icnEAS).BeginInit();
+            dbpBtnClose.SuspendLayout();
+            dbpBtnRestart.SuspendLayout();
             SuspendLayout();
             // 
             // panel1
@@ -61,9 +67,9 @@
             panel1.BorderStyle = BorderStyle.FixedSingle;
             panel1.Controls.Add(flowLayoutPanel1);
             panel1.ForeColor = Color.Black;
-            panel1.Location = new Point(15, 17);
+            panel1.Location = new Point(15, 61);
             panel1.Name = "panel1";
-            panel1.Size = new Size(267, 216);
+            panel1.Size = new Size(267, 220);
             panel1.TabIndex = 0;
             // 
             // flowLayoutPanel1
@@ -75,7 +81,7 @@
             flowLayoutPanel1.Controls.Add(appPnlEAS);
             flowLayoutPanel1.Location = new Point(0, 0);
             flowLayoutPanel1.Name = "flowLayoutPanel1";
-            flowLayoutPanel1.Size = new Size(265, 214);
+            flowLayoutPanel1.Size = new Size(265, 218);
             flowLayoutPanel1.TabIndex = 0;
             // 
             // appPnlTapo
@@ -199,6 +205,52 @@
             icnEAS.TabIndex = 0;
             icnEAS.TabStop = false;
             // 
+            // dbpBtnClose
+            // 
+            dbpBtnClose.BackgroundImage = Properties.Resources.glass_btn_close_norm;
+            dbpBtnClose.BackgroundImageLayout = ImageLayout.Stretch;
+            dbpBtnClose.Controls.Add(lblBtnClose);
+            dbpBtnClose.Location = new Point(15, 18);
+            dbpBtnClose.Name = "dbpBtnClose";
+            dbpBtnClose.Size = new Size(125, 24);
+            dbpBtnClose.TabIndex = 3;
+            dbpBtnClose.Click += dbpBtnClose_Click;
+            dbpBtnClose.MouseEnter += dbpBtnClose_MouseEnter;
+            dbpBtnClose.MouseLeave += dbpBtnClose_MouseLeave;
+            // 
+            // lblBtnClose
+            // 
+            lblBtnClose.AutoSize = true;
+            lblBtnClose.ForeColor = Color.White;
+            lblBtnClose.Location = new Point(26, 5);
+            lblBtnClose.Name = "lblBtnClose";
+            lblBtnClose.Size = new Size(89, 15);
+            lblBtnClose.TabIndex = 0;
+            lblBtnClose.Text = "Quit InfoScreen";
+            // 
+            // dbpBtnRestart
+            // 
+            dbpBtnRestart.BackgroundImage = Properties.Resources.glass_btn_restart_norm;
+            dbpBtnRestart.BackgroundImageLayout = ImageLayout.Stretch;
+            dbpBtnRestart.Controls.Add(lblBtnRestart);
+            dbpBtnRestart.Location = new Point(156, 18);
+            dbpBtnRestart.Name = "dbpBtnRestart";
+            dbpBtnRestart.Size = new Size(125, 24);
+            dbpBtnRestart.TabIndex = 4;
+            dbpBtnRestart.Click += dbpBtnRestart_Click;
+            dbpBtnRestart.MouseEnter += dbpBtnRestart_MouseEnter;
+            dbpBtnRestart.MouseLeave += dbpBtnRestart_MouseLeave;
+            // 
+            // lblBtnRestart
+            // 
+            lblBtnRestart.AutoSize = true;
+            lblBtnRestart.ForeColor = Color.White;
+            lblBtnRestart.Location = new Point(21, 5);
+            lblBtnRestart.Name = "lblBtnRestart";
+            lblBtnRestart.Size = new Size(102, 15);
+            lblBtnRestart.TabIndex = 1;
+            lblBtnRestart.Text = "Restart InfoScreen";
+            // 
             // ctrlAppsPanel
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -206,10 +258,12 @@
             BackColor = Color.Transparent;
             BackgroundImage = Properties.Resources.glass_bl;
             BackgroundImageLayout = ImageLayout.Stretch;
+            Controls.Add(dbpBtnRestart);
+            Controls.Add(dbpBtnClose);
             Controls.Add(panel1);
             DoubleBuffered = true;
             Name = "ctrlAppsPanel";
-            Size = new Size(297, 256);
+            Size = new Size(297, 304);
             Load += ctrlAppsPanel_Load;
             panel1.ResumeLayout(false);
             flowLayoutPanel1.ResumeLayout(false);
@@ -225,6 +279,10 @@
             appPnlEAS.ResumeLayout(false);
             appPnlEAS.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)icnEAS).EndInit();
+            dbpBtnClose.ResumeLayout(false);
+            dbpBtnClose.PerformLayout();
+            dbpBtnRestart.ResumeLayout(false);
+            dbpBtnRestart.PerformLayout();
             ResumeLayout(false);
         }
 
@@ -244,5 +302,9 @@
         private Panel appPnlTapo;
         private Label lblTapo;
         private PictureBox icnTapo;
+        private DoubleBufferedPanel dbpBtnClose;
+        private DoubleBufferedPanel dbpBtnRestart;
+        private Label lblBtnClose;
+        private Label lblBtnRestart;
     }
 }
