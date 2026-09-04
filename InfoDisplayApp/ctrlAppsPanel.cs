@@ -1,4 +1,5 @@
-﻿using System;
+﻿using InfoDisplayApp.Properties;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -29,6 +30,18 @@ namespace InfoDisplayApp
             // Tapo
             icnTapo.Click += appPnlTapo_Click;
             lblTapo.Click += appPnlTapo_Click;
+
+            // Quit Button
+            lblBtnClose.Click += dbpBtnClose_Click;
+            lblBtnClose.MouseEnter += dbpBtnClose_MouseEnter;
+            lblBtnClose.MouseLeave += dbpBtnClose_MouseLeave;
+            lblBtnClose.Cursor = Cursors.Hand;
+
+            // Restart Button
+            lblBtnRestart.Click += dbpBtnRestart_Click;
+            lblBtnRestart.MouseEnter += dbpBtnRestart_MouseEnter;
+            lblBtnRestart.MouseLeave += dbpBtnRestart_MouseLeave;
+            lblBtnRestart.Cursor = Cursors.Hand;
         }
 
         private void appPnlPhilo_Click(object sender, EventArgs e)
@@ -68,9 +81,9 @@ namespace InfoDisplayApp
                 {
                     mainForm.ShowCameraMode();
                 }
-                else if(appName == "EAS")
+                else if (appName == "EAS")
                 {
-                    if(mainForm.tickerMode == "EAS")
+                    if (mainForm.tickerMode == "EAS")
                     {
                         mainForm.ToggleTickerMode("Normal");
                         mainForm.tickerMode = "normal";
@@ -91,6 +104,42 @@ namespace InfoDisplayApp
         private void ctrlAppsPanel_Load(object sender, EventArgs e)
         {
 
+        }
+
+        private void dbpBtnClose_MouseEnter(object sender, EventArgs e)
+        {
+            dbpBtnClose.BackgroundImage = Resources.glass_btn_close_hover;
+        }
+
+        private void dbpBtnClose_MouseLeave(object sender, EventArgs e)
+        {
+            dbpBtnClose.BackgroundImage = Resources.glass_btn_close_norm;
+        }
+
+        private void dbpBtnClose_Click(object sender, EventArgs e)
+        {
+            if (AppMessages.AskYesNo("Do you wish to close InfoScreen?"))
+            {
+                Application.Exit();
+            }
+        }
+
+        private void dbpBtnRestart_MouseEnter(object sender, EventArgs e)
+        {
+            dbpBtnRestart.BackgroundImage = Resources.glass_btn_restart_hover;
+        }
+
+        private void dbpBtnRestart_MouseLeave(object sender, EventArgs e)
+        {
+            dbpBtnRestart.BackgroundImage = Resources.glass_btn_restart_norm;
+        }
+
+        private void dbpBtnRestart_Click(object sender, EventArgs e)
+        {
+            if (AppMessages.AskYesNo("Do you wish to restart InfoScreen?"))
+            {
+                Application.Restart();
+            }
         }
     }
 }
