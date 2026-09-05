@@ -225,6 +225,26 @@ namespace InfoDisplayApp
             UpdateModeButtons(true);
         }
 
+        public void ShowBrowserMode()
+        {
+            if (_youtubeView == null || _cameraView == null || _philoView == null)
+                return;
+            _cameraView.SetMuted(true);
+            _cameraView.StopCamera();
+            _cameraView.Visible = false;
+            _philoView.SetMuted(true);
+            _youtubeView.Visible = true;
+            _youtubeView.SetMuted(false);
+            _youtubeView.BringToFront();
+            pnlApps.Hide();
+
+            frmBrowser frmBrowser = new frmBrowser();
+            frmBrowser.ShowDialog(this);
+            frmBrowser.BringToFront();
+
+            UpdateModeButtons(true);
+        }
+
         public void ShowCameraMode()
         {
             if (_philoView == null || _cameraView == null)

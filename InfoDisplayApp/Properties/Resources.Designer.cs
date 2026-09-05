@@ -102,6 +102,16 @@ namespace InfoDisplayApp.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap browser_icn {
+            get {
+                object obj = ResourceManager.GetObject("browser_icn", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap Coffee_Bean {
             get {
                 object obj = ResourceManager.GetObject("Coffee Bean", resourceCulture);

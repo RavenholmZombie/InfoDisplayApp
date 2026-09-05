@@ -94,6 +94,10 @@ namespace InfoDisplayApp
                         mainForm.tickerMode = "EAS";
                     }
                 }
+                else if (appName == "browser")
+                {
+                    mainForm.ShowBrowserMode();
+                }
             }
             catch (Exception ex)
             {
@@ -144,6 +148,11 @@ namespace InfoDisplayApp
                 frmClosing.setRestarting(true);
                 frmClosing.ShowDialog(this);
             }
+        }
+
+        private void appPnlBrowser_Click(object sender, EventArgs e)
+        {
+            SendAppChange(sender, e, "browser");
         }
     }
 }
