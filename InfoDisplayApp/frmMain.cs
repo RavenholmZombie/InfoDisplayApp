@@ -141,14 +141,14 @@ namespace InfoDisplayApp
             DateTimeOffset now = DateTimeOffset.Now;
 
             const string displayText =
-                "THIS IS A TEST OF THE EMERGENCY ALERT SYSTEM. THIS IS ONLY A TEST. " +
-                "If this had been an actual emergency, official instructions would follow this message. " +
-                "This concludes this National Periodic Test of the Emergency Alert System.";
+                "This is a test of the National Emergency Alert System. " +
+                "This system was developed by broadcast and cable operators in voluntary cooperation with the Federal Emergency Management Agency, the Federal Communications Commission, and local authorities to keep you informed in the event of an emergency. " +
+                "If this had been an actual emergency, an official message would have followed the tone-alert you heard at the start of this message. No action is required.";
 
             const string speechText =
-                "This is a test of the Emergency Alert System. This is only a test. " +
-                "If this had been an actual emergency, official instructions would follow this message. " +
-                "This concludes this National Periodic Test of the Emergency Alert System.";
+                "This is a test of the National Emergency Alert System. " +
+                "This system was developed by broadcast and cable operators in voluntary cooperation with the Federal Emergency Management Agency, the Federal Communications Commission, and local authorities to keep you informed in the event of an emergency. " +
+                "If this had been an actual emergency, an official message would have followed the tone-alert you heard at the start of this message. No action is required.";
 
             NwsAlertMessage testAlert = new(
                 $"InfoDisplay-NPT-{now:yyyyMMddHHmmssfff}",
