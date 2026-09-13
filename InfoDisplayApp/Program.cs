@@ -20,6 +20,11 @@ namespace InfoDisplayApp
             private static readonly TimeSpan MinimumSplashDuration =
                 TimeSpan.FromSeconds(3.5);
 
+            private static readonly TimeSpan CrossFadeDuration =
+                TimeSpan.FromMilliseconds(650);
+
+            private const int CrossFadeSteps = 26;
+
             private readonly frmSplash _splash;
             private readonly Stopwatch _startupClock = new();
             private frmMain? _mainForm;
@@ -90,18 +95,24 @@ namespace InfoDisplayApp
                 try
                 {
                     _splash.SetStartupStatus("Loading weather and status services...", 75);
-                    await Task.Delay(450);
+                    await Task.Delay(250);
 
-                    _splash.SetStartupStatus("Finishing startup...", 90);
+                    // Do not reveal the dashboard until the ticker has completed its
+                    // initial status/weather work and has a real rendered message
+                    // ready for the scrolling animation.
+                    _splash.SetStartupStatus("Preparing text ticker...", 85);
+                    await _mainForm.WaitForStartupReadyAsync();
 
-                    // Ensure the splash remains visible long enough to read as an
-                    // intentional boot screen even on a fast development PC.
+                    _splash.SetStartupStatus("Finishing startup...", 95);
+
+                    // Keep the deliberate boot-screen pacing even if all of the
+                    // real initialization work finishes unusually quickly.
                     TimeSpan remaining = MinimumSplashDuration - _startupClock.Elapsed;
                     if (remaining > TimeSpan.Zero)
                         await Task.Delay(remaining);
 
                     _splash.SetStartupStatus("Ready", 100);
-                    await Task.Delay(180);
+                    await Task.Delay(150);
 
                     // A borderless Maximized WinForms window still uses the screen's
                     // working area, which leaves the Windows taskbar uncovered.
@@ -110,27 +121,52 @@ namespace InfoDisplayApp
                     Screen targetScreen = Screen.FromHandle(_mainForm.Handle);
                     _mainForm.WindowState = FormWindowState.Normal;
                     _mainForm.Bounds = targetScreen.Bounds;
-
-                    _mainForm.Enabled = true;
                     _mainForm.ShowInTaskbar = false;
-                    _mainForm.Opacity = 1;
+                    _mainForm.Enabled = true;
+
+                    await CrossFadeToMainAsync();
+
                     _mainForm.TopMost = _mainWasTopMost;
                     _mainForm.BringToFront();
                     _mainForm.Activate();
 
                     _startupCompleted = true;
+                    _splash.Close();
 
                     // The sound now happens only after the fully-loaded main form
-                    // has actually been revealed to the user.
+                    // has actually finished fading in and is visible to the user.
                     _mainForm.NotifyStartupVisible();
-
-                    _splash.Close();
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"InfoDisplay reveal failed: {ex}");
                     ExitThread();
                 }
+            }
+
+            private async Task CrossFadeToMainAsync()
+            {
+                if (_mainForm == null)
+                    return;
+
+                double splashStartOpacity = Math.Clamp(_splash.Opacity, 0.0, 1.0);
+                int stepDelay = Math.Max(
+                    1,
+                    (int)(CrossFadeDuration.TotalMilliseconds / CrossFadeSteps));
+
+                for (int step = 0; step <= CrossFadeSteps; step++)
+                {
+                    double progress = (double)step / CrossFadeSteps;
+                    double eased = progress * progress * (3.0 - (2.0 * progress));
+
+                    _mainForm.Opacity = eased;
+                    _splash.Opacity = splashStartOpacity * (1.0 - eased);
+
+                    await Task.Delay(stepDelay);
+                }
+
+                _mainForm.Opacity = 1.0;
+                _splash.Opacity = 0.0;
             }
 
             private void Splash_FormClosed(object? sender, FormClosedEventArgs e)
