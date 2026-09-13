@@ -1,4 +1,4 @@
-using CefSharp;
+using CefSharp.WinForms;
 using InfoDisplayApp.Experiments;
 
 namespace InfoDisplayApp
@@ -22,9 +22,10 @@ namespace InfoDisplayApp
 
             if (runBrowserExperiment)
             {
-                // InfoDisplay currently builds AnyCPU. CefSharp ships separate
-                // x86/x64 native runtimes, so install its architecture resolver
-                // before touching anything that can load CefSharp.Core.Runtime.
+                // CefSharp's .NET Core WinForms package exposes CefRuntime,
+                // CefSettings and Cef from the CefSharp.WinForms namespace.
+                // Register the AnyCPU resolver before initializing CEF so the
+                // correct native runtime can be loaded for this process.
                 CefRuntime.SubscribeAnyCpuAssemblyResolver();
 
                 string cachePath = Path.Combine(
