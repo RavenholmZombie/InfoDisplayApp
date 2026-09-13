@@ -16,7 +16,7 @@ namespace InfoDisplayApp
         private double _lastScrollSeconds;
         private double _scrollX;
         private float _messageWidth;
-        private bool _visualFinished;
+        private bool _completedOneScroll;
         private bool _speechFinished;
         private bool _finishedRaised;
 
@@ -49,7 +49,7 @@ namespace InfoDisplayApp
                 return;
 
             _alert = alert;
-            _visualFinished = false;
+            _completedOneScroll = false;
             _speechFinished = false;
             _finishedRaised = false;
 
@@ -64,9 +64,7 @@ namespace InfoDisplayApp
                 int.MaxValue,
                 StringFormat.GenericTypographic).Width + 12f;
 
-            _scrollX = panel1.ClientSize.Width + MessageGap;
-            _scrollClock.Restart();
-            _lastScrollSeconds = 0;
+            ResetScrollPosition();
             _animationTimer.Start();
             panel1.Invalidate();
 
@@ -95,13 +93,9 @@ namespace InfoDisplayApp
                     return;
 
                 if (InvokeRequired)
-                {
                     BeginInvoke(new Action(StartSpeech));
-                }
                 else
-                {
                     StartSpeech();
-                }
             }
             catch (Exception ex)
             {
@@ -165,7 +159,7 @@ namespace InfoDisplayApp
 
         private void AnimationTimer_Tick(object? sender, EventArgs e)
         {
-            if (_alert == null || _visualFinished)
+            if (_alert == null || _finishedRaised)
                 return;
 
             double now = _scrollClock.Elapsed.TotalSeconds;
@@ -177,10 +171,27 @@ namespace InfoDisplayApp
 
             if (_scrollX + _messageWidth < -MessageGap)
             {
-                _visualFinished = true;
-                _animationTimer.Stop();
-                TryFinishAlert();
+                _completedOneScroll = true;
+
+                if (_speechFinished)
+                {
+                    TryFinishAlert();
+                }
+                else
+                {
+                    // Keep the message on screen while TTS is still reading it.
+                    // The alert ends only after at least one complete visual pass
+                    // and the spoken message have both finished.
+                    ResetScrollPosition();
+                }
             }
+        }
+
+        private void ResetScrollPosition()
+        {
+            _scrollX = panel1.ClientSize.Width + MessageGap;
+            _scrollClock.Restart();
+            _lastScrollSeconds = 0;
         }
 
         private void panel1_Paint(object? sender, PaintEventArgs e)
@@ -212,16 +223,17 @@ namespace InfoDisplayApp
 
         private void panel1_Resize(object? sender, EventArgs e)
         {
-            if (_alert != null && !_visualFinished)
+            if (_alert != null && !_finishedRaised)
                 panel1.Invalidate();
         }
 
         private void TryFinishAlert()
         {
-            if (_finishedRaised || !_visualFinished || !_speechFinished)
+            if (_finishedRaised || !_completedOneScroll || !_speechFinished)
                 return;
 
             _finishedRaised = true;
+            _animationTimer.Stop();
             AlertFinished?.Invoke(this, EventArgs.Empty);
         }
 
