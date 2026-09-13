@@ -5,9 +5,8 @@ namespace InfoDisplayApp.Experiments
     /// <summary>
     /// Standalone test harness that intentionally resembles frmMain: a large
     /// browser/TV surface on top and a persistent information/control bar along
-    /// the bottom. Firefox is embedded directly into pnlBrowserSurface so it
-    /// participates in the same layout instead of competing as a top-level
-    /// window.
+    /// the bottom. Firefox remains a top-level window, but is constrained to the
+    /// browser rectangle while this host form yields z-order during playback.
     /// </summary>
     internal sealed class frmFirefoxKioskExperiment : Form
     {
@@ -45,12 +44,9 @@ namespace InfoDisplayApp.Experiments
 
             BuildLayout();
 
-            _firefox = new FirefoxKioskController(
-                () => pnlBrowserSurface.IsHandleCreated
-                    ? pnlBrowserSurface.Handle
-                    : IntPtr.Zero,
-                () => pnlBrowserSurface.ClientSize);
+            _firefox = new FirefoxKioskController(GetBrowserScreenRectangle);
             _firefox.StatusChanged += Firefox_StatusChanged;
+            _firefox.RunningChanged += Firefox_RunningChanged;
 
             _clockTimer.Interval = 1000;
             _clockTimer.Tick += (_, _) => UpdateClock();
@@ -60,11 +56,11 @@ namespace InfoDisplayApp.Experiments
             Shown += (_, _) =>
             {
                 lblStatus.Text =
-                    "Ready. Firefox will be embedded directly into the black viewport above this bar.";
+                    "Ready. Firefox will be kept above the black viewport while this bottom bar remains visible.";
             };
 
-            pnlBrowserSurface.Resize += (_, _) =>
-                BeginInvoke(new Action(_firefox.ReapplyBounds));
+            Resize += (_, _) => BeginInvoke(new Action(_firefox.ReapplyBounds));
+            Move += (_, _) => BeginInvoke(new Action(_firefox.ReapplyBounds));
             FormClosing += FrmFirefoxKioskExperiment_FormClosing;
         }
 
@@ -80,9 +76,9 @@ namespace InfoDisplayApp.Experiments
             lblViewportHint.ForeColor = Color.DimGray;
             lblViewportHint.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
             lblViewportHint.Text =
-                "FIREFOX EMBEDDED VIEWPORT\r\n\r\n" +
-                "Firefox should become a child of this black panel.\r\n" +
-                "The browser should never overlap the information bar below.";
+                "FIREFOX KIOSK VIEWPORT\r\n\r\n" +
+                "Firefox remains a normal top-level window, but is continually resized\r\n" +
+                "to exactly this black area so the information bar stays unobstructed.";
             pnlBrowserSurface.Controls.Add(lblViewportHint);
 
             pnlBottomBar.Dock = DockStyle.Bottom;
@@ -127,7 +123,7 @@ namespace InfoDisplayApp.Experiments
             ConfigureButton(btnPhilo, "Philo", (_, _) => Launch(PhiloUrl));
             ConfigureButton(btnYouTube, "YouTube", (_, _) => Launch(YouTubeUrl));
             ConfigureButton(btnExample, "Example", (_, _) => Launch(ExampleUrl));
-            ConfigureButton(btnStop, "Stop", (_, _) => _firefox.Stop());
+            ConfigureButton(btnStop, "Stop", (_, _) => StopFirefox());
             ConfigureButton(btnClose, "Close Test", (_, _) => Close());
 
             buttons.Controls.AddRange(
@@ -156,18 +152,57 @@ namespace InfoDisplayApp.Experiments
             button.Click += onClick;
         }
 
+        private Rectangle GetBrowserScreenRectangle()
+        {
+            if (!pnlBrowserSurface.IsHandleCreated)
+                return Rectangle.Empty;
+
+            return pnlBrowserSurface.RectangleToScreen(pnlBrowserSurface.ClientRectangle);
+        }
+
         private void Launch(string url)
         {
             try
             {
+                // A topmost host form would sit above Firefox even when Firefox
+                // is correctly sized. Yield the topmost band while Firefox is
+                // active; because Firefox stops above pnlBottomBar, that bar
+                // remains visible and clickable in the uncovered screen area.
+                TopMost = false;
                 lblStatus.Text = $"Launching {url}";
                 _firefox.Launch(url);
             }
             catch (Exception ex)
             {
+                TopMost = true;
                 lblStatus.Text = $"Launch failed: {ex.Message}";
                 Debug.WriteLine($"Firefox kiosk experiment launch failed: {ex}");
             }
+        }
+
+        private void StopFirefox()
+        {
+            _firefox.Stop();
+            TopMost = true;
+            BringToFront();
+        }
+
+        private void Firefox_RunningChanged(object? sender, bool running)
+        {
+            if (IsDisposed)
+                return;
+
+            void ApplyState()
+            {
+                TopMost = !running;
+                if (!running)
+                    BringToFront();
+            }
+
+            if (InvokeRequired)
+                BeginInvoke(new Action(ApplyState));
+            else
+                ApplyState();
         }
 
         private void Firefox_StatusChanged(object? sender, string message)
