@@ -163,5 +163,12 @@ namespace InfoDisplayApp
         {
             SendAppChange(sender, e, "browser");
         }
+
+        private void aloneButton1_Click(object sender, EventArgs e)
+        {
+            frmSplash frmSplash = new frmSplash();
+            frmSplash.ShowDialog(this);
+            frmSplash.BringToFront();
+        }
     }
 }

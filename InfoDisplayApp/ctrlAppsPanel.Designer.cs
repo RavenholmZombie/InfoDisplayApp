@@ -42,13 +42,13 @@
             appPnlEAS = new Panel();
             lblEAS = new Label();
             icnEAS = new PictureBox();
+            appPnlBrowser = new Panel();
+            lblBrowser = new Label();
+            icnBrowser = new PictureBox();
             dbpBtnClose = new DoubleBufferedPanel();
             lblBtnClose = new Label();
             dbpBtnRestart = new DoubleBufferedPanel();
             lblBtnRestart = new Label();
-            appPnlBrowser = new Panel();
-            lblBrowser = new Label();
-            icnBrowser = new PictureBox();
             panel1.SuspendLayout();
             flowLayoutPanel1.SuspendLayout();
             appPnlTapo.SuspendLayout();
@@ -59,10 +59,10 @@
             ((System.ComponentModel.ISupportInitialize)icnYouTube).BeginInit();
             appPnlEAS.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)icnEAS).BeginInit();
-            dbpBtnClose.SuspendLayout();
-            dbpBtnRestart.SuspendLayout();
             appPnlBrowser.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)icnBrowser).BeginInit();
+            dbpBtnClose.SuspendLayout();
+            dbpBtnRestart.SuspendLayout();
             SuspendLayout();
             // 
             // panel1
@@ -211,6 +211,37 @@
             icnEAS.TabIndex = 0;
             icnEAS.TabStop = false;
             // 
+            // appPnlBrowser
+            // 
+            appPnlBrowser.Controls.Add(lblBrowser);
+            appPnlBrowser.Controls.Add(icnBrowser);
+            appPnlBrowser.Cursor = Cursors.Hand;
+            appPnlBrowser.Location = new Point(91, 107);
+            appPnlBrowser.Name = "appPnlBrowser";
+            appPnlBrowser.Size = new Size(82, 98);
+            appPnlBrowser.TabIndex = 4;
+            appPnlBrowser.Click += appPnlBrowser_Click;
+            // 
+            // lblBrowser
+            // 
+            lblBrowser.AutoSize = true;
+            lblBrowser.Location = new Point(17, 64);
+            lblBrowser.Name = "lblBrowser";
+            lblBrowser.Size = new Size(49, 15);
+            lblBrowser.TabIndex = 1;
+            lblBrowser.Text = "Browser";
+            lblBrowser.TextAlign = ContentAlignment.TopCenter;
+            // 
+            // icnBrowser
+            // 
+            icnBrowser.Image = Properties.Resources.browser_icn;
+            icnBrowser.Location = new Point(17, 12);
+            icnBrowser.Name = "icnBrowser";
+            icnBrowser.Size = new Size(49, 49);
+            icnBrowser.SizeMode = PictureBoxSizeMode.StretchImage;
+            icnBrowser.TabIndex = 0;
+            icnBrowser.TabStop = false;
+            // 
             // dbpBtnClose
             // 
             dbpBtnClose.BackgroundImage = Properties.Resources.glass_btn_close_norm;
@@ -257,37 +288,6 @@
             lblBtnRestart.TabIndex = 1;
             lblBtnRestart.Text = "Restart InfoScreen";
             // 
-            // appPnlBrowser
-            // 
-            appPnlBrowser.Controls.Add(lblBrowser);
-            appPnlBrowser.Controls.Add(icnBrowser);
-            appPnlBrowser.Cursor = Cursors.Hand;
-            appPnlBrowser.Location = new Point(91, 107);
-            appPnlBrowser.Name = "appPnlBrowser";
-            appPnlBrowser.Size = new Size(82, 98);
-            appPnlBrowser.TabIndex = 4;
-            appPnlBrowser.Click += appPnlBrowser_Click;
-            // 
-            // lblBrowser
-            // 
-            lblBrowser.AutoSize = true;
-            lblBrowser.Location = new Point(17, 64);
-            lblBrowser.Name = "lblBrowser";
-            lblBrowser.Size = new Size(49, 15);
-            lblBrowser.TabIndex = 1;
-            lblBrowser.Text = "Browser";
-            lblBrowser.TextAlign = ContentAlignment.TopCenter;
-            // 
-            // icnBrowser
-            // 
-            icnBrowser.Image = Properties.Resources.browser_icn;
-            icnBrowser.Location = new Point(17, 12);
-            icnBrowser.Name = "icnBrowser";
-            icnBrowser.Size = new Size(49, 49);
-            icnBrowser.SizeMode = PictureBoxSizeMode.StretchImage;
-            icnBrowser.TabIndex = 0;
-            icnBrowser.TabStop = false;
-            // 
             // ctrlAppsPanel
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -316,13 +316,13 @@
             appPnlEAS.ResumeLayout(false);
             appPnlEAS.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)icnEAS).EndInit();
+            appPnlBrowser.ResumeLayout(false);
+            appPnlBrowser.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)icnBrowser).EndInit();
             dbpBtnClose.ResumeLayout(false);
             dbpBtnClose.PerformLayout();
             dbpBtnRestart.ResumeLayout(false);
             dbpBtnRestart.PerformLayout();
-            appPnlBrowser.ResumeLayout(false);
-            appPnlBrowser.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)icnBrowser).EndInit();
             ResumeLayout(false);
         }
 

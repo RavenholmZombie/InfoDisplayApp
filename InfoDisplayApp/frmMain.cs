@@ -12,6 +12,7 @@ namespace InfoDisplayApp
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
+        private bool _startupSoundPlayed;
         public string tickerMode = "normal";
 
         private Color _startColor;
@@ -46,6 +47,25 @@ namespace InfoDisplayApp
             pboxAppsIcon.MouseEnter += pnlBtnApps_MouseEnter;
             pboxAppsIcon.MouseLeave += pnlBtnApps_MouseLeave;
             pboxAppsIcon.Click += pnlBtnApps_Click;
+        }
+
+        internal void NotifyStartupVisible()
+        {
+            if (_startupSoundPlayed || !Visible || Opacity <= 0)
+                return;
+
+            _startupSoundPlayed = true;
+
+            try
+            {
+                using SoundPlayer player = new(Resources.sfx_startup);
+                player.Load();
+                player.Play();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Unable to play startup sound: {ex}");
+            }
         }
 
         private Color RandomColor()
@@ -106,16 +126,6 @@ namespace InfoDisplayApp
 
         private void frmMain_Load(object sender, EventArgs e)
         {
-            // -------------------------------
-            // PLAY OUR AWESOME STARTUP SOUND
-            // -------------------------------
-            using (SoundPlayer player = new SoundPlayer(Resources.sfx_startup))
-            {
-                player.Load();
-                player.Play();
-            }
-
-
             // -----------------------------
             // EAS TEXT TICKER - WIP
             // -----------------------------
