@@ -84,9 +84,6 @@ namespace InfoDisplayApp
                 Debug.WriteLine($"Unable to play startup sound: {ex}");
             }
 
-            // Start alert monitoring only after the dashboard has been revealed.
-            // This prevents an EAS attention signal/TTS message from firing while
-            // the splash screen still owns the screen.
             _alertPollTimer.Start();
             _ = PollAlertsAsync();
         }
@@ -133,18 +130,45 @@ namespace InfoDisplayApp
                 return;
             }
 
-            // The EAS button now performs a manual NWS refresh. If an alert is
-            // active it may be replayed even if the automatic monitor has already
-            // announced it during this application session.
             _ = PollAlertsAsync(replayActiveAlert: true);
+        }
+
+        public void TriggerNationalPeriodicTest()
+        {
+            if (IsDisposed || _emergencyAlertActive)
+                return;
+
+            DateTimeOffset now = DateTimeOffset.Now;
+
+            const string displayText =
+                "THIS IS A TEST OF THE EMERGENCY ALERT SYSTEM. THIS IS ONLY A TEST. " +
+                "If this had been an actual emergency, official instructions would follow this message. " +
+                "This concludes this National Periodic Test of the Emergency Alert System.";
+
+            const string speechText =
+                "This is a test of the Emergency Alert System. This is only a test. " +
+                "If this had been an actual emergency, official instructions would follow this message. " +
+                "This concludes this National Periodic Test of the Emergency Alert System.";
+
+            NwsAlertMessage testAlert = new(
+                $"InfoDisplay-NPT-{now:yyyyMMddHHmmssfff}",
+                "National Periodic Test",
+                displayText,
+                speechText,
+                "Minor",
+                "Expected",
+                "InfoDisplay Test Generator",
+                "Princeton-Calais, ME",
+                now,
+                now.AddMinutes(15),
+                1);
+
+            _pendingAlerts.Enqueue(testAlert);
+            BeginNextEmergencyAlert();
         }
 
         private void frmMain_Load(object sender, EventArgs e)
         {
-            // -----------------------------
-            // PHILO
-            // -----------------------------
-
             _philoView = new ctrlPhiloWebView
             {
                 Dock = DockStyle.Fill,
@@ -152,10 +176,6 @@ namespace InfoDisplayApp
             };
 
             pnlTV.Controls.Add(_philoView);
-
-            // -----------------------------
-            // CAMERA
-            // -----------------------------
 
             _cameraView = new ctrlCameras
             {
@@ -165,10 +185,6 @@ namespace InfoDisplayApp
 
             pnlTV.Controls.Add(_cameraView);
 
-            // -----------------------------
-            // YOUTUBE
-            // -----------------------------
-
             _youtubeView = new ctrlYouTubeWebView
             {
                 Dock = DockStyle.Fill,
@@ -176,12 +192,7 @@ namespace InfoDisplayApp
             };
 
             pnlTV.Controls.Add(_youtubeView);
-
             _philoView.BringToFront();
-
-            // -----------------------------
-            // DATE / TIME
-            // -----------------------------
 
             ctrlTimeDate ctrlTimeDate = new ctrlTimeDate
             {
@@ -189,29 +200,18 @@ namespace InfoDisplayApp
             };
             pnlDateTime.Controls.Add(ctrlTimeDate);
 
-            // -----------------------------
-            // TEXT TICKER
-            // -----------------------------
             _normalTicker = new ctrlTicker
             {
                 Dock = DockStyle.Fill
             };
             pnlTicker.Controls.Add(_normalTicker);
 
-            // -----------------------------
-            // WEATHER
-            // -----------------------------
-
             ctrlWeather ctrlWeather = new ctrlWeather
             {
                 Dock = DockStyle.Fill
             };
-
             pnlWeather.Controls.Add(ctrlWeather);
 
-            // -----------------------------
-            // APP PANEL
-            // -----------------------------
             _appsPanel = new ctrlAppsPanel
             {
                 Dock = DockStyle.Fill
@@ -373,9 +373,6 @@ namespace InfoDisplayApp
                 return;
             }
 
-            // Restore audio according to whichever source is currently visible.
-            // This avoids accidentally unmuting a background source when the EAS
-            // interruption ends.
             if (_philoView != null)
                 _philoView.SetMuted(!_philoView.Visible);
 
@@ -480,9 +477,6 @@ namespace InfoDisplayApp
 
         private void UpdateModeButtons(bool isPhiloMode)
         {
-            //btnPhiloMode.Enabled = !isPhiloMode;
-            //btnCameraMode.Enabled = isPhiloMode;
-            //btnCameraMode.Enabled = _cameraView.IsConfigured;
         }
 
         private void pnlWeather_Paint(object sender, PaintEventArgs e)
