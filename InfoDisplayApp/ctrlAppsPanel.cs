@@ -76,6 +76,9 @@ namespace InfoDisplayApp
         {
             frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
 
+            if (mainForm == null)
+                return;
+
             try
             {
                 if (appName == "Philo")
@@ -92,16 +95,10 @@ namespace InfoDisplayApp
                 }
                 else if (appName == "EAS")
                 {
-                    if (mainForm.tickerMode == "EAS")
-                    {
-                        mainForm.ToggleTickerMode("Normal");
-                        mainForm.tickerMode = "normal";
-                    }
-                    else
-                    {
-                        mainForm.ToggleTickerMode("EAS");
-                        mainForm.tickerMode = "EAS";
-                    }
+                    mainForm.ToggleTickerMode(
+                        mainForm.tickerMode.Equals("EAS", StringComparison.OrdinalIgnoreCase)
+                            ? "Normal"
+                            : "EAS");
                 }
                 else if (appName == "browser")
                 {
