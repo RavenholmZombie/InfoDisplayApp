@@ -163,10 +163,6 @@ namespace InfoDisplayApp
                 _lastScrollSeconds = now;
                 _scrollX -= ScrollPixelsPerSecond * elapsed;
 
-                // Match ctrlTicker's proven rendering path. Invalidate schedules
-                // the paint and Update performs it immediately on the UI thread,
-                // while the high-resolution worker timer keeps motion based on
-                // elapsed time instead of WinForms timer scheduling jitter.
                 panel1.Invalidate();
                 panel1.Update();
 
@@ -180,9 +176,6 @@ namespace InfoDisplayApp
                     }
                     else
                     {
-                        // Keep the message moving while TTS is still reading it.
-                        // The alert ends only after at least one complete visual
-                        // pass and the spoken message have both finished.
                         ResetScrollPosition();
                     }
                 }
@@ -245,6 +238,9 @@ namespace InfoDisplayApp
                 _speechSynthesizer?.Dispose();
                 _speechSynthesizer = new SpeechSynthesizer();
                 _speechSynthesizer.SetOutputToDefaultAudioDevice();
+
+                SelectPreferredEasVoice(_speechSynthesizer);
+
                 _speechSynthesizer.Rate = 0;
                 _speechSynthesizer.Volume = 100;
                 _speechSynthesizer.SpeakCompleted += SpeechSynthesizer_SpeakCompleted;
@@ -254,6 +250,52 @@ namespace InfoDisplayApp
             {
                 Debug.WriteLine($"Windows TTS could not read the EAS message: {ex}");
                 MarkSpeechFinished();
+            }
+        }
+
+        private static void SelectPreferredEasVoice(SpeechSynthesizer synthesizer)
+        {
+            try
+            {
+                InstalledVoice? maleVoice = synthesizer.GetInstalledVoices()
+                    .Where(voice => voice.Enabled)
+                    .FirstOrDefault(voice =>
+                        voice.VoiceInfo.Gender == VoiceGender.Male &&
+                        voice.VoiceInfo.Culture.Name.StartsWith(
+                            "en-US",
+                            StringComparison.OrdinalIgnoreCase));
+
+                maleVoice ??= synthesizer.GetInstalledVoices()
+                    .Where(voice => voice.Enabled)
+                    .FirstOrDefault(voice =>
+                        voice.VoiceInfo.Gender == VoiceGender.Male &&
+                        voice.VoiceInfo.Culture.TwoLetterISOLanguageName.Equals(
+                            "en",
+                            StringComparison.OrdinalIgnoreCase));
+
+                maleVoice ??= synthesizer.GetInstalledVoices()
+                    .Where(voice => voice.Enabled)
+                    .FirstOrDefault(voice =>
+                        voice.VoiceInfo.Gender == VoiceGender.Male);
+
+                if (maleVoice != null)
+                {
+                    synthesizer.SelectVoice(maleVoice.VoiceInfo.Name);
+                    Debug.WriteLine(
+                        $"EAS TTS voice: {maleVoice.VoiceInfo.Name} " +
+                        $"({maleVoice.VoiceInfo.Gender}, {maleVoice.VoiceInfo.Culture.Name})");
+                }
+                else
+                {
+                    Debug.WriteLine(
+                        "No enabled male Windows TTS voice is installed; " +
+                        "using the system default voice for EAS playback.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"Unable to select a male EAS TTS voice; using system default: {ex}");
             }
         }
 
