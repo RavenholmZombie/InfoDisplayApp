@@ -24,6 +24,8 @@ namespace InfoDisplayApp
         private float _messageWidth;
         private bool _completedOneScroll;
         private bool _speechFinished;
+        private bool _endSignalFinished;
+        private bool _endSignalStarted;
         private bool _finishedRaised;
 
         private const double ScrollPixelsPerSecond = 190.0;
@@ -65,6 +67,8 @@ namespace InfoDisplayApp
             _alert = alert;
             _completedOneScroll = false;
             _speechFinished = false;
+            _endSignalFinished = false;
+            _endSignalStarted = false;
             _finishedRaised = false;
 
             label1.Text =
@@ -167,7 +171,7 @@ namespace InfoDisplayApp
                 {
                     _completedOneScroll = true;
 
-                    if (_speechFinished)
+                    if (_speechFinished && _endSignalFinished)
                     {
                         TryFinishAlert();
                     }
@@ -320,8 +324,65 @@ namespace InfoDisplayApp
                 return;
             }
 
+            if (_speechFinished)
+                return;
+
             _speechFinished = true;
+
+            // Real EAS-style sequence: play the end-of-message signal as soon
+            // as the spoken message completes, while the visual ticker is free
+            // to continue scrolling to the end of its current pass.
+            if (!_endSignalStarted)
+            {
+                _endSignalStarted = true;
+                _ = PlayEndSignalAsync();
+            }
+
             TryFinishAlert();
+        }
+
+        private async Task PlayEndSignalAsync()
+        {
+            try
+            {
+                await Task.Run(() =>
+                {
+                    using Stream stream = Resources.alert_end;
+                    using SoundPlayer player = new(stream);
+                    player.Load();
+                    player.PlaySync();
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to play EAS end signal: {ex}");
+            }
+
+            if (IsDisposed || Disposing)
+                return;
+
+            if (InvokeRequired)
+            {
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        if (IsDisposed || Disposing)
+                            return;
+
+                        _endSignalFinished = true;
+                        TryFinishAlert();
+                    }));
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+            else
+            {
+                _endSignalFinished = true;
+                TryFinishAlert();
+            }
         }
 
         private void panel1_Paint(object? sender, PaintEventArgs e)
@@ -357,54 +418,17 @@ namespace InfoDisplayApp
 
         private void TryFinishAlert()
         {
-            if (_finishedRaised || !_completedOneScroll || !_speechFinished)
+            if (_finishedRaised ||
+                !_completedOneScroll ||
+                !_speechFinished ||
+                !_endSignalFinished)
+            {
                 return;
+            }
 
             _finishedRaised = true;
             StopAnimation();
-            _ = PlayEndSignalAndFinishAsync();
-        }
-
-        private async Task PlayEndSignalAndFinishAsync()
-        {
-            try
-            {
-                await Task.Run(() =>
-                {
-                    using Stream stream = Resources.alert_end;
-                    using SoundPlayer player = new(stream);
-                    player.Load();
-                    player.PlaySync();
-                });
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Unable to play EAS end signal: {ex}");
-            }
-
-            if (IsDisposed || Disposing)
-                return;
-
-            if (InvokeRequired)
-            {
-                try
-                {
-                    BeginInvoke(new Action(() =>
-                    {
-                        if (!IsDisposed && !Disposing)
-                            AlertFinished?.Invoke(this, EventArgs.Empty);
-                    }));
-                }
-                catch (InvalidOperationException)
-                {
-                    // ObjectDisposedException derives from InvalidOperationException,
-                    // so this single catch also covers disposal during BeginInvoke.
-                }
-            }
-            else
-            {
-                AlertFinished?.Invoke(this, EventArgs.Empty);
-            }
+            AlertFinished?.Invoke(this, EventArgs.Empty);
         }
 
         private void ctrlEmergencyTicker_Disposed(object? sender, EventArgs e)
