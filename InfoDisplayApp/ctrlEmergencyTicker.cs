@@ -3,16 +3,22 @@ using InfoDisplayApp.Services;
 using System.Diagnostics;
 using System.Drawing.Text;
 using System.Media;
+using System.Runtime.InteropServices;
 using System.Speech.Synthesis;
+using System.Threading;
 
 namespace InfoDisplayApp
 {
     public partial class ctrlEmergencyTicker : UserControl
     {
-        private readonly System.Windows.Forms.Timer _animationTimer;
+        private readonly System.Threading.Timer _animationTimer;
         private readonly Stopwatch _scrollClock = new();
         private SpeechSynthesizer? _speechSynthesizer;
         private NwsAlertMessage? _alert;
+
+        private int _animationFramePending;
+        private bool _animationRunning;
+        private bool _timerResolutionRequested;
         private double _lastScrollSeconds;
         private double _scrollX;
         private float _messageWidth;
@@ -21,8 +27,15 @@ namespace InfoDisplayApp
         private bool _finishedRaised;
 
         private const double ScrollPixelsPerSecond = 190.0;
+        private const int AnimationPulseMilliseconds = 8;
         private const int MessageGap = 40;
-        private const int AnimationIntervalMilliseconds = 16;
+        private const uint TimerResolutionMilliseconds = 1;
+
+        [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+        private static extern uint TimeBeginPeriod(uint period);
+
+        [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+        private static extern uint TimeEndPeriod(uint period);
 
         public event EventHandler? AlertFinished;
 
@@ -34,12 +47,13 @@ namespace InfoDisplayApp
             panel1.Paint += panel1_Paint;
             panel1.Resize += panel1_Resize;
 
-            _animationTimer = new System.Windows.Forms.Timer
-            {
-                Interval = AnimationIntervalMilliseconds
-            };
-            _animationTimer.Tick += AnimationTimer_Tick;
+            _animationTimer = new System.Threading.Timer(
+                AnimationTimerCallback,
+                null,
+                Timeout.Infinite,
+                Timeout.Infinite);
 
+            Load += ctrlEmergencyTicker_Load;
             Disposed += ctrlEmergencyTicker_Disposed;
         }
 
@@ -65,16 +79,130 @@ namespace InfoDisplayApp
                 StringFormat.GenericTypographic).Width + 12f;
 
             ResetScrollPosition();
-            _animationTimer.Start();
+            StartAnimation();
             panel1.Invalidate();
+            panel1.Update();
 
             _ = BeginAlertAudioAsync();
         }
 
-        private void ctrlEmergencyTicker_Load(object sender, EventArgs e)
+        private void ctrlEmergencyTicker_Load(object? sender, EventArgs e)
         {
+            _timerResolutionRequested =
+                TimeBeginPeriod(TimerResolutionMilliseconds) == 0;
+
             // Alert playback is started explicitly by frmMain once the control
             // has been placed on screen and application audio has been muted.
+        }
+
+        private void StartAnimation()
+        {
+            if (_animationRunning || IsDisposed)
+                return;
+
+            _animationRunning = true;
+            ResetScrollClock();
+            _animationTimer.Change(0, AnimationPulseMilliseconds);
+        }
+
+        private void StopAnimation()
+        {
+            if (!_animationRunning)
+                return;
+
+            _animationRunning = false;
+            _animationTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            Interlocked.Exchange(ref _animationFramePending, 0);
+        }
+
+        private void AnimationTimerCallback(object? state)
+        {
+            if (!_animationRunning ||
+                IsDisposed ||
+                Disposing ||
+                !IsHandleCreated)
+            {
+                return;
+            }
+
+            if (Interlocked.Exchange(ref _animationFramePending, 1) != 0)
+                return;
+
+            try
+            {
+                BeginInvoke(new Action(RenderAnimationFrame));
+            }
+            catch (ObjectDisposedException)
+            {
+                Interlocked.Exchange(ref _animationFramePending, 0);
+            }
+            catch (InvalidOperationException)
+            {
+                Interlocked.Exchange(ref _animationFramePending, 0);
+            }
+        }
+
+        private void RenderAnimationFrame()
+        {
+            try
+            {
+                if (!_animationRunning ||
+                    IsDisposed ||
+                    _alert == null ||
+                    _finishedRaised)
+                {
+                    return;
+                }
+
+                double now = _scrollClock.Elapsed.TotalSeconds;
+                double elapsed = Math.Clamp(
+                    now - _lastScrollSeconds,
+                    0.0,
+                    0.050);
+
+                _lastScrollSeconds = now;
+                _scrollX -= ScrollPixelsPerSecond * elapsed;
+
+                // Match ctrlTicker's proven rendering path. Invalidate schedules
+                // the paint and Update performs it immediately on the UI thread,
+                // while the high-resolution worker timer keeps motion based on
+                // elapsed time instead of WinForms timer scheduling jitter.
+                panel1.Invalidate();
+                panel1.Update();
+
+                if (_scrollX + _messageWidth < -MessageGap)
+                {
+                    _completedOneScroll = true;
+
+                    if (_speechFinished)
+                    {
+                        TryFinishAlert();
+                    }
+                    else
+                    {
+                        // Keep the message moving while TTS is still reading it.
+                        // The alert ends only after at least one complete visual
+                        // pass and the spoken message have both finished.
+                        ResetScrollPosition();
+                    }
+                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _animationFramePending, 0);
+            }
+        }
+
+        private void ResetScrollPosition()
+        {
+            _scrollX = panel1.ClientSize.Width + MessageGap;
+            ResetScrollClock();
+        }
+
+        private void ResetScrollClock()
+        {
+            _scrollClock.Restart();
+            _lastScrollSeconds = 0;
         }
 
         private async Task BeginAlertAudioAsync()
@@ -157,43 +285,6 @@ namespace InfoDisplayApp
             TryFinishAlert();
         }
 
-        private void AnimationTimer_Tick(object? sender, EventArgs e)
-        {
-            if (_alert == null || _finishedRaised)
-                return;
-
-            double now = _scrollClock.Elapsed.TotalSeconds;
-            double elapsed = Math.Clamp(now - _lastScrollSeconds, 0.0, 0.050);
-            _lastScrollSeconds = now;
-
-            _scrollX -= ScrollPixelsPerSecond * elapsed;
-            panel1.Invalidate();
-
-            if (_scrollX + _messageWidth < -MessageGap)
-            {
-                _completedOneScroll = true;
-
-                if (_speechFinished)
-                {
-                    TryFinishAlert();
-                }
-                else
-                {
-                    // Keep the message on screen while TTS is still reading it.
-                    // The alert ends only after at least one complete visual pass
-                    // and the spoken message have both finished.
-                    ResetScrollPosition();
-                }
-            }
-        }
-
-        private void ResetScrollPosition()
-        {
-            _scrollX = panel1.ClientSize.Width + MessageGap;
-            _scrollClock.Restart();
-            _lastScrollSeconds = 0;
-        }
-
         private void panel1_Paint(object? sender, PaintEventArgs e)
         {
             if (_alert == null)
@@ -201,13 +292,14 @@ namespace InfoDisplayApp
 
             e.Graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
 
-            using SolidBrush brush = new(Color.White);
-            using StringFormat format = new(StringFormat.GenericTypographic)
-            {
-                LineAlignment = StringAlignment.Center,
-                Alignment = StringAlignment.Near,
-                FormatFlags = StringFormatFlags.NoWrap
-            };
+            using SolidBrush brush = new(lblAlertText.ForeColor);
+            using StringFormat format =
+                new(StringFormat.GenericTypographic)
+                {
+                    LineAlignment = StringAlignment.Center,
+                    Alignment = StringAlignment.Near,
+                    FormatFlags = StringFormatFlags.NoWrap
+                };
 
             e.Graphics.DrawString(
                 _alert.DisplayText,
@@ -221,11 +313,8 @@ namespace InfoDisplayApp
                 format);
         }
 
-        private void panel1_Resize(object? sender, EventArgs e)
-        {
-            if (_alert != null && !_finishedRaised)
-                panel1.Invalidate();
-        }
+        private void panel1_Resize(object? sender, EventArgs e) =>
+            panel1.Invalidate();
 
         private void TryFinishAlert()
         {
@@ -233,15 +322,21 @@ namespace InfoDisplayApp
                 return;
 
             _finishedRaised = true;
-            _animationTimer.Stop();
+            StopAnimation();
             AlertFinished?.Invoke(this, EventArgs.Empty);
         }
 
         private void ctrlEmergencyTicker_Disposed(object? sender, EventArgs e)
         {
-            _animationTimer.Stop();
+            StopAnimation();
             _animationTimer.Dispose();
             _scrollClock.Stop();
+
+            if (_timerResolutionRequested)
+            {
+                TimeEndPeriod(TimerResolutionMilliseconds);
+                _timerResolutionRequested = false;
+            }
 
             if (_speechSynthesizer != null)
             {
