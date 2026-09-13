@@ -7,13 +7,14 @@ namespace InfoDisplayApp
 {
     public partial class ctrlPhiloWebView : UserControl
     {
-        // Instead of relying on a disruptive full-page reload every few hours,
-        // periodically give the active HTML5 video element a very short
-        // pause/play pulse. This asks Chromium to re-anchor the media clocks while
-        // preserving the current Philo page, channel, cookies, and login state.
-        private static readonly TimeSpan SoftResyncInterval = TimeSpan.FromMinutes(30);
-        private static readonly TimeSpan HardRecoveryInterval = TimeSpan.FromHours(4);
-        private static readonly TimeSpan HiddenResyncThreshold = TimeSpan.FromMinutes(5);
+        // Philo's long-running live stream can slowly drift in WebView2. A plain
+        // pause/play was not always enough to make Chromium rebuild the media
+        // timeline, so the lightweight recovery now also performs a tiny seek.
+        // This forces the decoder/compositor to re-anchor to the media clock while
+        // keeping the user on the same channel and preserving the page/session.
+        private static readonly TimeSpan SoftResyncInterval = TimeSpan.FromMinutes(15);
+        private static readonly TimeSpan HardRecoveryInterval = TimeSpan.FromHours(2);
+        private static readonly TimeSpan HiddenResyncThreshold = TimeSpan.FromMinutes(2);
 
         private readonly System.Windows.Forms.Timer _softResyncTimer;
         private readonly System.Windows.Forms.Timer _hardRecoveryTimer;
@@ -52,10 +53,11 @@ namespace InfoDisplayApp
         }
 
         /// <summary>
-        /// Performs a lightweight media-clock resync without navigating away from
-        /// the current Philo page. If Philo has an actively playing video, it is
-        /// paused for roughly 120 ms and immediately resumed at the same playback
-        /// position/rate. This is intentionally much less disruptive than reload.
+        /// Re-anchors Chromium's media pipeline without navigating away from the
+        /// active Philo channel. The player is paused briefly and its playhead is
+        /// nudged forward by about 50 ms when the stream exposes a seekable range.
+        /// Seeking is important here: it makes Chromium flush/reselect a decoded
+        /// frame instead of merely restarting the same potentially-drifted clocks.
         /// </summary>
         public async Task SoftResyncPhiloPlayerAsync()
         {
@@ -78,13 +80,44 @@ namespace InfoDisplayApp
     if (videos.length === 0)
         return 'idle';
 
+    let recovered = 0;
+
     for (const video of videos) {
         const muted = video.muted;
         const volume = video.volume;
         const playbackRate = video.playbackRate;
+        const originalTime = video.currentTime;
 
         video.pause();
-        await new Promise(resolve => setTimeout(resolve, 120));
+        await new Promise(resolve => setTimeout(resolve, 180));
+
+        // A pause/play by itself can leave Chromium on the same stale decoder
+        // timeline. A microscopic seek makes the media pipeline choose a fresh
+        // frame/timestamp pair without producing a noticeable jump in live TV.
+        try {
+            if (video.seekable && video.seekable.length > 0 && Number.isFinite(originalTime)) {
+                const rangeIndex = video.seekable.length - 1;
+                const rangeStart = video.seekable.start(rangeIndex);
+                const rangeEnd = video.seekable.end(rangeIndex);
+
+                let target = originalTime + 0.05;
+                target = Math.max(rangeStart + 0.01, Math.min(target, rangeEnd - 0.01));
+
+                if (Number.isFinite(target) && Math.abs(target - originalTime) >= 0.001) {
+                    const seekFinished = new Promise(resolve => {
+                        const done = () => resolve();
+                        video.addEventListener('seeked', done, { once: true });
+                        setTimeout(done, 400);
+                    });
+
+                    video.currentTime = target;
+                    await seekFinished;
+                }
+            }
+        } catch {
+            // Some DRM/live-player states may temporarily reject a seek. The
+            // pause/play pulse below is still safe and useful in that case.
+        }
 
         video.muted = muted;
         video.volume = volume;
@@ -92,19 +125,33 @@ namespace InfoDisplayApp
 
         try {
             await video.play();
+
+            // When available, wait until Chromium has actually presented a new
+            // video frame before considering the recovery complete.
+            if (typeof video.requestVideoFrameCallback === 'function') {
+                await Promise.race([
+                    new Promise(resolve => video.requestVideoFrameCallback(() => resolve())),
+                    new Promise(resolve => setTimeout(resolve, 500))
+                ]);
+            }
+
+            recovered++;
         } catch {
             // If autoplay policy rejects the resume, leave Philo itself in
-            // control rather than turning a routine resync into an error popup.
+            // control rather than turning a maintenance pulse into an error.
         }
     }
 
-    return 'resynced';
+    return recovered > 0 ? 'resynced' : 'idle';
 })();";
 
                 string result = await wvPhilo.ExecuteScriptAsync(script);
 
                 if (result.Contains("resynced", StringComparison.OrdinalIgnoreCase))
-                    Debug.WriteLine("Philo: performed lightweight A/V resync pulse.");
+                {
+                    Debug.WriteLine(
+                        "Philo: re-anchored WebView2 media pipeline with pause/seek/play pulse.");
+                }
             }
             catch (Exception ex)
             {
@@ -118,8 +165,8 @@ namespace InfoDisplayApp
 
         /// <summary>
         /// Performs the stronger fallback recovery by reloading the current page.
-        /// Unlike the old implementation, this waits for navigation to actually
-        /// finish before allowing another recovery operation to begin.
+        /// This is intentionally infrequent, but now happens before a many-hour
+        /// viewing session has enough time to accumulate severe drift.
         /// </summary>
         public async Task ResetPhiloPlayerAsync()
         {
@@ -153,7 +200,10 @@ namespace InfoDisplayApp
                         Task.Delay(TimeSpan.FromSeconds(20)));
 
                     if (finished != navigationFinished.Task)
-                        Debug.WriteLine("Philo: full recovery reload timed out waiting for navigation.");
+                    {
+                        Debug.WriteLine(
+                            "Philo: full recovery reload timed out waiting for navigation.");
+                    }
                 }
                 finally
                 {
@@ -216,9 +266,8 @@ namespace InfoDisplayApp
                 if (_hiddenAt.HasValue &&
                     DateTime.Now - _hiddenAt.Value >= HiddenResyncThreshold)
                 {
-                    // Switching back from camera/YouTube after a while is a good
-                    // opportunity to reset the media clocks before the user starts
-                    // watching Philo again.
+                    // Returning from a camera/YouTube view is an ideal time to
+                    // refresh the playback clocks before the viewer notices drift.
                     await SoftResyncPhiloPlayerAsync();
                 }
 
