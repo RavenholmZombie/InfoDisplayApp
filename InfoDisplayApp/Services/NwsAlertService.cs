@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -38,8 +39,12 @@ namespace InfoDisplayApp.Services
             {
                 try
                 {
+                    string coordinate =
+                        latitude.ToString("0.######", CultureInfo.InvariantCulture) + "," +
+                        longitude.ToString("0.######", CultureInfo.InvariantCulture);
+
                     string url =
-                        $"https://api.weather.gov/alerts/active?point={latitude:0.######},{longitude:0.######}";
+                        $"https://api.weather.gov/alerts/active?point={coordinate}";
 
                     using HttpResponseMessage response =
                         await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
@@ -111,6 +116,9 @@ namespace InfoDisplayApp.Services
 
             DateTimeOffset? sent = ParseDate(properties, "sent");
             DateTimeOffset? expires = ParseDate(properties, "expires");
+
+            if (expires.HasValue && expires.Value <= DateTimeOffset.UtcNow)
+                return null;
 
             string displayText = BuildDisplayText(
                 eventName,
