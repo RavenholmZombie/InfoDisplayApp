@@ -22,9 +22,10 @@ namespace InfoDisplayApp
 
             if (runBrowserExperiment)
             {
-#if ANYCPU
+                // InfoDisplay currently builds AnyCPU. CefSharp ships separate
+                // x86/x64 native runtimes, so install its architecture resolver
+                // before touching anything that can load CefSharp.Core.Runtime.
                 CefRuntime.SubscribeAnyCpuAssemblyResolver();
-#endif
 
                 string cachePath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -33,7 +34,9 @@ namespace InfoDisplayApp
 
                 CefSettings settings = new()
                 {
-                    CachePath = cachePath
+                    CachePath = cachePath,
+                    PersistSessionCookies = true,
+                    PersistUserPreferences = true
                 };
 
                 // Streaming sites commonly expect autoplay behavior closer to a
@@ -67,6 +70,7 @@ namespace InfoDisplayApp
                 finally
                 {
                     Cef.Shutdown();
+                    CefRuntime.UnsubscribeAnyCpuAssemblyResolver();
                 }
 
                 return;
