@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
 using System.Windows.Forms;
 
 namespace InfoDisplayApp
@@ -16,15 +11,32 @@ namespace InfoDisplayApp
             Opacity = 0;
         }
 
+        public void SetStartupStatus(string message, int progress)
+        {
+            if (IsDisposed)
+                return;
+
+            progress = Math.Clamp(progress, pBarMain.Minimum, pBarMain.Maximum);
+            lblStatus.Text = message;
+            pBarMain.Value = progress;
+            lblStatus.Refresh();
+            pBarMain.Refresh();
+        }
+
         private void frmSplash_Load(object sender, EventArgs e)
         {
+            SetStartupStatus("Starting Info Display...", 10);
             fadeTimer.Start();
         }
 
         private void fadeTimer_Tick(object sender, EventArgs e)
         {
             Opacity += 0.2;
-            if (Opacity >= 1.0) { Opacity = 1.0; fadeTimer.Stop(); }
+            if (Opacity >= 1.0)
+            {
+                Opacity = 1.0;
+                fadeTimer.Stop();
+            }
         }
     }
 }
