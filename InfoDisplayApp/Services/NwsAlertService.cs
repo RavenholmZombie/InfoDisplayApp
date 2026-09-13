@@ -14,11 +14,14 @@ namespace InfoDisplayApp.Services
             ("Calais", 45.18829, -67.27664)
         };
 
-        private readonly HttpClient _httpClient;
+        // GlobalUsings.cs aliases HttpClient to the weather-specific
+        // ResilientHttpClient wrapper. This service needs the real HTTP client
+        // because it configures headers, timeout, and reads HttpResponseMessage.
+        private readonly System.Net.Http.HttpClient _httpClient;
 
         public NwsAlertService()
         {
-            _httpClient = new HttpClient
+            _httpClient = new System.Net.Http.HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(12)
             };
