@@ -4,10 +4,9 @@ using System.Runtime.InteropServices;
 namespace InfoDisplayApp.Experiments
 {
     /// <summary>
-    /// Experimental Firefox host. Firefox is launched with a dedicated
-    /// pseudo-kiosk profile, then its top-level window is re-parented into the
-    /// WinForms browser panel. This avoids the z-order fight between two
-    /// top-level windows and guarantees the browser cannot cover the bottom bar.
+    /// Experimental Firefox pseudo-kiosk host. Firefox remains a normal
+    /// top-level window (re-parenting Firefox can destabilize its compositor),
+    /// while InfoDisplay continually constrains it to the browser viewport.
     /// </summary>
     internal sealed class FirefoxKioskController : IDisposable
     {
@@ -15,35 +14,21 @@ namespace InfoDisplayApp.Experiments
 
         private const uint SWP_NOACTIVATE = 0x0010;
         private const uint SWP_SHOWWINDOW = 0x0040;
-        private const uint SWP_FRAMECHANGED = 0x0020;
         private const int SW_RESTORE = 9;
 
-        private const int GWL_STYLE = -16;
-        private const long WS_CHILD = 0x40000000L;
-        private const long WS_POPUP = 0x80000000L;
-        private const long WS_CAPTION = 0x00C00000L;
-        private const long WS_THICKFRAME = 0x00040000L;
-        private const long WS_SYSMENU = 0x00080000L;
-        private const long WS_MINIMIZEBOX = 0x00020000L;
-        private const long WS_MAXIMIZEBOX = 0x00010000L;
-
-        private readonly Func<IntPtr> _getHostHandle;
-        private readonly Func<Size> _getViewportSize;
+        private readonly Func<Rectangle> _getTargetRectangle;
         private readonly System.Windows.Forms.Timer _watchdog;
         private readonly HashSet<int> _preExistingFirefoxPids = new();
 
         private IntPtr _firefoxWindow;
         private int _firefoxWindowPid;
         private DateTime _launchTimeUtc;
-        private bool _isEmbedded;
+        private bool _reportedRunning;
         private bool _disposed;
 
-        public FirefoxKioskController(
-            Func<IntPtr> getHostHandle,
-            Func<Size> getViewportSize)
+        public FirefoxKioskController(Func<Rectangle> getTargetRectangle)
         {
-            _getHostHandle = getHostHandle;
-            _getViewportSize = getViewportSize;
+            _getTargetRectangle = getTargetRectangle;
 
             _watchdog = new System.Windows.Forms.Timer
             {
@@ -53,6 +38,7 @@ namespace InfoDisplayApp.Experiments
         }
 
         public event EventHandler<string>? StatusChanged;
+        public event EventHandler<bool>? RunningChanged;
 
         public bool IsRunning =>
             _firefoxWindow != IntPtr.Zero && IsWindow(_firefoxWindow);
@@ -102,6 +88,9 @@ namespace InfoDisplayApp.Experiments
                 WorkingDirectory = Path.GetDirectoryName(FirefoxPath) ?? AppContext.BaseDirectory
             };
 
+            // Keep Firefox a genuine top-level window. The dedicated profile
+            // strips browser chrome without invoking native --kiosk/F11 mode,
+            // which would otherwise insist on filling the whole monitor.
             startInfo.ArgumentList.Add("-no-remote");
             startInfo.ArgumentList.Add("-profile");
             startInfo.ArgumentList.Add(profileDirectory);
@@ -113,7 +102,7 @@ namespace InfoDisplayApp.Experiments
             _launchTimeUtc = DateTime.UtcNow;
             _firefoxWindow = IntPtr.Zero;
             _firefoxWindowPid = 0;
-            _isEmbedded = false;
+            SetReportedRunning(false);
             _watchdog.Start();
 
             OnStatusChanged($"Launching Firefox pseudo-kiosk: {uri.Host}");
@@ -124,73 +113,24 @@ namespace InfoDisplayApp.Experiments
             if (_disposed || _firefoxWindow == IntPtr.Zero || !IsWindow(_firefoxWindow))
                 return;
 
-            IntPtr hostHandle = _getHostHandle();
-            Size viewport = _getViewportSize();
-
-            if (hostHandle == IntPtr.Zero || viewport.Width <= 0 || viewport.Height <= 0)
+            Rectangle target = _getTargetRectangle();
+            if (target.Width <= 0 || target.Height <= 0)
                 return;
 
-            if (!_isEmbedded)
-            {
-                EmbedFirefoxWindow(hostHandle);
-                if (!_isEmbedded)
-                    return;
-            }
-
-            // Once Firefox is a child of pnlBrowserSurface, coordinates are
-            // relative to that panel. This makes the browser viewport exactly
-            // match the black area and makes it physically impossible for the
-            // browser to cover the separate InfoDisplay bottom bar.
-            SetWindowPos(
-                _firefoxWindow,
-                HWND_TOP,
-                0,
-                0,
-                viewport.Width,
-                viewport.Height,
-                SWP_NOACTIVATE | SWP_SHOWWINDOW);
-        }
-
-        private void EmbedFirefoxWindow(IntPtr hostHandle)
-        {
             ShowWindow(_firefoxWindow, SW_RESTORE);
 
-            long style = GetWindowStyle(_firefoxWindow);
-            style &= ~(WS_POPUP |
-                       WS_CAPTION |
-                       WS_THICKFRAME |
-                       WS_SYSMENU |
-                       WS_MINIMIZEBOX |
-                       WS_MAXIMIZEBOX);
-            style |= WS_CHILD;
-
-            SetWindowStyle(_firefoxWindow, style);
-
-            IntPtr previousParent = SetParent(_firefoxWindow, hostHandle);
-            int error = Marshal.GetLastWin32Error();
-
-            // SetParent returning NULL is not automatically failure when the
-            // previous parent was the desktop, so verify the relationship.
-            if (GetParent(_firefoxWindow) != hostHandle)
-            {
-                OnStatusChanged(
-                    $"Firefox window found, but embedding failed (Win32 error {error}).");
-                return;
-            }
-
-            _isEmbedded = true;
-
+            // Firefox remains a normal top-level window, but its actual window
+            // rectangle is exactly the viewport rectangle above InfoDisplay's
+            // bottom bar. The page therefore lays itself out at the shorter
+            // height instead of being hidden behind an overlay.
             SetWindowPos(
                 _firefoxWindow,
                 HWND_TOP,
-                0,
-                0,
-                Math.Max(1, _getViewportSize().Width),
-                Math.Max(1, _getViewportSize().Height),
-                SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED);
-
-            OnStatusChanged(
-                $"Firefox embedded in InfoDisplay viewport (PID {_firefoxWindowPid}).");
+                target.Left,
+                target.Top,
+                target.Width,
+                target.Height,
+                SWP_NOACTIVATE | SWP_SHOWWINDOW);
         }
 
         public void Stop()
@@ -200,7 +140,7 @@ namespace InfoDisplayApp.Experiments
             int pid = _firefoxWindowPid;
             _firefoxWindow = IntPtr.Zero;
             _firefoxWindowPid = 0;
-            _isEmbedded = false;
+            SetReportedRunning(false);
 
             if (pid != 0)
             {
@@ -229,10 +169,17 @@ namespace InfoDisplayApp.Experiments
 
         private void Watchdog_Tick(object? sender, EventArgs e)
         {
-            if (_firefoxWindow == IntPtr.Zero || !IsWindow(_firefoxWindow))
+            if (_firefoxWindow != IntPtr.Zero && !IsWindow(_firefoxWindow))
+            {
+                _firefoxWindow = IntPtr.Zero;
+                _firefoxWindowPid = 0;
+                SetReportedRunning(false);
+                OnStatusChanged("Firefox window closed unexpectedly.");
+            }
+
+            if (_firefoxWindow == IntPtr.Zero)
             {
                 _firefoxWindow = FindNewFirefoxTopLevelWindow(out _firefoxWindowPid);
-                _isEmbedded = false;
 
                 if (_firefoxWindow == IntPtr.Zero)
                 {
@@ -241,8 +188,10 @@ namespace InfoDisplayApp.Experiments
                     return;
                 }
 
+                SetReportedRunning(true);
                 OnStatusChanged(
-                    $"Firefox window attached (PID {_firefoxWindowPid}); embedding into InfoDisplay...");
+                    $"Firefox window attached (PID {_firefoxWindowPid}). " +
+                    "Keeping it constrained to the InfoDisplay viewport.");
             }
 
             ReapplyBounds();
@@ -327,19 +276,13 @@ namespace InfoDisplayApp.Experiments
             return candidates.FirstOrDefault(File.Exists);
         }
 
-        private static long GetWindowStyle(IntPtr hWnd)
+        private void SetReportedRunning(bool running)
         {
-            return IntPtr.Size == 8
-                ? GetWindowLongPtr64(hWnd, GWL_STYLE).ToInt64()
-                : GetWindowLong32(hWnd, GWL_STYLE);
-        }
+            if (_reportedRunning == running)
+                return;
 
-        private static void SetWindowStyle(IntPtr hWnd, long style)
-        {
-            if (IntPtr.Size == 8)
-                SetWindowLongPtr64(hWnd, GWL_STYLE, new IntPtr(style));
-            else
-                SetWindowLong32(hWnd, GWL_STYLE, unchecked((int)style));
+            _reportedRunning = running;
+            RunningChanged?.Invoke(this, running);
         }
 
         private void OnStatusChanged(string message) =>
@@ -376,24 +319,6 @@ namespace InfoDisplayApp.Experiments
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetParent(IntPtr hWnd);
-
-        [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
-        private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
-
-        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
-        private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
-
-        [DllImport("user32.dll", EntryPoint = "SetWindowLong")]
-        private static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
-
-        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
-        private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
