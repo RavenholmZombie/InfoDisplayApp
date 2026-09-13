@@ -23,10 +23,6 @@ namespace InfoDisplayApp
 
             if (runBrowserExperiment)
             {
-                // AnyCPU builds need CefSharp's resolver installed before the
-                // first native CEF assembly is loaded.
-                CefRuntime.SubscribeAnyCpuAssemblyResolver();
-
                 string cachePath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "InfoDisplayApp",
@@ -37,10 +33,6 @@ namespace InfoDisplayApp
                     CachePath = cachePath,
                     PersistSessionCookies = true
                 };
-
-                // PersistUserPreferences was removed from modern CEF/CefSharp;
-                // Chrome bootstrap persists preferences automatically when a
-                // persistent cache path is supplied.
 
                 settings.CefCommandLineArgs.Add(
                     "autoplay-policy",
@@ -71,7 +63,6 @@ namespace InfoDisplayApp
                 finally
                 {
                     Cef.Shutdown();
-                    CefRuntime.UnsubscribeAnyCpuAssemblyResolver();
                 }
 
                 return;
