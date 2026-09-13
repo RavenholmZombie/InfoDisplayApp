@@ -49,7 +49,6 @@
             lblBtnClose = new Label();
             dbpBtnRestart = new DoubleBufferedPanel();
             lblBtnRestart = new Label();
-            aloneButton1 = new ReaLTaiizor.Controls.AloneButton();
             panel1.SuspendLayout();
             flowLayoutPanel1.SuspendLayout();
             appPnlTapo.SuspendLayout();
@@ -86,7 +85,6 @@
             flowLayoutPanel1.Controls.Add(appPnlYouTube);
             flowLayoutPanel1.Controls.Add(appPnlEAS);
             flowLayoutPanel1.Controls.Add(appPnlBrowser);
-            flowLayoutPanel1.Controls.Add(aloneButton1);
             flowLayoutPanel1.Location = new Point(0, 0);
             flowLayoutPanel1.Name = "flowLayoutPanel1";
             flowLayoutPanel1.Size = new Size(265, 218);
@@ -290,19 +288,6 @@
             lblBtnRestart.TabIndex = 1;
             lblBtnRestart.Text = "Restart InfoScreen";
             // 
-            // aloneButton1
-            // 
-            aloneButton1.BackColor = Color.Transparent;
-            aloneButton1.EnabledCalc = true;
-            aloneButton1.Font = new Font("Segoe UI", 9F);
-            aloneButton1.ForeColor = Color.FromArgb(124, 133, 142);
-            aloneButton1.Location = new Point(179, 107);
-            aloneButton1.Name = "aloneButton1";
-            aloneButton1.Size = new Size(82, 40);
-            aloneButton1.TabIndex = 5;
-            aloneButton1.Text = "aloneButton1";
-            aloneButton1.Click += aloneButton1_Click;
-            // 
             // ctrlAppsPanel
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -364,6 +349,5 @@
         private Panel appPnlBrowser;
         private Label lblBrowser;
         private PictureBox icnBrowser;
-        private ReaLTaiizor.Controls.AloneButton aloneButton1;
     }
 }
