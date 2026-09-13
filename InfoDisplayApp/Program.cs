@@ -1,3 +1,4 @@
+using CefSharp;
 using InfoDisplayApp.Experiments;
 
 namespace InfoDisplayApp
@@ -14,14 +15,60 @@ namespace InfoDisplayApp
 
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
-            bool runFirefoxExperiment = args.Any(arg =>
+            // Keep the existing experiment switch so the current Visual Studio
+            // launch profile does not need to change while we swap browser engines.
+            bool runBrowserExperiment = args.Any(arg =>
                 arg.Equals("--firefox-kiosk-experiment", StringComparison.OrdinalIgnoreCase));
 
-            if (runFirefoxExperiment)
+            if (runBrowserExperiment)
             {
-                frmFirefoxKioskExperiment experimentForm = new();
-                AppMessages.Initialize(experimentForm);
-                Application.Run(experimentForm);
+#if ANYCPU
+                CefRuntime.SubscribeAnyCpuAssemblyResolver();
+#endif
+
+                string cachePath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "InfoDisplayApp",
+                    "CefSharpExperiment");
+
+                CefSettings settings = new()
+                {
+                    CachePath = cachePath
+                };
+
+                // Streaming sites commonly expect autoplay behavior closer to a
+                // living-room browser than a freshly-created embedded control.
+                settings.CefCommandLineArgs.Add(
+                    "autoplay-policy",
+                    "no-user-gesture-required");
+
+                bool initialized = Cef.Initialize(
+                    settings,
+                    performDependencyCheck: true,
+                    browserProcessHandler: null);
+
+                if (!initialized)
+                {
+                    MessageBox.Show(
+                        $"CefSharp failed to initialize ({Cef.GetExitCode()}). " +
+                        "Check the CefSharp log and runtime files in the output directory.",
+                        "InfoDisplay CefSharp Experiment",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                    return;
+                }
+
+                try
+                {
+                    frmCefSharpExperiment experimentForm = new();
+                    AppMessages.Initialize(experimentForm);
+                    Application.Run(experimentForm);
+                }
+                finally
+                {
+                    Cef.Shutdown();
+                }
+
                 return;
             }
 
