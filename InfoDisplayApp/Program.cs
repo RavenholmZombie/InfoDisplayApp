@@ -116,10 +116,9 @@ namespace InfoDisplayApp
             {
                 _splash.FormClosed -= Splash_FormClosed;
 
-                // If the splash disappears before the main form is ready, treat
-                // that as a cancelled/failed startup instead of leaving an
-                // invisible application process running in the background.
-                if (!_startupCompleted && _mainForm is not { IsDisposed: false })
+                // If the splash disappears before the normal reveal path finishes,
+                // do not leave an invisible main window/process behind.
+                if (!_startupCompleted)
                     ExitThread();
             }
         }
