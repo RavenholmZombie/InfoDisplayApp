@@ -42,13 +42,14 @@
             appPnlEAS = new Panel();
             lblEAS = new Label();
             icnEAS = new PictureBox();
+            appPnlBrowser = new Panel();
+            lblBrowser = new Label();
+            icnBrowser = new PictureBox();
             dbpBtnClose = new DoubleBufferedPanel();
             lblBtnClose = new Label();
             dbpBtnRestart = new DoubleBufferedPanel();
             lblBtnRestart = new Label();
-            appPnlBrowser = new Panel();
-            lblBrowser = new Label();
-            icnBrowser = new PictureBox();
+            aloneButton1 = new ReaLTaiizor.Controls.AloneButton();
             panel1.SuspendLayout();
             flowLayoutPanel1.SuspendLayout();
             appPnlTapo.SuspendLayout();
@@ -59,10 +60,10 @@
             ((System.ComponentModel.ISupportInitialize)icnYouTube).BeginInit();
             appPnlEAS.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)icnEAS).BeginInit();
-            dbpBtnClose.SuspendLayout();
-            dbpBtnRestart.SuspendLayout();
             appPnlBrowser.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)icnBrowser).BeginInit();
+            dbpBtnClose.SuspendLayout();
+            dbpBtnRestart.SuspendLayout();
             SuspendLayout();
             // 
             // panel1
@@ -85,6 +86,7 @@
             flowLayoutPanel1.Controls.Add(appPnlYouTube);
             flowLayoutPanel1.Controls.Add(appPnlEAS);
             flowLayoutPanel1.Controls.Add(appPnlBrowser);
+            flowLayoutPanel1.Controls.Add(aloneButton1);
             flowLayoutPanel1.Location = new Point(0, 0);
             flowLayoutPanel1.Name = "flowLayoutPanel1";
             flowLayoutPanel1.Size = new Size(265, 218);
@@ -211,6 +213,37 @@
             icnEAS.TabIndex = 0;
             icnEAS.TabStop = false;
             // 
+            // appPnlBrowser
+            // 
+            appPnlBrowser.Controls.Add(lblBrowser);
+            appPnlBrowser.Controls.Add(icnBrowser);
+            appPnlBrowser.Cursor = Cursors.Hand;
+            appPnlBrowser.Location = new Point(91, 107);
+            appPnlBrowser.Name = "appPnlBrowser";
+            appPnlBrowser.Size = new Size(82, 98);
+            appPnlBrowser.TabIndex = 4;
+            appPnlBrowser.Click += appPnlBrowser_Click;
+            // 
+            // lblBrowser
+            // 
+            lblBrowser.AutoSize = true;
+            lblBrowser.Location = new Point(17, 64);
+            lblBrowser.Name = "lblBrowser";
+            lblBrowser.Size = new Size(49, 15);
+            lblBrowser.TabIndex = 1;
+            lblBrowser.Text = "Browser";
+            lblBrowser.TextAlign = ContentAlignment.TopCenter;
+            // 
+            // icnBrowser
+            // 
+            icnBrowser.Image = Properties.Resources.browser_icn;
+            icnBrowser.Location = new Point(17, 12);
+            icnBrowser.Name = "icnBrowser";
+            icnBrowser.Size = new Size(49, 49);
+            icnBrowser.SizeMode = PictureBoxSizeMode.StretchImage;
+            icnBrowser.TabIndex = 0;
+            icnBrowser.TabStop = false;
+            // 
             // dbpBtnClose
             // 
             dbpBtnClose.BackgroundImage = Properties.Resources.glass_btn_close_norm;
@@ -257,36 +290,18 @@
             lblBtnRestart.TabIndex = 1;
             lblBtnRestart.Text = "Restart InfoScreen";
             // 
-            // appPnlBrowser
+            // aloneButton1
             // 
-            appPnlBrowser.Controls.Add(lblBrowser);
-            appPnlBrowser.Controls.Add(icnBrowser);
-            appPnlBrowser.Cursor = Cursors.Hand;
-            appPnlBrowser.Location = new Point(91, 107);
-            appPnlBrowser.Name = "appPnlBrowser";
-            appPnlBrowser.Size = new Size(82, 98);
-            appPnlBrowser.TabIndex = 4;
-            appPnlBrowser.Click += appPnlBrowser_Click;
-            // 
-            // lblBrowser
-            // 
-            lblBrowser.AutoSize = true;
-            lblBrowser.Location = new Point(17, 64);
-            lblBrowser.Name = "lblBrowser";
-            lblBrowser.Size = new Size(49, 15);
-            lblBrowser.TabIndex = 1;
-            lblBrowser.Text = "Browser";
-            lblBrowser.TextAlign = ContentAlignment.TopCenter;
-            // 
-            // icnBrowser
-            // 
-            icnBrowser.Image = Properties.Resources.browser_icn;
-            icnBrowser.Location = new Point(17, 12);
-            icnBrowser.Name = "icnBrowser";
-            icnBrowser.Size = new Size(49, 49);
-            icnBrowser.SizeMode = PictureBoxSizeMode.StretchImage;
-            icnBrowser.TabIndex = 0;
-            icnBrowser.TabStop = false;
+            aloneButton1.BackColor = Color.Transparent;
+            aloneButton1.EnabledCalc = true;
+            aloneButton1.Font = new Font("Segoe UI", 9F);
+            aloneButton1.ForeColor = Color.FromArgb(124, 133, 142);
+            aloneButton1.Location = new Point(179, 107);
+            aloneButton1.Name = "aloneButton1";
+            aloneButton1.Size = new Size(82, 40);
+            aloneButton1.TabIndex = 5;
+            aloneButton1.Text = "aloneButton1";
+            aloneButton1.Click += aloneButton1_Click;
             // 
             // ctrlAppsPanel
             // 
@@ -316,13 +331,13 @@
             appPnlEAS.ResumeLayout(false);
             appPnlEAS.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)icnEAS).EndInit();
+            appPnlBrowser.ResumeLayout(false);
+            appPnlBrowser.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)icnBrowser).EndInit();
             dbpBtnClose.ResumeLayout(false);
             dbpBtnClose.PerformLayout();
             dbpBtnRestart.ResumeLayout(false);
             dbpBtnRestart.PerformLayout();
-            appPnlBrowser.ResumeLayout(false);
-            appPnlBrowser.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)icnBrowser).EndInit();
             ResumeLayout(false);
         }
 
@@ -349,5 +364,6 @@
         private Panel appPnlBrowser;
         private Label lblBrowser;
         private PictureBox icnBrowser;
+        private ReaLTaiizor.Controls.AloneButton aloneButton1;
     }
 }
