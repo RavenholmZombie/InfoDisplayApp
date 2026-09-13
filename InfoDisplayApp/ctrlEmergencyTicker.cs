@@ -365,7 +365,50 @@ namespace InfoDisplayApp
 
             _finishedRaised = true;
             StopAnimation();
-            AlertFinished?.Invoke(this, EventArgs.Empty);
+            _ = PlayEndSignalAndFinishAsync();
+        }
+
+        private async Task PlayEndSignalAndFinishAsync()
+        {
+            try
+            {
+                await Task.Run(() =>
+                {
+                    using Stream stream = Resources.alert_end;
+                    using SoundPlayer player = new(stream);
+                    player.Load();
+                    player.PlaySync();
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to play EAS end signal: {ex}");
+            }
+
+            if (IsDisposed || Disposing)
+                return;
+
+            if (InvokeRequired)
+            {
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        if (!IsDisposed && !Disposing)
+                            AlertFinished?.Invoke(this, EventArgs.Empty);
+                    }));
+                }
+                catch (InvalidOperationException)
+                {
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            }
+            else
+            {
+                AlertFinished?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         private void ctrlEmergencyTicker_Disposed(object? sender, EventArgs e)
