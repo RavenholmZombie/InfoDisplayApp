@@ -25,7 +25,7 @@ namespace InfoDisplayApp
             lblYouTube.Click += appPnlYouTube_Click;
             lblBtnRestart.Cursor = Cursors.Hand;
 
-            // EAS
+            // EAS test
             icnEAS.Click += appPnlEAS_Click;
             lblEAS.Click += appPnlEAS_Click;
             lblBtnRestart.Cursor = Cursors.Hand;
@@ -57,6 +57,7 @@ namespace InfoDisplayApp
         {
             SendAppChange(sender, e, "Philo");
         }
+
         private void appPnlYouTube_Click(object sender, EventArgs e)
         {
             SendAppChange(sender, e, "YouTube");
@@ -69,7 +70,8 @@ namespace InfoDisplayApp
 
         private void appPnlEAS_Click(object sender, EventArgs e)
         {
-            SendAppChange(sender, e, "EAS");
+            frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
+            mainForm?.TriggerNationalPeriodicTest();
         }
 
         private void SendAppChange(object sender, EventArgs e, String appName)
@@ -92,13 +94,6 @@ namespace InfoDisplayApp
                 else if (appName == "Tapo")
                 {
                     mainForm.ShowCameraMode();
-                }
-                else if (appName == "EAS")
-                {
-                    mainForm.ToggleTickerMode(
-                        mainForm.tickerMode.Equals("EAS", StringComparison.OrdinalIgnoreCase)
-                            ? "Normal"
-                            : "EAS");
                 }
                 else if (appName == "browser")
                 {
