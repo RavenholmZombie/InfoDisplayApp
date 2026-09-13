@@ -31,6 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="CefSharp.WinForms.NETCore" Version="151.3.240" />
     <PackageReference Include="LibVLCSharp" Version="3.10.1" />
     <PackageReference Include="LibVLCSharp.WinForms" Version="3.10.1" />
     <PackageReference Include="MCStatus.NET" Version="1.0.0" />
