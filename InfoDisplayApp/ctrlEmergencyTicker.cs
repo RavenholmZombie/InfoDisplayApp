@@ -2,6 +2,7 @@ using InfoDisplayApp.Properties;
 using InfoDisplayApp.Services;
 using System.Diagnostics;
 using System.Drawing.Text;
+using System.Media;
 using System.Speech.Synthesis;
 
 namespace InfoDisplayApp
@@ -42,7 +43,7 @@ namespace InfoDisplayApp
             Disposed += ctrlEmergencyTicker_Disposed;
         }
 
-        public void StartAlert(NwsAlertMessage alert)
+        internal void StartAlert(NwsAlertMessage alert)
         {
             if (IsDisposed)
                 return;
