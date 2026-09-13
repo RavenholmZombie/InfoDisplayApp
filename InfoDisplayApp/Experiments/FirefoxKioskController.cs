@@ -4,15 +4,14 @@ using System.Runtime.InteropServices;
 namespace InfoDisplayApp.Experiments
 {
     /// <summary>
-    /// Experimental external Firefox kiosk host. Firefox remains a normal
-    /// top-level Windows window; InfoDisplayApp repeatedly constrains it to the
-    /// exact screen rectangle supplied by the experiment form so the browser's
-    /// viewport ends above the InfoDisplay bottom bar instead of being hidden
-    /// behind it.
+    /// Experimental external Firefox host. Rather than Firefox's native
+    /// --kiosk mode (which insists on monitor-sized fullscreen), this uses a
+    /// dedicated profile with userChrome.css to hide browser chrome while
+    /// keeping the top-level window normally resizable.
     /// </summary>
     internal sealed class FirefoxKioskController : IDisposable
     {
-        private static readonly IntPtr HWND_TOPMOST = new(-1);
+        private static readonly IntPtr HWND_TOP = IntPtr.Zero;
 
         private const uint SWP_NOACTIVATE = 0x0010;
         private const uint SWP_SHOWWINDOW = 0x0040;
@@ -79,7 +78,8 @@ namespace InfoDisplayApp.Experiments
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "InfoDisplayApp",
                 "FirefoxKioskProfile");
-            Directory.CreateDirectory(profileDirectory);
+
+            PreparePseudoKioskProfile(profileDirectory);
 
             ProcessStartInfo startInfo = new(FirefoxPath)
             {
@@ -87,13 +87,14 @@ namespace InfoDisplayApp.Experiments
                 WorkingDirectory = Path.GetDirectoryName(FirefoxPath) ?? AppContext.BaseDirectory
             };
 
-            // A dedicated persistent profile gives Philo/YouTube somewhere to
-            // keep logins, cookies and DRM state without touching the user's
-            // everyday Firefox profile.
+            // Do not use --kiosk here. Firefox's native kiosk mode deliberately
+            // takes over the whole monitor, which defeats InfoDisplay's reserved
+            // bottom information bar. The dedicated profile hides Firefox chrome
+            // while leaving the window resizable by Win32.
             startInfo.ArgumentList.Add("-no-remote");
             startInfo.ArgumentList.Add("-profile");
             startInfo.ArgumentList.Add(profileDirectory);
-            startInfo.ArgumentList.Add("--kiosk");
+            startInfo.ArgumentList.Add("-new-window");
             startInfo.ArgumentList.Add(uri.AbsoluteUri);
 
             Process.Start(startInfo)?.Dispose();
@@ -103,7 +104,7 @@ namespace InfoDisplayApp.Experiments
             _firefoxWindowPid = 0;
             _watchdog.Start();
 
-            OnStatusChanged($"Launching Firefox kiosk: {uri.Host}");
+            OnStatusChanged($"Launching Firefox pseudo-kiosk: {uri.Host}");
         }
 
         public void ReapplyBounds()
@@ -116,9 +117,13 @@ namespace InfoDisplayApp.Experiments
                 return;
 
             ShowWindow(_firefoxWindow, SW_RESTORE);
+
+            // Keep Firefox as a normal (non-topmost) top-level window. It only
+            // needs to sit over the browser rectangle; because its height stops
+            // before the bottom bar, the InfoDisplay controls remain visible.
             SetWindowPos(
                 _firefoxWindow,
-                HWND_TOPMOST,
+                HWND_TOP,
                 target.Left,
                 target.Top,
                 target.Width,
@@ -156,7 +161,7 @@ namespace InfoDisplayApp.Experiments
                 }
             }
 
-            OnStatusChanged("Firefox kiosk stopped.");
+            OnStatusChanged("Firefox pseudo-kiosk stopped.");
         }
 
         private void Watchdog_Tick(object? sender, EventArgs e)
@@ -168,7 +173,7 @@ namespace InfoDisplayApp.Experiments
                 if (_firefoxWindow == IntPtr.Zero)
                 {
                     if (DateTime.UtcNow - _launchTimeUtc > TimeSpan.FromSeconds(15))
-                        OnStatusChanged("Waiting for a Firefox kiosk window...");
+                        OnStatusChanged("Waiting for a Firefox window...");
                     return;
                 }
 
@@ -212,6 +217,36 @@ namespace InfoDisplayApp.Experiments
 
             pid = foundPid;
             return foundWindow;
+        }
+
+        private static void PreparePseudoKioskProfile(string profileDirectory)
+        {
+            Directory.CreateDirectory(profileDirectory);
+
+            // Enable userChrome.css for this isolated profile. These prefs are
+            // intentionally limited to the experiment profile and do not touch
+            // the user's normal Firefox installation/profile.
+            string userJsPath = Path.Combine(profileDirectory, "user.js");
+            File.WriteAllText(
+                userJsPath,
+                "user_pref(\"toolkit.legacyUserProfileCustomizations.stylesheets\", true);\r\n" +
+                "user_pref(\"browser.tabs.warnOnClose\", false);\r\n" +
+                "user_pref(\"browser.shell.checkDefaultBrowser\", false);\r\n");
+
+            string chromeDirectory = Path.Combine(profileDirectory, "chrome");
+            Directory.CreateDirectory(chromeDirectory);
+
+            // Hide all normal browser furniture while retaining the content area.
+            // Unlike --kiosk/F11, this does not force the top-level window to
+            // occupy the entire monitor.
+            string userChromePath = Path.Combine(chromeDirectory, "userChrome.css");
+            File.WriteAllText(
+                userChromePath,
+                "#navigator-toolbox { visibility: collapse !important; }\r\n" +
+                "#TabsToolbar { visibility: collapse !important; }\r\n" +
+                "#titlebar { visibility: collapse !important; }\r\n" +
+                "#sidebar-box, #sidebar-splitter { display: none !important; }\r\n" +
+                "#statuspanel { display: none !important; }\r\n");
         }
 
         private static string? FindFirefoxExecutable()
