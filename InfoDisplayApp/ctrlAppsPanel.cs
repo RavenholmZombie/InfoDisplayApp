@@ -18,18 +18,22 @@ namespace InfoDisplayApp
             // Philo
             icnPhilo.Click += appPnlPhilo_Click;
             lblPhilo.Click += appPnlPhilo_Click;
+            lblBtnRestart.Cursor = Cursors.Hand;
 
             // YouTube
             icnYouTube.Click += appPnlYouTube_Click;
             lblYouTube.Click += appPnlYouTube_Click;
+            lblBtnRestart.Cursor = Cursors.Hand;
 
             // EAS
             icnEAS.Click += appPnlEAS_Click;
             lblEAS.Click += appPnlEAS_Click;
+            lblBtnRestart.Cursor = Cursors.Hand;
 
             // Tapo
             icnTapo.Click += appPnlTapo_Click;
             lblTapo.Click += appPnlTapo_Click;
+            lblBtnRestart.Cursor = Cursors.Hand;
 
             // Quit Button
             lblBtnClose.Click += dbpBtnClose_Click;
@@ -41,6 +45,11 @@ namespace InfoDisplayApp
             lblBtnRestart.Click += dbpBtnRestart_Click;
             lblBtnRestart.MouseEnter += dbpBtnRestart_MouseEnter;
             lblBtnRestart.MouseLeave += dbpBtnRestart_MouseLeave;
+            lblBtnRestart.Cursor = Cursors.Hand;
+
+            // Browser Button
+            lblBrowser.Click += appPnlBrowser_Click;
+            icnBrowser.Click += appPnlBrowser_Click;
             lblBtnRestart.Cursor = Cursors.Hand;
         }
 
