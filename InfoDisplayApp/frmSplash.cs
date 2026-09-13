@@ -16,7 +16,7 @@ namespace InfoDisplayApp
             if (IsDisposed)
                 return;
 
-            progress = Math.Clamp(progress, pBarMain.Minimum, pBarMain.Maximum);
+            progress = Math.Clamp(progress, pBarMain.Value = 0, pBarMain.Maximum);
             lblStatus.Text = message;
             pBarMain.Value = progress;
             lblStatus.Refresh();
