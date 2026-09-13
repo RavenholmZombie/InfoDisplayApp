@@ -5,8 +5,9 @@ namespace InfoDisplayApp.Experiments
     /// <summary>
     /// Standalone test harness that intentionally resembles frmMain: a large
     /// browser/TV surface on top and a persistent information/control bar along
-    /// the bottom. The external Firefox window is constrained to pnlBrowserSurface
-    /// so its actual viewport ends before the bottom bar begins.
+    /// the bottom. Firefox is embedded directly into pnlBrowserSurface so it
+    /// participates in the same layout instead of competing as a top-level
+    /// window.
     /// </summary>
     internal sealed class frmFirefoxKioskExperiment : Form
     {
@@ -44,7 +45,11 @@ namespace InfoDisplayApp.Experiments
 
             BuildLayout();
 
-            _firefox = new FirefoxKioskController(GetBrowserScreenRectangle);
+            _firefox = new FirefoxKioskController(
+                () => pnlBrowserSurface.IsHandleCreated
+                    ? pnlBrowserSurface.Handle
+                    : IntPtr.Zero,
+                () => pnlBrowserSurface.ClientSize);
             _firefox.StatusChanged += Firefox_StatusChanged;
 
             _clockTimer.Interval = 1000;
@@ -55,17 +60,16 @@ namespace InfoDisplayApp.Experiments
             Shown += (_, _) =>
             {
                 lblStatus.Text =
-                    "Ready. Launch a site to test whether Firefox kiosk mode stays constrained above this bar.";
+                    "Ready. Firefox will be embedded directly into the black viewport above this bar.";
             };
 
-            Resize += (_, _) => BeginInvoke(new Action(_firefox.ReapplyBounds));
-            Move += (_, _) => BeginInvoke(new Action(_firefox.ReapplyBounds));
+            pnlBrowserSurface.Resize += (_, _) =>
+                BeginInvoke(new Action(_firefox.ReapplyBounds));
             FormClosing += FrmFirefoxKioskExperiment_FormClosing;
         }
 
         private void BuildLayout()
         {
-            // Browser/TV area: equivalent role to frmMain.pnlTV.
             pnlBrowserSurface.Dock = DockStyle.Fill;
             pnlBrowserSurface.BackColor = Color.Black;
             pnlBrowserSurface.Padding = new Padding(0);
@@ -76,13 +80,11 @@ namespace InfoDisplayApp.Experiments
             lblViewportHint.ForeColor = Color.DimGray;
             lblViewportHint.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
             lblViewportHint.Text =
-                "FIREFOX KIOSK VIEWPORT\r\n\r\n" +
-                "The external browser window should occupy exactly this black area.\r\n" +
-                "Its page viewport should never extend underneath the information bar.";
+                "FIREFOX EMBEDDED VIEWPORT\r\n\r\n" +
+                "Firefox should become a child of this black panel.\r\n" +
+                "The browser should never overlap the information bar below.";
             pnlBrowserSurface.Controls.Add(lblViewportHint);
 
-            // Persistent bottom bar: same basic relationship as frmMain's ticker,
-            // apps, weather and date/time strip, but simplified for this test.
             pnlBottomBar.Dock = DockStyle.Bottom;
             pnlBottomBar.Height = 100;
             pnlBottomBar.BackColor = Color.FromArgb(28, 42, 61);
@@ -152,14 +154,6 @@ namespace InfoDisplayApp.Experiments
             button.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             button.UseVisualStyleBackColor = true;
             button.Click += onClick;
-        }
-
-        private Rectangle GetBrowserScreenRectangle()
-        {
-            if (!pnlBrowserSurface.IsHandleCreated)
-                return Rectangle.Empty;
-
-            return pnlBrowserSurface.RectangleToScreen(pnlBrowserSurface.ClientRectangle);
         }
 
         private void Launch(string url)
