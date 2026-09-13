@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace InfoDisplayApp
 {
     internal static class Program
@@ -15,7 +17,11 @@ namespace InfoDisplayApp
 
         private sealed class StartupApplicationContext : ApplicationContext
         {
+            private static readonly TimeSpan MinimumSplashDuration =
+                TimeSpan.FromSeconds(3.5);
+
             private readonly frmSplash _splash;
+            private readonly Stopwatch _startupClock = new();
             private frmMain? _mainForm;
             private bool _mainWasTopMost;
             private bool _startupCompleted;
@@ -31,11 +37,12 @@ namespace InfoDisplayApp
             private async void Splash_Shown(object? sender, EventArgs e)
             {
                 _splash.Shown -= Splash_Shown;
+                _startupClock.Restart();
 
                 try
                 {
-                    _splash.SetStartupStatus("Preparing Info Display...", 25);
-                    await Task.Yield();
+                    _splash.SetStartupStatus("Preparing Info Display...", 15);
+                    await Task.Delay(350);
 
                     _mainForm = new frmMain();
                     AppMessages.Initialize(_mainForm);
@@ -49,7 +56,9 @@ namespace InfoDisplayApp
 
                     MainForm = _mainForm;
 
-                    _splash.SetStartupStatus("Loading display modules...", 55);
+                    _splash.SetStartupStatus("Loading display modules...", 40);
+                    await Task.Delay(350);
+                    _splash.SetStartupStatus("Starting media services...", 60);
 
                     // Showing the form while fully transparent gives WinForms and
                     // the child controls their normal Load/Shown lifecycle without
@@ -58,7 +67,7 @@ namespace InfoDisplayApp
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"InfoDisplay startup failed: {ex}");
+                    Debug.WriteLine($"InfoDisplay startup failed: {ex}");
                     _splash.SetStartupStatus("Startup failed.", 100);
 
                     MessageBox.Show(
@@ -80,18 +89,30 @@ namespace InfoDisplayApp
 
                 try
                 {
-                    _splash.SetStartupStatus("Finishing startup...", 85);
+                    _splash.SetStartupStatus("Loading weather and status services...", 75);
+                    await Task.Delay(450);
 
-                    // Yield once more so controls created from frmMain_Load can
-                    // process their first queued UI work before the dashboard is
-                    // revealed.
-                    await Task.Yield();
-                    await Task.Delay(150);
+                    _splash.SetStartupStatus("Finishing startup...", 90);
+
+                    // Ensure the splash remains visible long enough to read as an
+                    // intentional boot screen even on a fast development PC.
+                    TimeSpan remaining = MinimumSplashDuration - _startupClock.Elapsed;
+                    if (remaining > TimeSpan.Zero)
+                        await Task.Delay(remaining);
 
                     _splash.SetStartupStatus("Ready", 100);
+                    await Task.Delay(180);
+
+                    // A borderless Maximized WinForms window still uses the screen's
+                    // working area, which leaves the Windows taskbar uncovered.
+                    // Switch to Normal and explicitly occupy the monitor's full bounds
+                    // so InfoDisplay behaves like a true kiosk/fullscreen application.
+                    Screen targetScreen = Screen.FromHandle(_mainForm.Handle);
+                    _mainForm.WindowState = FormWindowState.Normal;
+                    _mainForm.Bounds = targetScreen.Bounds;
 
                     _mainForm.Enabled = true;
-                    _mainForm.ShowInTaskbar = true;
+                    _mainForm.ShowInTaskbar = false;
                     _mainForm.Opacity = 1;
                     _mainForm.TopMost = _mainWasTopMost;
                     _mainForm.BringToFront();
@@ -107,7 +128,7 @@ namespace InfoDisplayApp
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"InfoDisplay reveal failed: {ex}");
+                    Debug.WriteLine($"InfoDisplay reveal failed: {ex}");
                     ExitThread();
                 }
             }
