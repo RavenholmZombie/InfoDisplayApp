@@ -185,12 +185,12 @@ namespace InfoDisplayApp.Experiments
             IntPtr foundWindow = IntPtr.Zero;
             int foundPid = 0;
 
-            EnumWindows((window, _) =>
+            EnumWindows((window, lParam) =>
             {
                 if (!IsWindowVisible(window))
                     return true;
 
-                _ = GetWindowThreadProcessId(window, out uint windowPid);
+                GetWindowThreadProcessId(window, out uint windowPid);
                 if (windowPid == 0 || _preExistingFirefoxPids.Contains((int)windowPid))
                     return true;
 
