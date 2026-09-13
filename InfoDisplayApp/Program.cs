@@ -1,3 +1,4 @@
+using CefSharp;
 using CefSharp.WinForms;
 using InfoDisplayApp.Experiments;
 
@@ -22,10 +23,8 @@ namespace InfoDisplayApp
 
             if (runBrowserExperiment)
             {
-                // CefSharp's .NET Core WinForms package exposes CefRuntime,
-                // CefSettings and Cef from the CefSharp.WinForms namespace.
-                // Register the AnyCPU resolver before initializing CEF so the
-                // correct native runtime can be loaded for this process.
+                // AnyCPU builds need CefSharp's resolver installed before the
+                // first native CEF assembly is loaded.
                 CefRuntime.SubscribeAnyCpuAssemblyResolver();
 
                 string cachePath = Path.Combine(
@@ -36,12 +35,13 @@ namespace InfoDisplayApp
                 CefSettings settings = new()
                 {
                     CachePath = cachePath,
-                    PersistSessionCookies = true,
-                    PersistUserPreferences = true
+                    PersistSessionCookies = true
                 };
 
-                // Streaming sites commonly expect autoplay behavior closer to a
-                // living-room browser than a freshly-created embedded control.
+                // PersistUserPreferences was removed from modern CEF/CefSharp;
+                // Chrome bootstrap persists preferences automatically when a
+                // persistent cache path is supplied.
+
                 settings.CefCommandLineArgs.Add(
                     "autoplay-policy",
                     "no-user-gesture-required");
