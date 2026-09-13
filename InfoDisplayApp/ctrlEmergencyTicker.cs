@@ -90,9 +90,6 @@ namespace InfoDisplayApp
         {
             _timerResolutionRequested =
                 TimeBeginPeriod(TimerResolutionMilliseconds) == 0;
-
-            // Alert playback is started explicitly by frmMain once the control
-            // has been placed on screen and application audio has been muted.
         }
 
         private void StartAnimation()
@@ -400,9 +397,8 @@ namespace InfoDisplayApp
                 }
                 catch (InvalidOperationException)
                 {
-                }
-                catch (ObjectDisposedException)
-                {
+                    // ObjectDisposedException derives from InvalidOperationException,
+                    // so this single catch also covers disposal during BeginInvoke.
                 }
             }
             else
