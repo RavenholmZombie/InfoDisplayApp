@@ -1,4 +1,6 @@
 using InfoDisplayApp.Properties;
+using InfoDisplayApp.Services;
+using System.Diagnostics;
 using System.Media;
 
 namespace InfoDisplayApp
@@ -9,10 +11,22 @@ namespace InfoDisplayApp
         private ctrlCameras? _cameraView;
         private ctrlYouTubeWebView? _youtubeView;
         private ctrlAppsPanel? _appsPanel;
+        private ctrlTicker? _normalTicker;
+        private ctrlEmergencyTicker? _emergencyTicker;
+        private frmBrowser? _browserForm;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
+        private readonly System.Windows.Forms.Timer _alertPollTimer = new System.Windows.Forms.Timer();
+        private readonly NwsAlertService _nwsAlertService = new();
+        private readonly Queue<NwsAlertMessage> _pendingAlerts = new();
+        private readonly HashSet<string> _seenAlertIds = new(StringComparer.OrdinalIgnoreCase);
+
         private bool _startupSoundPlayed;
+        private bool _alertPollInProgress;
+        private bool _emergencyAlertActive;
+        private string? _currentAlertId;
+
         public string tickerMode = "normal";
 
         private Color _startColor;
@@ -44,6 +58,9 @@ namespace InfoDisplayApp
             _colorTimer.Tick += ColorTimer_Tick;
             _colorTimer.Start();
 
+            _alertPollTimer.Interval = 60_000;
+            _alertPollTimer.Tick += AlertPollTimer_Tick;
+
             pboxAppsIcon.MouseEnter += pnlBtnApps_MouseEnter;
             pboxAppsIcon.MouseLeave += pnlBtnApps_MouseLeave;
             pboxAppsIcon.Click += pnlBtnApps_Click;
@@ -64,8 +81,14 @@ namespace InfoDisplayApp
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Unable to play startup sound: {ex}");
+                Debug.WriteLine($"Unable to play startup sound: {ex}");
             }
+
+            // Start alert monitoring only after the dashboard has been revealed.
+            // This prevents an EAS attention signal/TTS message from firing while
+            // the splash screen still owns the screen.
+            _alertPollTimer.Start();
+            _ = PollAlertsAsync();
         }
 
         private Color RandomColor()
@@ -104,35 +127,20 @@ namespace InfoDisplayApp
 
         public void ToggleTickerMode(string mode)
         {
-            if (mode == "normal")
+            if (mode.Equals("normal", StringComparison.OrdinalIgnoreCase))
             {
-                ctrlTicker ctrlTicker = new ctrlTicker
-                {
-                    Dock = DockStyle.Fill
-                };
-                pnlTicker.Controls.Add(ctrlTicker);
-                ctrlTicker.BringToFront();
-                tickerMode = "normal";
+                EndEmergencyAlertSequence();
+                return;
             }
-            else
-            {
-                ctrlEmergencyTicker ctrlEmergencyTicker = new ctrlEmergencyTicker();
-                pnlTicker.Controls.Add(ctrlEmergencyTicker);
-                ctrlEmergencyTicker.Dock = DockStyle.Fill;
-                ctrlEmergencyTicker.BringToFront();
-                tickerMode = "EAS";
-            }
+
+            // The EAS button now performs a manual NWS refresh. If an alert is
+            // active it may be replayed even if the automatic monitor has already
+            // announced it during this application session.
+            _ = PollAlertsAsync(replayActiveAlert: true);
         }
 
         private void frmMain_Load(object sender, EventArgs e)
         {
-            // -----------------------------
-            // EAS TEXT TICKER - WIP
-            // -----------------------------
-            //ctrlEmergencyTicker ctrlEmergencyTicker = new ctrlEmergencyTicker();
-            //pnlTicker.Controls.Add(ctrlEmergencyTicker);
-            //ctrlEmergencyTicker.Dock = DockStyle.Fill;
-
             // -----------------------------
             // PHILO
             // -----------------------------
@@ -184,11 +192,11 @@ namespace InfoDisplayApp
             // -----------------------------
             // TEXT TICKER
             // -----------------------------
-            ctrlTicker ctrlTicker = new ctrlTicker
+            _normalTicker = new ctrlTicker
             {
                 Dock = DockStyle.Fill
             };
-            pnlTicker.Controls.Add(ctrlTicker);
+            pnlTicker.Controls.Add(_normalTicker);
 
             // -----------------------------
             // WEATHER
@@ -204,15 +212,180 @@ namespace InfoDisplayApp
             // -----------------------------
             // APP PANEL
             // -----------------------------
-            ctrlAppsPanel ctrlAppsPanel = new ctrlAppsPanel
+            _appsPanel = new ctrlAppsPanel
             {
                 Dock = DockStyle.Fill
             };
 
-            pnlApps.Controls.Add(ctrlAppsPanel);
+            pnlApps.Controls.Add(_appsPanel);
             pnlApps.Visible = false;
 
             UpdateModeButtons(true);
+        }
+
+        private async void AlertPollTimer_Tick(object? sender, EventArgs e)
+        {
+            await PollAlertsAsync();
+        }
+
+        private async Task PollAlertsAsync(bool replayActiveAlert = false)
+        {
+            if (_alertPollInProgress || IsDisposed)
+                return;
+
+            _alertPollInProgress = true;
+
+            try
+            {
+                IReadOnlyList<NwsAlertMessage> alerts =
+                    await _nwsAlertService.GetActiveAlertsAsync();
+
+                if (replayActiveAlert && alerts.Count > 0)
+                {
+                    NwsAlertMessage alert = alerts[0];
+                    bool alreadyCurrent =
+                        _currentAlertId?.Equals(alert.Id, StringComparison.OrdinalIgnoreCase) == true;
+                    bool alreadyQueued = _pendingAlerts.Any(item =>
+                        item.Id.Equals(alert.Id, StringComparison.OrdinalIgnoreCase));
+
+                    if (!alreadyCurrent && !alreadyQueued)
+                        _pendingAlerts.Enqueue(alert);
+                }
+                else
+                {
+                    foreach (NwsAlertMessage alert in alerts)
+                    {
+                        if (_seenAlertIds.Add(alert.Id))
+                            _pendingAlerts.Enqueue(alert);
+                    }
+                }
+
+                if (!_emergencyAlertActive && _pendingAlerts.Count > 0)
+                    BeginNextEmergencyAlert();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to update NWS emergency alerts: {ex}");
+            }
+            finally
+            {
+                _alertPollInProgress = false;
+            }
+        }
+
+        private void BeginNextEmergencyAlert()
+        {
+            if (_emergencyAlertActive || _pendingAlerts.Count == 0 || IsDisposed)
+                return;
+
+            NwsAlertMessage alert = _pendingAlerts.Dequeue();
+            _currentAlertId = alert.Id;
+            _emergencyAlertActive = true;
+            tickerMode = "EAS";
+
+            SetApplicationAudioMuted(true);
+
+            if (_normalTicker != null)
+                _normalTicker.Visible = false;
+
+            if (_emergencyTicker != null)
+            {
+                _emergencyTicker.AlertFinished -= EmergencyTicker_AlertFinished;
+                pnlTicker.Controls.Remove(_emergencyTicker);
+                _emergencyTicker.Dispose();
+            }
+
+            _emergencyTicker = new ctrlEmergencyTicker
+            {
+                Dock = DockStyle.Fill
+            };
+            _emergencyTicker.AlertFinished += EmergencyTicker_AlertFinished;
+
+            pnlTicker.Controls.Add(_emergencyTicker);
+            _emergencyTicker.BringToFront();
+            _emergencyTicker.StartAlert(alert);
+
+            Debug.WriteLine(
+                $"EAS ticker started: {alert.EventName} ({alert.Severity}/{alert.Urgency}) " +
+                $"matched near {alert.MatchedPoint}.");
+        }
+
+        private void EmergencyTicker_AlertFinished(object? sender, EventArgs e)
+        {
+            if (_emergencyTicker != null)
+            {
+                _emergencyTicker.AlertFinished -= EmergencyTicker_AlertFinished;
+                pnlTicker.Controls.Remove(_emergencyTicker);
+                _emergencyTicker.Dispose();
+                _emergencyTicker = null;
+            }
+
+            _emergencyAlertActive = false;
+            _currentAlertId = null;
+
+            if (_pendingAlerts.Count > 0)
+            {
+                BeginNextEmergencyAlert();
+                return;
+            }
+
+            RestoreNormalTickerAndAudio();
+        }
+
+        private void EndEmergencyAlertSequence()
+        {
+            _pendingAlerts.Clear();
+
+            if (_emergencyTicker != null)
+            {
+                _emergencyTicker.AlertFinished -= EmergencyTicker_AlertFinished;
+                pnlTicker.Controls.Remove(_emergencyTicker);
+                _emergencyTicker.Dispose();
+                _emergencyTicker = null;
+            }
+
+            _emergencyAlertActive = false;
+            _currentAlertId = null;
+            RestoreNormalTickerAndAudio();
+        }
+
+        private void RestoreNormalTickerAndAudio()
+        {
+            tickerMode = "normal";
+
+            if (_normalTicker != null)
+            {
+                _normalTicker.Visible = true;
+                _normalTicker.BringToFront();
+            }
+
+            SetApplicationAudioMuted(false);
+        }
+
+        private void SetApplicationAudioMuted(bool muted)
+        {
+            if (muted)
+            {
+                _philoView?.SetMuted(true);
+                _youtubeView?.SetMuted(true);
+                _cameraView?.SetMuted(true);
+                _browserForm?.SetMuted(true);
+                return;
+            }
+
+            // Restore audio according to whichever source is currently visible.
+            // This avoids accidentally unmuting a background source when the EAS
+            // interruption ends.
+            if (_philoView != null)
+                _philoView.SetMuted(!_philoView.Visible);
+
+            if (_youtubeView != null)
+                _youtubeView.SetMuted(!_youtubeView.Visible);
+
+            if (_cameraView != null)
+                _cameraView.SetMuted(!_cameraView.Visible);
+
+            _browserForm?.SetMuted(false);
         }
 
         public void ShowPhiloMode()
@@ -227,7 +400,7 @@ namespace InfoDisplayApp
             if (_youtubeView != null)
                 _youtubeView.Visible = false;
 
-            _philoView.SetMuted(false);
+            _philoView.SetMuted(_emergencyAlertActive);
             _philoView.Visible = true;
             _philoView.BringToFront();
             pnlApps.Hide();
@@ -239,18 +412,29 @@ namespace InfoDisplayApp
         {
             if (_youtubeView == null || _cameraView == null || _philoView == null)
                 return;
+
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
             _cameraView.Visible = false;
             _philoView.SetMuted(true);
             _youtubeView.Visible = true;
-            _youtubeView.SetMuted(false);
+            _youtubeView.SetMuted(true);
             _youtubeView.BringToFront();
             pnlApps.Hide();
 
-            frmBrowser frmBrowser = new frmBrowser();
-            frmBrowser.ShowDialog(this);
-            frmBrowser.BringToFront();
+            _browserForm = new frmBrowser();
+            _browserForm.SetMuted(_emergencyAlertActive);
+
+            try
+            {
+                _browserForm.ShowDialog(this);
+                _browserForm.BringToFront();
+            }
+            finally
+            {
+                _browserForm.Dispose();
+                _browserForm = null;
+            }
 
             UpdateModeButtons(true);
         }
@@ -269,7 +453,7 @@ namespace InfoDisplayApp
             _cameraView.Visible = true;
             _cameraView.BringToFront();
 
-            _cameraView.SetMuted(false);
+            _cameraView.SetMuted(_emergencyAlertActive);
             _cameraView.StartCamera();
             pnlApps.Hide();
 
@@ -287,7 +471,7 @@ namespace InfoDisplayApp
             _philoView.SetMuted(true);
 
             _youtubeView.Visible = true;
-            _youtubeView.SetMuted(false);
+            _youtubeView.SetMuted(_emergencyAlertActive);
             _youtubeView.BringToFront();
             pnlApps.Hide();
 
@@ -332,7 +516,9 @@ namespace InfoDisplayApp
 
         private void frmMain_FormClosing(object sender, FormClosingEventArgs e)
         {
-
+            _alertPollTimer.Stop();
+            _alertPollTimer.Dispose();
+            EndEmergencyAlertSequence();
         }
     }
 }
