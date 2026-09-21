@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -219,6 +220,10 @@ namespace InfoDisplayApp
                 }
 
                 AppMessageEventArgs args = new(type, message, exception);
+
+                if (type == AppMessageType.Warning || type == AppMessageType.Error)
+                    WriteMessageLog(args);
+
                 MessageRaised?.Invoke(null, args);
 
                 void ShowWindow(object? _)
@@ -258,6 +263,41 @@ namespace InfoDisplayApp
             finally
             {
                 _publishing = false;
+            }
+        }
+        private static void WriteMessageLog(AppMessageEventArgs args)
+        {
+            try
+            {
+                string logsDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+                Directory.CreateDirectory(logsDirectory);
+
+                string level = args.Type == AppMessageType.Error ? "ERROR" : "ALERT";
+                string timestamp = args.Timestamp.ToString("hh-mm-ss-tt-MM-dd-yyyy");
+                string filePath = Path.Combine(
+                    logsDirectory,
+                    $"InfoScreen-{level}-{timestamp}.txt");
+
+                StringBuilder contents = new();
+                contents.AppendLine($"InfoScreen {level}");
+                contents.AppendLine($"Time: {args.Timestamp:yyyy-MM-dd HH:mm:ss}");
+                contents.AppendLine();
+                contents.AppendLine(args.Message);
+
+                if (args.Exception != null)
+                {
+                    contents.AppendLine();
+                    contents.AppendLine("Exception details:");
+                    contents.AppendLine(args.Exception.ToString());
+                }
+
+                File.WriteAllText(filePath, contents.ToString(), Encoding.UTF8);
+            }
+            catch (Exception logException)
+            {
+                // Logging must never cause another user-facing error, otherwise
+                // a failed log write could recursively create more messages.
+                Debug.WriteLine($"Failed to write InfoScreen message log: {logException}");
             }
         }
     }
