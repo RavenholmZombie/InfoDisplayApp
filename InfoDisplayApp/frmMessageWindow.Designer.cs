@@ -31,6 +31,7 @@
             btnClose = new Button();
             btnYes = new Button();
             btnNo = new Button();
+            lblAutoDismiss = new Label();
             doubleBufferedPanel1 = new DoubleBufferedPanel();
             pboxIcn = new PictureBox();
             doubleBufferedPanel2 = new DoubleBufferedPanel();
@@ -74,6 +75,20 @@
             btnNo.UseVisualStyleBackColor = true;
             btnNo.Visible = false;
             btnNo.Click += btnNo_Click;
+            // 
+            // lblAutoDismiss
+            // 
+            lblAutoDismiss.AutoSize = false;
+            lblAutoDismiss.BackColor = Color.Transparent;
+            lblAutoDismiss.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lblAutoDismiss.ForeColor = Color.White;
+            lblAutoDismiss.Location = new Point(16, 258);
+            lblAutoDismiss.Name = "lblAutoDismiss";
+            lblAutoDismiss.Size = new Size(519, 15);
+            lblAutoDismiss.TabIndex = 6;
+            lblAutoDismiss.Text = "Closing in 10 seconds...";
+            lblAutoDismiss.TextAlign = ContentAlignment.MiddleCenter;
+            lblAutoDismiss.Visible = false;
             // 
             // doubleBufferedPanel1
             // 
@@ -125,6 +140,7 @@
             BackgroundImage = Properties.Resources.glass_bl;
             BackgroundImageLayout = ImageLayout.Stretch;
             ClientSize = new Size(550, 332);
+            Controls.Add(lblAutoDismiss);
             Controls.Add(btnNo);
             Controls.Add(btnYes);
             Controls.Add(btnClose);
@@ -150,6 +166,7 @@
         private Button btnClose;
         private Button btnYes;
         private Button btnNo;
+        private Label lblAutoDismiss;
         private DoubleBufferedPanel doubleBufferedPanel1;
         private PictureBox pboxIcn;
         private DoubleBufferedPanel doubleBufferedPanel2;
