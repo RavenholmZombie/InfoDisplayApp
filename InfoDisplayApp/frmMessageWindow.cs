@@ -10,14 +10,43 @@ namespace InfoDisplayApp
     {
         private string _messageText = "";
         private string _messageType = "info";
+        private const int AutoDismissSeconds = 10;
+        private readonly System.Windows.Forms.Timer _autoDismissTimer = new();
+        private int _secondsRemaining = AutoDismissSeconds;
 
         public frmMessageWindow()
         {
             InitializeComponent();
+            _autoDismissTimer.Interval = 1000;
+            _autoDismissTimer.Tick += AutoDismissTimer_Tick;
         }
 
         private void frmMessageWindow_Load(object sender, EventArgs e)
         {
+            if (!_messageType.Equals("question", StringComparison.OrdinalIgnoreCase))
+                StartAutoDismiss();
+        }
+
+        private void StartAutoDismiss()
+        {
+            _secondsRemaining = AutoDismissSeconds;
+            lblAutoDismiss.Text = $"Closing in {_secondsRemaining} seconds...";
+            lblAutoDismiss.Visible = true;
+            _autoDismissTimer.Start();
+        }
+
+        private void AutoDismissTimer_Tick(object? sender, EventArgs e)
+        {
+            _secondsRemaining--;
+
+            if (_secondsRemaining <= 0)
+            {
+                _autoDismissTimer.Stop();
+                Close();
+                return;
+            }
+
+            lblAutoDismiss.Text = $"Closing in {_secondsRemaining} seconds...";
         }
 
         private void PlaySoundForMessageType(string messageType)
@@ -112,6 +141,8 @@ namespace InfoDisplayApp
         {
             SetIcon("question");
 
+            _autoDismissTimer.Stop();
+            lblAutoDismiss.Visible = false;
             btnClose.Visible = false;
 
             btnYes.Text = string.IsNullOrWhiteSpace(yesText) ? "Yes" : yesText;
@@ -128,6 +159,7 @@ namespace InfoDisplayApp
 
         private void btnClose_Click(object sender, EventArgs e)
         {
+            _autoDismissTimer.Stop();
             Close();
         }
 
