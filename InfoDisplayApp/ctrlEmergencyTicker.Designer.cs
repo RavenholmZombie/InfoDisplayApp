@@ -28,7 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
-            panel1 = new Panel();
+            panel1 = new DoubleBufferedPanel();
             lblAlertText = new Label();
             label1 = new Label();
             panel1.SuspendLayout();
@@ -48,6 +48,7 @@
             // 
             lblAlertText.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             lblAlertText.Font = new Font("Cascadia Code", 18F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            lblAlertText.ForeColor = Color.White;
             lblAlertText.Location = new Point(0, 0);
             lblAlertText.Name = "lblAlertText";
             lblAlertText.Size = new Size(822, 44);
@@ -72,6 +73,7 @@
             BackColor = Color.Red;
             Controls.Add(label1);
             Controls.Add(panel1);
+            DoubleBuffered = true;
             ForeColor = Color.White;
             Name = "ctrlEmergencyTicker";
             Size = new Size(828, 74);
@@ -83,7 +85,7 @@
 
         #endregion
 
-        private Panel panel1;
+        private DoubleBufferedPanel panel1;
         private Label label1;
         private Label lblAlertText;
     }

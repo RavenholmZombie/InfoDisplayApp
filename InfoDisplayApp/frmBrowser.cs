@@ -10,9 +10,29 @@ namespace InfoDisplayApp
 {
     public partial class frmBrowser : Form
     {
+        private bool _muted;
+
         public frmBrowser()
         {
             InitializeComponent();
+            webView21.CoreWebView2InitializationCompleted +=
+                webView21_CoreWebView2InitializationCompleted;
+        }
+
+        public void SetMuted(bool muted)
+        {
+            _muted = muted;
+
+            if (webView21.CoreWebView2 != null)
+                webView21.CoreWebView2.IsMuted = muted;
+        }
+
+        private void webView21_CoreWebView2InitializationCompleted(
+            object? sender,
+            Microsoft.Web.WebView2.Core.CoreWebView2InitializationCompletedEventArgs e)
+        {
+            if (e.IsSuccess && webView21.CoreWebView2 != null)
+                webView21.CoreWebView2.IsMuted = _muted;
         }
 
         private void frmBrowser_Load(object sender, EventArgs e)
@@ -53,7 +73,7 @@ namespace InfoDisplayApp
                 }
                 catch (UriFormatException)
                 {
-                    AppMessages.Error("Invalid URL format entered in the browser form. Please enter a valid URL.");
+                    AppMessages.Error($"Invalid URL format entered in the browser form. Please enter a valid URL.");
                 }
             }
         }
