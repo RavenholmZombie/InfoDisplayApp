@@ -82,7 +82,7 @@
             lblAutoDismiss.BackColor = Color.Transparent;
             lblAutoDismiss.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             lblAutoDismiss.ForeColor = Color.White;
-            lblAutoDismiss.Location = new Point(16, 313);
+            lblAutoDismiss.Location = new Point(16, 258);
             lblAutoDismiss.Name = "lblAutoDismiss";
             lblAutoDismiss.Size = new Size(519, 15);
             lblAutoDismiss.TabIndex = 6;
