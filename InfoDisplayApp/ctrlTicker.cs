@@ -51,8 +51,8 @@ namespace InfoDisplayApp.Properties
         private int _rycraftRconPort = 25575;
         private string _rycraftRconPassword = "";
 
-        private const string CheddarCameraIp = "192.168.40.210";
-        private const string DenCameraIp = "192.168.40.209";
+        private const string CheddarCameraIp = "192.168.40.207";
+        private const string DenCameraIp = "192.168.40.220";
         private const string DoorbellCameraIp = "192.168.40.233";
         private const int CameraPingTimeoutMilliseconds = 1500;
 
@@ -1218,13 +1218,13 @@ namespace InfoDisplayApp.Properties
 
             _tapoStatus =
                 $"Cheddar Camera (Backyard): {cheddarStatus} | " +
-                $"Den Camera (Office): {denStatus} | " +
+                $"Pet Camera (Living Room): {denStatus} | " +
                 $"Doorbell Camera (Front Door): {doorbellStatus}";
 
             Debug.WriteLine(
                 $"Tapo Cheddar Camera ({CheddarCameraIp}): {cheddarStatus}");
             Debug.WriteLine(
-                $"Tapo Den Camera ({DenCameraIp}): {denStatus}");
+                $"Tapo Pet Camera ({DenCameraIp}): {denStatus}");
             Debug.WriteLine(
                 $"Tapo Doorbell Camera ({DoorbellCameraIp}): {doorbellStatus}");
         }
