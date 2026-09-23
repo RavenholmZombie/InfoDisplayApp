@@ -475,6 +475,65 @@ namespace InfoDisplayApp
             UpdateModeButtons(true);
         }
 
+        /// <summary>
+        /// Stops and disposes all media hosted by the TV panel before the closing
+        /// screen appears. This is used for both exit and restart so no stream
+        /// audio continues underneath frmClosing.
+        /// </summary>
+        public void PrepareForShutdown()
+        {
+            _alertPollTimer.Stop();
+
+            // Mute first so shutdown is silent even if a player takes a moment
+            // to release its underlying media session.
+            SetApplicationAudioMuted(true);
+
+            try
+            {
+                _cameraView?.StopCamera();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to stop camera during shutdown: {ex}");
+            }
+
+            if (_browserForm != null && !_browserForm.IsDisposed)
+            {
+                try { _browserForm.SetMuted(true); }
+                catch (Exception ex) { Debug.WriteLine($"Unable to mute browser during shutdown: {ex}"); }
+            }
+
+            // Dispose only the media controls. pnlTV also contains pnlApps,
+            // which owns the ctrlAppsPanel currently executing the Close/Restart
+            // click handler. Disposing every pnlTV child here tears down the caller
+            // mid-event and can freeze shutdown with ObjectDisposedException.
+            DisposeTvMediaControl(ref _philoView);
+            DisposeTvMediaControl(ref _cameraView);
+            DisposeTvMediaControl(ref _youtubeView);
+        }
+
+        private void DisposeTvMediaControl<T>(ref T? control)
+            where T : Control
+        {
+            if (control == null)
+                return;
+
+            try
+            {
+                pnlTV.Controls.Remove(control);
+                control.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"Unable to dispose {typeof(T).Name} during shutdown: {ex}");
+            }
+            finally
+            {
+                control = null;
+            }
+        }
+
         private void UpdateModeButtons(bool isPhiloMode)
         {
         }

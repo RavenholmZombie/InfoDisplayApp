@@ -65,11 +65,38 @@ namespace InfoDisplayApp
 
             TaskScheduler.UnobservedTaskException += (_, e) =>
             {
+                // A transient socket timeout can be reported late by the runtime
+                // after the originating operation has already handled the outage.
+                // Keep it in diagnostics, but don't interrupt TV/dashboard use
+                // with a duplicate modal error window.
+                if (ContainsSocketTimeout(e.Exception))
+                {
+                    Debug.WriteLine(
+                        $"Observed late background network timeout: {e.Exception}");
+                    e.SetObserved();
+                    return;
+                }
+
                 Error("An unobserved background task error occurred.", e.Exception);
                 e.SetObserved();
             };
 
             Trace.Listeners.Add(new AppMessageTraceListener());
+        }
+
+        private static bool ContainsSocketTimeout(Exception exception)
+        {
+            if (exception is System.Net.Sockets.SocketException socketException &&
+                socketException.SocketErrorCode == System.Net.Sockets.SocketError.TimedOut)
+            {
+                return true;
+            }
+
+            if (exception is AggregateException aggregate)
+                return aggregate.Flatten().InnerExceptions.Any(ContainsSocketTimeout);
+
+            return exception.InnerException != null &&
+                   ContainsSocketTimeout(exception.InnerException);
         }
 
         public static void Info(string message) =>

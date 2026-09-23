@@ -51,8 +51,8 @@ namespace InfoDisplayApp.Properties
         private int _rycraftRconPort = 25575;
         private string _rycraftRconPassword = "";
 
-        private const string CheddarCameraIp = "192.168.40.210";
-        private const string DenCameraIp = "192.168.40.209";
+        private const string CheddarCameraIp = "192.168.40.207";
+        private const string DenCameraIp = "192.168.40.220";
         private const string DoorbellCameraIp = "192.168.40.233";
         private const int CameraPingTimeoutMilliseconds = 1500;
 
@@ -81,7 +81,7 @@ namespace InfoDisplayApp.Properties
         private string _renderedMessage = "";
 
         private const double ScrollPixelsPerSecond = 240.0;
-        private const int AnimationPulseMilliseconds = 8;
+        private const int AnimationPulseMilliseconds = 16;
         private const int MessageGap = 50;
         private const uint TimerResolutionMilliseconds = 1;
 
@@ -341,8 +341,10 @@ namespace InfoDisplayApp.Properties
                 _lastScrollSeconds = now;
                 _scrollX -= ScrollPixelsPerSecond * elapsed;
 
+                // Let WinForms coalesce paint requests instead of forcing a synchronous
+                // repaint every animation pulse. This substantially reduces UI/GPU
+                // pressure while Philo and camera video are active.
                 panel1.Invalidate();
-                panel1.Update();
 
                 if (_scrollX + _messageWidth < 0)
                 {
@@ -829,11 +831,28 @@ namespace InfoDisplayApp.Properties
                 using CancellationTokenSource timeout =
                     new(timeoutMilliseconds);
 
-                await client.ConnectAsync(
-                    host,
-                    port,
-                    timeout.Token);
+                // Avoid TcpClient.ConnectAsync(host, port, CancellationToken) here.
+                // Under connection-loss races the ValueTask-backed socket path can
+                // surface a later UnobservedTaskException even though this method
+                // catches the original failure. Keep the connect Task explicitly
+                // observed if our timeout wins the race.
+                Task connectTask = client.ConnectAsync(host, port);
+                Task completed = await Task.WhenAny(
+                    connectTask,
+                    Task.Delay(timeoutMilliseconds));
 
+                if (completed != connectTask)
+                {
+                    _ = connectTask.ContinueWith(
+                        static task => _ = task.Exception,
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted |
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                    return false;
+                }
+
+                await connectTask;
                 return client.Connected;
             }
             catch
@@ -993,10 +1012,24 @@ namespace InfoDisplayApp.Properties
                 using TcpClient client = new();
                 using CancellationTokenSource timeout = new(3000);
 
-                await client.ConnectAsync(
-                    host,
-                    _rycraftRconPort,
-                    timeout.Token);
+                Task connectTask = client.ConnectAsync(host, _rycraftRconPort);
+                Task completed = await Task.WhenAny(
+                    connectTask,
+                    Task.Delay(3000));
+
+                if (completed != connectTask)
+                {
+                    _ = connectTask.ContinueWith(
+                        static task => _ = task.Exception,
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted |
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                    Debug.WriteLine("Rycraft RCON connection timed out.");
+                    return null;
+                }
+
+                await connectTask;
 
                 using NetworkStream stream = client.GetStream();
 
@@ -1185,13 +1218,13 @@ namespace InfoDisplayApp.Properties
 
             _tapoStatus =
                 $"Cheddar Camera (Backyard): {cheddarStatus} | " +
-                $"Den Camera (Office): {denStatus} | " +
+                $"Pet Camera (Living Room): {denStatus} | " +
                 $"Doorbell Camera (Front Door): {doorbellStatus}";
 
             Debug.WriteLine(
                 $"Tapo Cheddar Camera ({CheddarCameraIp}): {cheddarStatus}");
             Debug.WriteLine(
-                $"Tapo Den Camera ({DenCameraIp}): {denStatus}");
+                $"Tapo Pet Camera ({DenCameraIp}): {denStatus}");
             Debug.WriteLine(
                 $"Tapo Doorbell Camera ({DoorbellCameraIp}): {doorbellStatus}");
         }
