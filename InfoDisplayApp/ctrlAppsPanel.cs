@@ -125,6 +125,9 @@ namespace InfoDisplayApp
         {
             if (AppMessages.AskYesNo("Do you wish to close InfoScreen?"))
             {
+                frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
+                mainForm?.PrepareForShutdown();
+
                 frmClosing frmClosing = new frmClosing();
                 frmClosing.setRestarting(false);
                 frmClosing.ShowDialog(this);
@@ -145,6 +148,9 @@ namespace InfoDisplayApp
         {
             if (AppMessages.AskYesNo("Do you wish to restart InfoScreen?"))
             {
+                frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
+                mainForm?.PrepareForShutdown();
+
                 frmClosing frmClosing = new frmClosing();
                 frmClosing.setRestarting(true);
                 frmClosing.ShowDialog(this);
