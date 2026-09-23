@@ -475,6 +475,47 @@ namespace InfoDisplayApp
             UpdateModeButtons(true);
         }
 
+        /// <summary>
+        /// Stops and disposes all media hosted by the TV panel before the closing
+        /// screen appears. This is used for both exit and restart so no stream
+        /// audio continues underneath frmClosing.
+        /// </summary>
+        public void PrepareForShutdown()
+        {
+            _alertPollTimer.Stop();
+
+            // Mute first so shutdown is silent even if a player takes a moment
+            // to release its underlying media session.
+            SetApplicationAudioMuted(true);
+
+            try
+            {
+                _cameraView?.StopCamera();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to stop camera during shutdown: {ex}");
+            }
+
+            if (_browserForm != null && !_browserForm.IsDisposed)
+            {
+                try { _browserForm.SetMuted(true); }
+                catch (Exception ex) { Debug.WriteLine($"Unable to mute browser during shutdown: {ex}"); }
+            }
+
+            // Dispose the controls themselves rather than only hiding pnlTV.
+            // WebView2 and LibVLC can otherwise keep audio/media sessions alive.
+            foreach (Control control in pnlTV.Controls.Cast<Control>().ToArray())
+            {
+                pnlTV.Controls.Remove(control);
+                control.Dispose();
+            }
+
+            _philoView = null;
+            _cameraView = null;
+            _youtubeView = null;
+        }
+
         private void UpdateModeButtons(bool isPhiloMode)
         {
         }
