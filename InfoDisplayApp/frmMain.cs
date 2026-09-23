@@ -503,17 +503,35 @@ namespace InfoDisplayApp
                 catch (Exception ex) { Debug.WriteLine($"Unable to mute browser during shutdown: {ex}"); }
             }
 
-            // Dispose the controls themselves rather than only hiding pnlTV.
-            // WebView2 and LibVLC can otherwise keep audio/media sessions alive.
-            foreach (Control control in pnlTV.Controls.Cast<Control>().ToArray())
+            // Dispose only the media controls. pnlTV also contains pnlApps,
+            // which owns the ctrlAppsPanel currently executing the Close/Restart
+            // click handler. Disposing every pnlTV child here tears down the caller
+            // mid-event and can freeze shutdown with ObjectDisposedException.
+            DisposeTvMediaControl(ref _philoView);
+            DisposeTvMediaControl(ref _cameraView);
+            DisposeTvMediaControl(ref _youtubeView);
+        }
+
+        private void DisposeTvMediaControl<T>(ref T? control)
+            where T : Control
+        {
+            if (control == null)
+                return;
+
+            try
             {
                 pnlTV.Controls.Remove(control);
                 control.Dispose();
             }
-
-            _philoView = null;
-            _cameraView = null;
-            _youtubeView = null;
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"Unable to dispose {typeof(T).Name} during shutdown: {ex}");
+            }
+            finally
+            {
+                control = null;
+            }
         }
 
         private void UpdateModeButtons(bool isPhiloMode)
