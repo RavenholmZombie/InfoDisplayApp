@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using InfoDisplayApp.Services;
 
 namespace InfoDisplayApp
 {
@@ -13,10 +14,22 @@ namespace InfoDisplayApp
             ApplicationConfiguration.Initialize();
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
-            // A/B test: remote diagnostics are completely disabled.
-            // Keep the diagnostics implementation in the branch, but do not
-            // construct or start it so this startup path matches master.
-            Application.Run(new StartupApplicationContext());
+            RemoteDiagnosticsServer? diagnosticsServer = null;
+
+            try
+            {
+                if (AppSettings.Current.Diagnostics.RemoteServer)
+                {
+                    diagnosticsServer = new RemoteDiagnosticsServer();
+                    diagnosticsServer.Start();
+                }
+
+                Application.Run(new StartupApplicationContext());
+            }
+            finally
+            {
+                diagnosticsServer?.Dispose();
+            }
         }
 
         private sealed class StartupApplicationContext : ApplicationContext
