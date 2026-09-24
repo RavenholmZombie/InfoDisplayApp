@@ -7,6 +7,9 @@ namespace InfoDisplayApp.Services
 
         public static void Start()
         {
+            if (!AppSettings.Current.Diagnostics.CoreAudioMonitor)
+                return;
+
             lock (Sync)
             {
                 if (_monitor != null)
