@@ -29,6 +29,10 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
     private DateTime _lastNetworkAt = DateTime.UtcNow;
     private TimeSpan _lastGo2RtcCpu;
     private DateTime _lastGo2RtcCpuAt = DateTime.UtcNow;
+    private int _sampleNumber;
+    private Go2RtcStreamResult[] _lastGo2RtcStreams = [];
+    private Go2RtcProcessResult _lastGo2RtcProcess = new(false, null, null, null, null);
+    private NetworkAdapterResult[] _lastAdapters = [];
 
     public void Start()
     {
@@ -171,13 +175,24 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
 
         ServiceResult go2rtcApi = await TcpProbeAsync("127.0.0.1", 1984);
         ServiceResult go2rtcRtsp = await TcpProbeAsync("127.0.0.1", 8554);
-        Go2RtcStreamResult[] go2rtcStreams =
-        [
-            await ProbeGo2RtcStreamAsync("cheddar_camera"),
-            await ProbeGo2RtcStreamAsync("front_door")
-        ];
-        Go2RtcProcessResult go2rtcProcess = GetGo2RtcProcessStats(now);
-        NetworkAdapterResult[] adapters = GetNetworkAdapterStats();
+        // Expensive/diagnostic-only inspection runs every 5th sample. The core
+        // reachability probes stay at 1 Hz, but process enumeration, adapter
+        // statistics and go2rtc API parsing should not compete with WinForms
+        // painting/media playback every second.
+        if (++_sampleNumber == 1 || _sampleNumber % 5 == 0)
+        {
+            _lastGo2RtcStreams =
+            [
+                await ProbeGo2RtcStreamAsync("cheddar_camera"),
+                await ProbeGo2RtcStreamAsync("front_door")
+            ];
+            _lastGo2RtcProcess = GetGo2RtcProcessStats(now);
+            _lastAdapters = GetNetworkAdapterStats();
+        }
+
+        Go2RtcStreamResult[] go2rtcStreams = _lastGo2RtcStreams;
+        Go2RtcProcessResult go2rtcProcess = _lastGo2RtcProcess;
+        NetworkAdapterResult[] adapters = _lastAdapters;
 
         CameraResult[] cameras =
         [
