@@ -20,6 +20,9 @@ namespace InfoDisplayApp.Services
 
         public static void InspectWave(string specimen, byte[] wavBytes)
         {
+            if (!AppSettings.Current.Diagnostics.AudioPathology)
+                return;
+
             try
             {
                 using MemoryStream stream = new(wavBytes, writable: false);
@@ -43,6 +46,9 @@ namespace InfoDisplayApp.Services
             IWavePlayer output,
             Stopwatch clock)
         {
+            if (!AppSettings.Current.Diagnostics.AudioPathology)
+                return;
+
             Log($"{specimen}: PLAY called at +{clock.Elapsed.TotalMilliseconds:F1}ms; " +
                 $"readerPosition={reader.Position}/{reader.Length}; currentTime={reader.CurrentTime.TotalMilliseconds:F1}ms; " +
                 $"playbackState={output.PlaybackState}.");
@@ -55,6 +61,9 @@ namespace InfoDisplayApp.Services
             Stopwatch clock,
             Exception? exception)
         {
+            if (!AppSettings.Current.Diagnostics.AudioPathology)
+                return;
+
             string exceptionText = exception == null
                 ? "none"
                 : $"{exception.GetType().FullName}: {exception.Message}";
@@ -67,6 +76,9 @@ namespace InfoDisplayApp.Services
 
         public static void Log(string message)
         {
+            if (!AppSettings.Current.Diagnostics.AudioPathology)
+                return;
+
             string line = $"{DateTime.Now:O} {message}{Environment.NewLine}";
             Debug.Write(line);
 
