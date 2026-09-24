@@ -46,6 +46,11 @@ namespace InfoDisplayApp.Properties
         private long _lastUiHeartbeatTicks;
         private long _worstUiHeartbeatTicks;
         private int _diagnosticWritePending;
+        private long _uiHeartbeatPostedTicks;
+        private long _uiHeartbeatWorstTicks;
+        private int _uiHeartbeatPending;
+        private TimeSpan _lastProcessCpuTime;
+        private long _lastDiagnosticTimestamp;
         private string DiagnosticLogPath =>
             Path.Combine(AppContext.BaseDirectory, "logs",
                 $"InfoScreen-PERF-{Environment.ProcessId}.log");
@@ -175,6 +180,9 @@ namespace InfoDisplayApp.Properties
             _weatherTimer.Start();
 
             _lastUiHeartbeatTicks = _diagnosticClock.ElapsedTicks;
+            using (Process process = Process.GetCurrentProcess())
+                _lastProcessCpuTime = process.TotalProcessorTime;
+            _lastDiagnosticTimestamp = Stopwatch.GetTimestamp();
             _diagnosticTimer.Change(1000, 1000);
         }
 
@@ -465,6 +473,43 @@ namespace InfoDisplayApp.Properties
             if (IsDisposed || Disposing)
                 return;
 
+            // Independent UI heartbeat: post exactly one callback at a time and
+            // measure how long the WinForms message pump takes to service it.
+            if (Interlocked.CompareExchange(ref _uiHeartbeatPending, 1, 0) == 0)
+            {
+                long posted = Stopwatch.GetTimestamp();
+                Interlocked.Exchange(ref _uiHeartbeatPostedTicks, posted);
+
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        long delay = Stopwatch.GetTimestamp() -
+                            Interlocked.Read(ref _uiHeartbeatPostedTicks);
+
+                        long currentWorst = Interlocked.Read(ref _uiHeartbeatWorstTicks);
+                        while (delay > currentWorst)
+                        {
+                            long observed = Interlocked.CompareExchange(
+                                ref _uiHeartbeatWorstTicks, delay, currentWorst);
+                            if (observed == currentWorst)
+                                break;
+                            currentWorst = observed;
+                        }
+
+                        Interlocked.Exchange(ref _uiHeartbeatPending, 0);
+                    }));
+                }
+                catch (ObjectDisposedException)
+                {
+                    Interlocked.Exchange(ref _uiHeartbeatPending, 0);
+                }
+                catch (InvalidOperationException)
+                {
+                    Interlocked.Exchange(ref _uiHeartbeatPending, 0);
+                }
+            }
+
             long requests = Interlocked.Read(ref _animationRequests);
             long renders = Interlocked.Read(ref _renderCallbacks);
             long paints = Interlocked.Read(ref _paintEvents);
@@ -473,16 +518,36 @@ namespace InfoDisplayApp.Properties
             long paintDelta = paints - Interlocked.Exchange(ref _lastPaintEvents, paints);
             long worstTicks = Interlocked.Exchange(ref _worstUiHeartbeatTicks, 0);
 
-            Process process = Process.GetCurrentProcess();
+            long heartbeatTicks = Interlocked.Exchange(ref _uiHeartbeatWorstTicks, 0);
+            bool heartbeatPending = Volatile.Read(ref _uiHeartbeatPending) != 0;
+
+            using Process process = Process.GetCurrentProcess();
+            long diagnosticNow = Stopwatch.GetTimestamp();
+            TimeSpan cpuNow = process.TotalProcessorTime;
+            double wallSeconds = Math.Max(
+                (diagnosticNow - _lastDiagnosticTimestamp) / (double)Stopwatch.Frequency,
+                0.001);
+            double cpuSeconds = Math.Max(
+                (cpuNow - _lastProcessCpuTime).TotalSeconds,
+                0.0);
+            double processCpuPercent =
+                cpuSeconds / (wallSeconds * Environment.ProcessorCount) * 100.0;
+
+            _lastDiagnosticTimestamp = diagnosticNow;
+            _lastProcessCpuTime = cpuNow;
+
+            string heartbeatText = heartbeatPending
+                ? "PENDING"
+                : $"{heartbeatTicks * 1000.0 / Stopwatch.Frequency:0.0}ms";
+
             string line =
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} " +
                 $"Ticker req={requestDelta}/s render={renderDelta}/s paint={paintDelta}/s " +
-                $"worstUiGap={(worstTicks * 1000.0 / Stopwatch.Frequency):0.0}ms " +
+                $"tickerGap={(worstTicks * 1000.0 / Stopwatch.Frequency):0.0}ms " +
+                $"uiHeartbeat={heartbeatText} cpu={processCpuPercent:0.0}% " +
                 $"WS={process.WorkingSet64 / 1048576.0:0.0}MB " +
                 $"handles={process.HandleCount} threads={process.Threads.Count} " +
                 $"gc={GC.GetTotalMemory(false) / 1048576.0:0.0}MB";
-
-            process.Dispose();
 
             if (Interlocked.Exchange(ref _diagnosticWritePending, 1) != 0)
                 return;
