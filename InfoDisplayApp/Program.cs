@@ -13,9 +13,9 @@ namespace InfoDisplayApp
             ApplicationConfiguration.Initialize();
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
-            using RemoteDiagnosticsServer diagnostics = new();
-            diagnostics.Start();
-
+            // A/B test: remote diagnostics are completely disabled.
+            // Keep the diagnostics implementation in the branch, but do not
+            // construct or start it so this startup path matches master.
             Application.Run(new StartupApplicationContext());
         }
 
