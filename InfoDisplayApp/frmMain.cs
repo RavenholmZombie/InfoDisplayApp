@@ -28,6 +28,7 @@ namespace InfoDisplayApp
         private readonly HashSet<string> _seenAlertIds = new(StringComparer.OrdinalIgnoreCase);
 
         private bool _startupSoundPlayed;
+        private bool _philoStartupDeferred = true;
         private bool _alertPollInProgress;
         private bool _emergencyAlertActive;
         private string? _currentAlertId;
@@ -149,6 +150,9 @@ namespace InfoDisplayApp
                 Debug.WriteLine("STARTUP AUDIO: NAudio WASAPI playback completed.");
 
                 _startupAudioOutput.PlaybackStopped -= PlaybackStopped;
+
+                if (!IsDisposed && !Disposing)
+                    InitializeDeferredPhilo();
             }
             catch (Exception ex)
             {
@@ -158,6 +162,26 @@ namespace InfoDisplayApp
             {
                 DisposeStartupAudio();
             }
+        }
+
+        private void InitializeDeferredPhilo()
+        {
+            if (!_philoStartupDeferred || _philoView != null || IsDisposed || Disposing)
+                return;
+
+            _philoStartupDeferred = false;
+            Debug.WriteLine("STARTUP AUDIO: initializing deferred Philo/WebView2 after playback completion.");
+
+            _philoView = new ctrlPhiloWebView
+            {
+                Dock = DockStyle.Fill,
+                Visible = true
+            };
+
+            pnlTV.Controls.Add(_philoView);
+            _philoView.SetMuted(_emergencyAlertActive);
+            _philoView.BringToFront();
+            UpdateModeButtons(true);
         }
 
         private void DisposeStartupAudio()
@@ -257,13 +281,9 @@ namespace InfoDisplayApp
 
         private void frmMain_Load(object sender, EventArgs e)
         {
-            _philoView = new ctrlPhiloWebView
-            {
-                Dock = DockStyle.Fill,
-                Visible = true
-            };
-
-            pnlTV.Controls.Add(_philoView);
+            // Diagnostic isolation: keep Philo/WebView2 uninitialized until the startup WAV completes.
+            _philoView = null;
+            pnlTV.BackColor = Color.Black;
 
             _cameraView = new ctrlCameras
             {
@@ -280,7 +300,6 @@ namespace InfoDisplayApp
             };
 
             pnlTV.Controls.Add(_youtubeView);
-            _philoView.BringToFront();
 
             ctrlTimeDate ctrlTimeDate = new ctrlTimeDate
             {
