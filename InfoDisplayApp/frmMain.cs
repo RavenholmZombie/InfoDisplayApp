@@ -14,7 +14,7 @@ namespace InfoDisplayApp
         private ctrlTicker? _normalTicker;
         private ctrlEmergencyTicker? _emergencyTicker;
         private frmBrowser? _browserForm;
-        private Control? _mediaHiddenForApps;
+        private frmApps? _appsForm;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -213,13 +213,18 @@ namespace InfoDisplayApp
             };
             pnlWeather.Controls.Add(ctrlWeather);
 
+            // pnlApps remains in the designer as a positioning/sizing anchor only.
+            // The actual Apps UI lives in its own top-level borderless window so
+            // it does not overlap WebView2/LibVLC native child HWNDs.
+            pnlApps.Visible = false;
+
             _appsPanel = new ctrlAppsPanel
             {
                 Dock = DockStyle.Fill
             };
 
-            pnlApps.Controls.Add(_appsPanel);
-            pnlApps.Visible = false;
+            _appsForm = new frmApps(_appsPanel);
+            PositionAppsForm();
 
             UpdateModeButtons(true);
         }
@@ -545,44 +550,27 @@ namespace InfoDisplayApp
 
         private void pnlBtnApps_Click(object sender, EventArgs e)
         {
-            if (pnlApps.Visible)
+            if (_appsForm == null || _appsForm.IsDisposed)
+                return;
+
+            if (_appsForm.Visible)
             {
-                pnlApps.Visible = false;
-
-                // Restore whichever media surface was visible before Apps opened.
-                // Keeping the native WebView2/LibVLC surface out of the visible
-                // hierarchy while Apps is on top is an A/B test for HWND
-                // composition/painting contention.
-                if (_mediaHiddenForApps != null && !_mediaHiddenForApps.IsDisposed)
-                {
-                    _mediaHiddenForApps.Visible = true;
-                    _mediaHiddenForApps.BringToFront();
-                }
-
-                _mediaHiddenForApps = null;
+                _appsForm.Hide();
+                return;
             }
-            else
-            {
-                // WebView2 and LibVLC both host native rendering surfaces. Do not
-                // leave one actively visible underneath pnlApps while testing the
-                // slow-paint issue; hide only the currently visible media control.
-                _mediaHiddenForApps = null;
 
-                if (_philoView?.Visible == true)
-                    _mediaHiddenForApps = _philoView;
-                else if (_cameraView?.Visible == true)
-                    _mediaHiddenForApps = _cameraView;
-                else if (_youtubeView?.Visible == true)
-                    _mediaHiddenForApps = _youtubeView;
+            PositionAppsForm();
+            _appsForm.Show(this);
+            _appsForm.BringToFront();
+        }
 
-                if (_mediaHiddenForApps != null)
-                    _mediaHiddenForApps.Visible = false;
+        private void PositionAppsForm()
+        {
+            if (_appsForm == null || _appsForm.IsDisposed || !IsHandleCreated)
+                return;
 
-                pnlApps.Visible = true;
-                pnlApps.BringToFront();
-                pnlApps.Invalidate(true);
-                pnlApps.Update();
-            }
+            Point screenLocation = pnlApps.PointToScreen(Point.Empty);
+            _appsForm.Bounds = new Rectangle(screenLocation, pnlApps.Size);
         }
 
         private void pnlBtnApps_MouseEnter(object sender, EventArgs e)
@@ -599,6 +587,13 @@ namespace InfoDisplayApp
 
         private void frmMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (_appsForm != null && !_appsForm.IsDisposed)
+            {
+                _appsForm.Close();
+                _appsForm.Dispose();
+                _appsForm = null;
+            }
+
             _alertPollTimer.Stop();
             _alertPollTimer.Dispose();
             EndEmergencyAlertSequence();
