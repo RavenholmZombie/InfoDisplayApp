@@ -14,6 +14,7 @@ namespace InfoDisplayApp
     {
         private int _countdown = 7; // Seconds
         private bool _isRestarting = false; // Tells the form whether to restart or exit the application.
+        private SoundPlayer? _exitSoundPlayer;
         public frmClosing()
         {
             InitializeComponent();
@@ -21,11 +22,10 @@ namespace InfoDisplayApp
 
         private void frmClosing_Load(object sender, EventArgs e)
         {
-            using (SoundPlayer player = new SoundPlayer(Resources.sfx_exit))
-            {
-                player.Load();
-                player.Play();
-            }
+            _exitSoundPlayer?.Dispose();
+            _exitSoundPlayer = new SoundPlayer(Resources.sfx_exit);
+            _exitSoundPlayer.Load();
+            _exitSoundPlayer.Play();
             actionTimer.Start();
             Cursor = Cursors.WaitCursor;
 
@@ -58,6 +58,19 @@ namespace InfoDisplayApp
                     Application.Exit();
                 }
             }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                try { _exitSoundPlayer?.Stop(); }
+                catch { }
+                _exitSoundPlayer?.Dispose();
+                _exitSoundPlayer = null;
+            }
+
+            base.Dispose(disposing);
         }
 
         public bool setRestarting(bool isRestarting)
