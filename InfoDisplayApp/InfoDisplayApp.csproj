@@ -12,6 +12,7 @@
     <None Remove="camera.conf" />
     <None Remove="camera.example.conf" />
     <None Remove="status.conf" />
+    <None Remove="settings.json" />
     <None Remove="ticker.txt" />
   </ItemGroup>
 
@@ -23,6 +24,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="status.conf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="settings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ticker.txt">
