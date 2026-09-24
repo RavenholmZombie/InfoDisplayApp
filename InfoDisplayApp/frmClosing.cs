@@ -17,7 +17,7 @@ namespace InfoDisplayApp
     {
         private int _countdown = 7; // Seconds
         private bool _isRestarting = false; // Tells the form whether to restart or exit the application.
-        private WasapiOut? _exitAudioOutput;
+        private WaveOutEvent? _exitAudioOutput;
         private WaveFileReader? _exitAudioReader;
         private MemoryStream? _exitAudioStream;
         private readonly Stopwatch _shutdownClock = Stopwatch.StartNew();
@@ -48,7 +48,7 @@ namespace InfoDisplayApp
         {
             LogShutdown($"frmClosing_Load entered; restarting={_isRestarting}.");
             StartExitAudio();
-            LogShutdown("Exit sound started with NAudio WASAPI.");
+            LogShutdown("Exit sound started with NAudio waveOut.");
             // Do not use the WinForms actionTimer for shutdown timing. WM_TIMER
             // delivery has proven unreliable under InfoScreen's media workload.
             actionTimer.Stop();
@@ -124,7 +124,7 @@ namespace InfoDisplayApp
 
             _exitAudioStream = new MemoryStream(wavBytes, writable: false);
             _exitAudioReader = new WaveFileReader(_exitAudioStream);
-            _exitAudioOutput = new WasapiOut();
+            _exitAudioOutput = new WaveOutEvent();
             _exitAudioOutput.Init(_exitAudioReader);
 
             Stopwatch playbackClock = Stopwatch.StartNew();
