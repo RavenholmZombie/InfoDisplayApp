@@ -1,9 +1,8 @@
 using NAudio.CoreAudioApi;
-using NAudio.CoreAudioApi.Interfaces;
 
 namespace InfoDisplayApp.Services
 {
-    internal sealed class AudioEndpointMonitor : IMMNotificationClient, IDisposable
+    internal sealed class AudioEndpointMonitor : MMNotificationClient, IDisposable
     {
         private readonly MMDeviceEnumerator _enumerator = new();
         private bool _registered;
@@ -41,7 +40,7 @@ namespace InfoDisplayApp.Services
             _enumerator.Dispose();
         }
 
-        public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
+        public override void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
         {
             AudioPathology.Log(
                 $"COREAUDIO EVENT: DefaultDeviceChanged flow={flow}; role={role}; id='{defaultDeviceId}'.");
@@ -49,26 +48,26 @@ namespace InfoDisplayApp.Services
             LogCurrentDefaults("after DefaultDeviceChanged");
         }
 
-        public void OnDeviceAdded(string pwstrDeviceId)
+        public override void OnDeviceAdded(string pwstrDeviceId)
         {
             AudioPathology.Log($"COREAUDIO EVENT: DeviceAdded id='{pwstrDeviceId}'.");
             LogDevice("added", pwstrDeviceId);
         }
 
-        public void OnDeviceRemoved(string deviceId)
+        public override void OnDeviceRemoved(string deviceId)
         {
             AudioPathology.Log($"COREAUDIO EVENT: DeviceRemoved id='{deviceId}'.");
             LogCurrentDefaults("after DeviceRemoved");
         }
 
-        public void OnDeviceStateChanged(string deviceId, DeviceState newState)
+        public override void OnDeviceStateChanged(string deviceId, DeviceState newState)
         {
             AudioPathology.Log(
                 $"COREAUDIO EVENT: DeviceStateChanged id='{deviceId}'; newState={newState}.");
             LogDevice("state changed", deviceId);
         }
 
-        public void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key)
+        public override void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key)
         {
             AudioPathology.Log(
                 $"COREAUDIO EVENT: PropertyValueChanged id='{pwstrDeviceId}'; " +
