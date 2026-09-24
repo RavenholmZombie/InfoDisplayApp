@@ -1,0 +1,274 @@
+using System.Diagnostics;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
+
+namespace InfoDisplayApp;
+
+internal sealed class RemoteDiagnosticsServer : IDisposable
+{
+    private const int Port = 8765;
+    private readonly TcpListener _listener = new(IPAddress.Any, Port);
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Stopwatch _uptime = Stopwatch.StartNew();
+    private Task? _acceptLoop;
+    private TimeSpan _lastCpu;
+    private DateTime _lastCpuAt = DateTime.UtcNow;
+    private long _lastRx;
+    private long _lastTx;
+    private DateTime _lastNetworkAt = DateTime.UtcNow;
+
+    public void Start()
+    {
+        _lastCpu = Process.GetCurrentProcess().TotalProcessorTime;
+        (_lastRx, _lastTx) = GetNetworkBytes();
+        _listener.Start();
+        _acceptLoop = Task.Run(AcceptLoopAsync);
+        Debug.WriteLine($"Remote diagnostics listening on TCP {Port}.");
+    }
+
+    private async Task AcceptLoopAsync()
+    {
+        while (!_cts.IsCancellationRequested)
+        {
+            try
+            {
+                TcpClient client = await _listener.AcceptTcpClientAsync(_cts.Token);
+                _ = Task.Run(() => HandleClientAsync(client));
+            }
+            catch (OperationCanceledException) { break; }
+            catch (ObjectDisposedException) { break; }
+            catch (Exception ex) { Debug.WriteLine($"Diagnostics accept failed: {ex}"); }
+        }
+    }
+
+    private async Task HandleClientAsync(TcpClient client)
+    {
+        using (client)
+        {
+            client.ReceiveTimeout = 5000;
+            client.SendTimeout = 5000;
+            using NetworkStream stream = client.GetStream();
+            using StreamReader reader = new(stream, Encoding.ASCII, false, 1024, leaveOpen: true);
+
+            string? requestLine = await reader.ReadLineAsync();
+            if (string.IsNullOrWhiteSpace(requestLine))
+                return;
+
+            string[] parts = requestLine.Split(' ');
+            if (parts.Length < 2)
+                return;
+
+            string method = parts[0];
+            string path = parts[1];
+
+            string? line;
+            do { line = await reader.ReadLineAsync(); }
+            while (!string.IsNullOrEmpty(line));
+
+            try
+            {
+                if (method == "GET" && path == "/api/diagnostics")
+                {
+                    object snapshot = await BuildSnapshotAsync();
+                    await WriteJsonAsync(stream, 200, snapshot);
+                    return;
+                }
+
+                if (method == "POST" && path.StartsWith("/api/control/", StringComparison.Ordinal))
+                {
+                    string command = path["/api/control/".Length..].ToLowerInvariant();
+                    bool accepted = DispatchCommand(command);
+                    await WriteJsonAsync(stream, accepted ? 202 : 404,
+                        new { accepted, command });
+                    return;
+                }
+
+                await WriteJsonAsync(stream, 404, new { error = "Not found" });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Diagnostics request failed: {ex}");
+                await WriteJsonAsync(stream, 500, new { error = ex.Message });
+            }
+        }
+    }
+
+    private async Task<object> BuildSnapshotAsync()
+    {
+        Process process = Process.GetCurrentProcess();
+        DateTime now = DateTime.UtcNow;
+
+        TimeSpan cpuNow = process.TotalProcessorTime;
+        double elapsedMs = Math.Max(1, (now - _lastCpuAt).TotalMilliseconds);
+        double cpu = (cpuNow - _lastCpu).TotalMilliseconds / elapsedMs /
+                     Environment.ProcessorCount * 100.0;
+        _lastCpu = cpuNow;
+        _lastCpuAt = now;
+
+        (long rx, long tx) = GetNetworkBytes();
+        double networkSeconds = Math.Max(0.001, (now - _lastNetworkAt).TotalSeconds);
+        double rxMbps = Math.Max(0, rx - _lastRx) * 8.0 / networkSeconds / 1_000_000.0;
+        double txMbps = Math.Max(0, tx - _lastTx) * 8.0 / networkSeconds / 1_000_000.0;
+        _lastRx = rx;
+        _lastTx = tx;
+        _lastNetworkAt = now;
+
+        string? gateway = NetworkInterface.GetAllNetworkInterfaces()
+            .Where(n => n.OperationalStatus == OperationalStatus.Up &&
+                        n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+            .SelectMany(n => n.GetIPProperties().GatewayAddresses)
+            .Select(g => g.Address)
+            .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)
+            ?.ToString();
+
+        PingResult gatewayPing = gateway == null
+            ? new(false, null)
+            : await PingAsync(gateway);
+        PingResult internetPing = await PingAsync("1.1.1.1");
+
+        ServiceResult go2rtcApi = await TcpProbeAsync("127.0.0.1", 1984);
+        ServiceResult go2rtcRtsp = await TcpProbeAsync("127.0.0.1", 8554);
+
+        CameraResult[] cameras =
+        [
+            await ProbeCameraAsync("Cheddar", "192.168.40.207"),
+            await ProbeCameraAsync("Pet", "192.168.40.220"),
+            await ProbeCameraAsync("Doorbell", "192.168.40.233")
+        ];
+
+        return new
+        {
+            timestampUtc = now,
+            server = new
+            {
+                machineName = Environment.MachineName,
+                processId = Environment.ProcessId,
+                cpuPercent = Math.Round(cpu, 1),
+                workingSetMb = Math.Round(process.WorkingSet64 / 1024d / 1024d, 1),
+                uptimeSeconds = Math.Round(_uptime.Elapsed.TotalSeconds),
+                threadCount = process.Threads.Count
+            },
+            network = new
+            {
+                gateway,
+                gatewayOnline = gatewayPing.Online,
+                gatewayLatencyMs = gatewayPing.LatencyMs,
+                internetOnline = internetPing.Online,
+                internetLatencyMs = internetPing.LatencyMs,
+                receiveMbps = Math.Round(rxMbps, 2),
+                transmitMbps = Math.Round(txMbps, 2)
+            },
+            go2rtc = new
+            {
+                apiOnline = go2rtcApi.Online,
+                apiLatencyMs = go2rtcApi.LatencyMs,
+                rtspOnline = go2rtcRtsp.Online,
+                rtspLatencyMs = go2rtcRtsp.LatencyMs
+            },
+            cameras
+        };
+    }
+
+    private static async Task<CameraResult> ProbeCameraAsync(string name, string address)
+    {
+        PingResult ping = await PingAsync(address);
+        ServiceResult rtsp = await TcpProbeAsync(address, 554);
+        return new(name, address, ping.Online, ping.LatencyMs, rtsp.Online);
+    }
+
+    private static async Task<PingResult> PingAsync(string host)
+    {
+        try
+        {
+            using Ping ping = new();
+            PingReply reply = await ping.SendPingAsync(host, 1500);
+            return new(reply.Status == IPStatus.Success,
+                reply.Status == IPStatus.Success ? reply.RoundtripTime : null);
+        }
+        catch { return new(false, null); }
+    }
+
+    private static async Task<ServiceResult> TcpProbeAsync(string host, int port)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            using TcpClient client = new();
+            Task connect = client.ConnectAsync(host, port);
+            if (await Task.WhenAny(connect, Task.Delay(1500)) != connect)
+            {
+                _ = connect.ContinueWith(t => _ = t.Exception,
+                    TaskContinuationOptions.OnlyOnFaulted);
+                return new(false, null);
+            }
+            await connect;
+            return new(true, sw.ElapsedMilliseconds);
+        }
+        catch { return new(false, null); }
+    }
+
+    private static (long Rx, long Tx) GetNetworkBytes()
+    {
+        long rx = 0, tx = 0;
+        foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces()
+                     .Where(n => n.OperationalStatus == OperationalStatus.Up &&
+                                 n.NetworkInterfaceType != NetworkInterfaceType.Loopback))
+        {
+            IPv4InterfaceStatistics stats = nic.GetIPv4Statistics();
+            rx += stats.BytesReceived;
+            tx += stats.BytesSent;
+        }
+        return (rx, tx);
+    }
+
+    private static bool DispatchCommand(string command)
+    {
+        frmMain? form = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
+        if (form == null || form.IsDisposed)
+            return false;
+
+        form.BeginInvoke(() =>
+        {
+            switch (command)
+            {
+                case "restart":
+                    form.PrepareForShutdown();
+                    Application.Restart();
+                    break;
+                case "shutdown":
+                    form.PrepareForShutdown();
+                    Application.Exit();
+                    break;
+                case "kill":
+                    Process.GetCurrentProcess().Kill();
+                    break;
+            }
+        });
+
+        return command is "restart" or "shutdown" or "kill";
+    }
+
+    private static async Task WriteJsonAsync(NetworkStream stream, int status, object value)
+    {
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(value);
+        string reason = status switch { 200 => "OK", 202 => "Accepted", 404 => "Not Found", _ => "Error" };
+        byte[] header = Encoding.ASCII.GetBytes(
+            $"HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n");
+        await stream.WriteAsync(header);
+        await stream.WriteAsync(body);
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _listener.Stop();
+        _cts.Dispose();
+    }
+
+    private sealed record PingResult(bool Online, long? LatencyMs);
+    private sealed record ServiceResult(bool Online, long? LatencyMs);
+    private sealed record CameraResult(string Name, string Address, bool Online, long? LatencyMs, bool RtspOnline);
+}
