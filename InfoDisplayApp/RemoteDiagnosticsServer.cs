@@ -23,6 +23,8 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
     private long _lastRx;
     private long _lastTx;
     private DateTime _lastNetworkAt = DateTime.UtcNow;
+    private TimeSpan _lastGo2RtcCpu;
+    private DateTime _lastGo2RtcCpuAt = DateTime.UtcNow;
 
     public void Start()
     {
@@ -170,6 +172,8 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
             await ProbeGo2RtcStreamAsync("cheddar_camera"),
             await ProbeGo2RtcStreamAsync("front_door")
         ];
+        Go2RtcProcessResult go2rtcProcess = GetGo2RtcProcessStats(now);
+        NetworkAdapterResult[] adapters = GetNetworkAdapterStats();
 
         CameraResult[] cameras =
         [
@@ -199,7 +203,8 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
                 internetOnline = internetPing.Online,
                 internetLatencyMs = internetPing.LatencyMs,
                 receiveMbps = Math.Round(rxMbps, 2),
-                transmitMbps = Math.Round(txMbps, 2)
+                transmitMbps = Math.Round(txMbps, 2),
+                adapters
             },
             go2rtc = new
             {
@@ -207,10 +212,60 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
                 apiLatencyMs = go2rtcApi.LatencyMs,
                 rtspOnline = go2rtcRtsp.Online,
                 rtspLatencyMs = go2rtcRtsp.LatencyMs,
+                process = go2rtcProcess,
                 streams = go2rtcStreams
             },
             cameras
         };
+    }
+
+    private Go2RtcProcessResult GetGo2RtcProcessStats(DateTime now)
+    {
+        try
+        {
+            Process? go2rtc = Process.GetProcessesByName("go2rtc")
+                .OrderByDescending(p => p.WorkingSet64)
+                .FirstOrDefault();
+
+            if (go2rtc == null)
+                return new(false, null, null, null, null);
+
+            TimeSpan cpuNow = go2rtc.TotalProcessorTime;
+            double elapsedMs = Math.Max(1, (now - _lastGo2RtcCpuAt).TotalMilliseconds);
+            double cpu = (cpuNow - _lastGo2RtcCpu).TotalMilliseconds /
+                         elapsedMs / Environment.ProcessorCount * 100.0;
+
+            _lastGo2RtcCpu = cpuNow;
+            _lastGo2RtcCpuAt = now;
+
+            return new(true, go2rtc.Id, Math.Round(Math.Max(0, cpu), 1),
+                Math.Round(go2rtc.WorkingSet64 / 1024d / 1024d, 1),
+                go2rtc.Threads.Count);
+        }
+        catch { return new(false, null, null, null, null); }
+    }
+
+    private static NetworkAdapterResult[] GetNetworkAdapterStats()
+    {
+        List<NetworkAdapterResult> results = [];
+        foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces()
+                     .Where(n => n.OperationalStatus == OperationalStatus.Up &&
+                                 n.NetworkInterfaceType != NetworkInterfaceType.Loopback))
+        {
+            try
+            {
+                IPv4InterfaceStatistics stats = nic.GetIPv4Statistics();
+                string[] addresses = nic.GetIPProperties().UnicastAddresses
+                    .Where(a => a.Address.AddressFamily == AddressFamily.InterNetwork)
+                    .Select(a => a.Address.ToString()).ToArray();
+                results.Add(new(nic.Name, nic.Description, nic.NetworkInterfaceType.ToString(),
+                    nic.Speed, addresses, stats.BytesReceived, stats.BytesSent,
+                    stats.IncomingPacketsWithErrors, stats.OutgoingPacketsWithErrors,
+                    stats.IncomingPacketsDiscarded, stats.OutgoingPacketsDiscarded));
+            }
+            catch (NetworkInformationException) { }
+        }
+        return results.ToArray();
     }
 
     private static async Task<Go2RtcStreamResult> ProbeGo2RtcStreamAsync(string name)
@@ -368,6 +423,12 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
 
     private sealed record PingResult(bool Online, long? LatencyMs);
     private sealed record ServiceResult(bool Online, long? LatencyMs);
+    private sealed record NetworkAdapterResult(
+        string Name, string Description, string Type, long LinkSpeedBitsPerSecond,
+        string[] Addresses, long BytesReceived, long BytesSent,
+        long ReceiveErrors, long TransmitErrors, long ReceiveDiscards, long TransmitDiscards);
+    private sealed record Go2RtcProcessResult(
+        bool Running, int? ProcessId, double? CpuPercent, double? WorkingSetMb, int? ThreadCount);
     private sealed record Go2RtcStreamResult(
         string Name,
         bool ApiResponding,
