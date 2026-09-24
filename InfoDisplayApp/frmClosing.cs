@@ -1,4 +1,5 @@
 ﻿using InfoDisplayApp.Properties;
+using NAudio.Wave;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -6,7 +7,6 @@ using System.Data;
 using System.Drawing;
 using System.Diagnostics;
 using System.IO;
-using System.Media;
 using System.Text;
 using System.Windows.Forms;
 
@@ -16,7 +16,9 @@ namespace InfoDisplayApp
     {
         private int _countdown = 7; // Seconds
         private bool _isRestarting = false; // Tells the form whether to restart or exit the application.
-        private SoundPlayer? _exitSoundPlayer;
+        private WasapiOut? _exitAudioOutput;
+        private WaveFileReader? _exitAudioReader;
+        private MemoryStream? _exitAudioStream;
         private readonly Stopwatch _shutdownClock = Stopwatch.StartNew();
         private string ShutdownLogPath =>
             Path.Combine(AppContext.BaseDirectory, "logs",
@@ -44,11 +46,8 @@ namespace InfoDisplayApp
         private async void frmClosing_Load(object sender, EventArgs e)
         {
             LogShutdown($"frmClosing_Load entered; restarting={_isRestarting}.");
-            _exitSoundPlayer?.Dispose();
-            _exitSoundPlayer = new SoundPlayer(Resources.sfx_exit);
-            _exitSoundPlayer.Load();
-            _exitSoundPlayer.Play();
-            LogShutdown("Exit sound started.");
+            StartExitAudio();
+            LogShutdown("Exit sound started with NAudio WASAPI.");
             // Do not use the WinForms actionTimer for shutdown timing. WM_TIMER
             // delivery has proven unreliable under InfoScreen's media workload.
             actionTimer.Stop();
@@ -107,12 +106,38 @@ namespace InfoDisplayApp
             // fix does not require designer churn; shutdown timing is Task-based.
         }
 
+        private void StartExitAudio()
+        {
+            DisposeExitSoundPlayer();
+
+            byte[] wavBytes;
+            using (Stream resourceStream = Resources.sfx_exit)
+            using (MemoryStream copy = new())
+            {
+                resourceStream.Position = 0;
+                resourceStream.CopyTo(copy);
+                wavBytes = copy.ToArray();
+            }
+
+            _exitAudioStream = new MemoryStream(wavBytes, writable: false);
+            _exitAudioReader = new WaveFileReader(_exitAudioStream);
+            _exitAudioOutput = new WasapiOut();
+            _exitAudioOutput.Init(_exitAudioReader);
+            _exitAudioOutput.Play();
+        }
+
         private void DisposeExitSoundPlayer()
         {
-            try { _exitSoundPlayer?.Stop(); }
+            try { _exitAudioOutput?.Stop(); }
             catch { }
-            _exitSoundPlayer?.Dispose();
-            _exitSoundPlayer = null;
+
+            _exitAudioOutput?.Dispose();
+            _exitAudioReader?.Dispose();
+            _exitAudioStream?.Dispose();
+
+            _exitAudioOutput = null;
+            _exitAudioReader = null;
+            _exitAudioStream = null;
         }
 
         public bool setRestarting(bool isRestarting)
