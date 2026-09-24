@@ -93,21 +93,47 @@ namespace InfoDisplayApp
                 return;
 
             _startupSoundPlayed = true;
+            _ = PlayStartupSoundAsync();
+
+            _alertPollTimer.Start();
+            _ = PollAlertsAsync();
+        }
+
+        private async Task PlayStartupSoundAsync()
+        {
+            SoundPlayer? player = null;
 
             try
             {
-                _startupSoundPlayer?.Dispose();
-                _startupSoundPlayer = new SoundPlayer(Resources.sfx_startup);
-                _startupSoundPlayer.Load();
-                _startupSoundPlayer.Play();
+                Debug.WriteLine("STARTUP AUDIO: playback beginning.");
+
+                player = new SoundPlayer(Resources.sfx_startup);
+                _startupSoundPlayer = player;
+
+                await Task.Run(() =>
+                {
+                    Debug.WriteLine("STARTUP AUDIO: PlaySync entered.");
+                    player.Load();
+                    player.PlaySync();
+                    Debug.WriteLine("STARTUP AUDIO: PlaySync completed.");
+                });
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Unable to play startup sound: {ex}");
             }
-
-            _alertPollTimer.Start();
-            _ = PollAlertsAsync();
+            finally
+            {
+                // Only clear/dispose the player if it is still the instance owned
+                // by this playback operation. FormClosing may have stopped and
+                // disposed it first.
+                if (ReferenceEquals(_startupSoundPlayer, player))
+                {
+                    _startupSoundPlayer = null;
+                    player?.Dispose();
+                    Debug.WriteLine("STARTUP AUDIO: player disposed.");
+                }
+            }
         }
 
         private Color RandomColor()
