@@ -19,6 +19,7 @@ namespace InfoDisplayApp
         private WasapiOut? _startupAudioOutput;
         private WaveFileReader? _startupAudioReader;
         private MemoryStream? _startupAudioStream;
+        private DisplayDiagnosticsMonitor? _displayDiagnosticsMonitor;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -97,6 +98,8 @@ namespace InfoDisplayApp
             _startupSoundPlayed = true;
             AudioPathology.BeginSession();
             AudioEndpointDiagnostics.Start();
+            _displayDiagnosticsMonitor ??= new DisplayDiagnosticsMonitor();
+            _displayDiagnosticsMonitor.Start();
             _ = PlayStartupSoundAsync();
 
             _alertPollTimer.Start();
@@ -717,6 +720,10 @@ namespace InfoDisplayApp
             _alertPollTimer.Stop();
             _alertPollTimer.Dispose();
             LogShutdown("Alert poll timer disposed.");
+
+            _displayDiagnosticsMonitor?.Dispose();
+            _displayDiagnosticsMonitor = null;
+            LogShutdown("Display diagnostics monitor disposed.");
 
             DisposeStartupAudio();
             LogShutdown("Startup NAudio player disposed.");
