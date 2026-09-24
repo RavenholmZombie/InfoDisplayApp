@@ -16,7 +16,7 @@ namespace InfoDisplayApp
         private ctrlEmergencyTicker? _emergencyTicker;
         private frmBrowser? _browserForm;
         private frmApps? _appsForm;
-        private WasapiOut? _startupAudioOutput;
+        private WaveOutEvent? _startupAudioOutput;
         private WaveFileReader? _startupAudioReader;
         private MemoryStream? _startupAudioStream;
         private DisplayDiagnosticsMonitor? _displayDiagnosticsMonitor;
@@ -119,7 +119,7 @@ namespace InfoDisplayApp
                     return;
                 }
 
-                Debug.WriteLine("STARTUP AUDIO: NAudio WASAPI playback beginning after startup delay.");
+                Debug.WriteLine("STARTUP AUDIO: NAudio waveOut playback beginning after startup delay.");
 
                 byte[] wavBytes;
                 using (Stream resourceStream = Resources.sfx_startup)
@@ -134,7 +134,7 @@ namespace InfoDisplayApp
 
                 _startupAudioStream = new MemoryStream(wavBytes, writable: false);
                 _startupAudioReader = new WaveFileReader(_startupAudioStream);
-                _startupAudioOutput = new WasapiOut();
+                _startupAudioOutput = new WaveOutEvent();
                 _startupAudioOutput.Init(_startupAudioReader);
 
                 Stopwatch playbackClock = Stopwatch.StartNew();
@@ -163,7 +163,7 @@ namespace InfoDisplayApp
                     _startupAudioReader,
                     _startupAudioOutput,
                     playbackClock);
-                Debug.WriteLine("STARTUP AUDIO: NAudio WASAPI Play() started.");
+                Debug.WriteLine("STARTUP AUDIO: NAudio waveOut Play() started.");
 
                 await completion.Task;
                 Debug.WriteLine("STARTUP AUDIO: NAudio WASAPI playback completed.");
