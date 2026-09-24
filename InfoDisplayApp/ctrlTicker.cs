@@ -25,9 +25,8 @@ namespace InfoDisplayApp.Properties
         private readonly System.Windows.Forms.Timer _reloadTimer;
         private readonly System.Windows.Forms.Timer _statusTimer;
         private readonly System.Windows.Forms.Timer _weatherTimer;
-        private readonly System.Threading.Timer _animationTimer;
+        private readonly System.Windows.Forms.Timer _animationTimer;
 
-        private int _animationFramePending;
         private bool _animationRunning;
         private bool _timerResolutionRequested;
         private bool _weatherUpdating;
@@ -125,11 +124,11 @@ namespace InfoDisplayApp.Properties
             panel1.Paint += panel1_Paint;
             panel1.Resize += panel1_Resize;
 
-            _animationTimer = new System.Threading.Timer(
-                AnimationTimerCallback,
-                null,
-                Timeout.Infinite,
-                Timeout.Infinite);
+            _animationTimer = new System.Windows.Forms.Timer
+            {
+                Interval = AnimationPulseMilliseconds
+            };
+            _animationTimer.Tick += AnimationTimer_Tick;
 
             _diagnosticTimer = new System.Threading.Timer(
                 DiagnosticTimerCallback,
@@ -319,7 +318,7 @@ namespace InfoDisplayApp.Properties
 
             _animationRunning = true;
             ResetScrollClock();
-            _animationTimer.Change(0, AnimationPulseMilliseconds);
+            _animationTimer.Start();
         }
 
         private void StopAnimation()
@@ -328,40 +327,21 @@ namespace InfoDisplayApp.Properties
                 return;
 
             _animationRunning = false;
-            _animationTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            Interlocked.Exchange(ref _animationFramePending, 0);
+            _animationTimer.Stop();
         }
 
-        private void AnimationTimerCallback(object? state)
+        private void AnimationTimer_Tick(object? sender, EventArgs e)
         {
             Interlocked.Increment(ref _animationRequests);
 
             if (!_animationRunning ||
                 IsDisposed ||
-                Disposing ||
-                !IsHandleCreated)
+                Disposing)
             {
                 return;
             }
 
-            if (Interlocked.Exchange(ref _animationFramePending, 1) != 0)
-            {
-                Interlocked.Increment(ref _droppedAnimationRequests);
-                return;
-            }
-
-            try
-            {
-                BeginInvoke(new Action(RenderAnimationFrame));
-            }
-            catch (ObjectDisposedException)
-            {
-                Interlocked.Exchange(ref _animationFramePending, 0);
-            }
-            catch (InvalidOperationException)
-            {
-                Interlocked.Exchange(ref _animationFramePending, 0);
-            }
+            RenderAnimationFrame();
         }
 
         private void RenderAnimationFrame()
@@ -384,40 +364,33 @@ namespace InfoDisplayApp.Properties
                 }
             }
 
-            try
+            if (!_animationRunning ||
+                IsDisposed ||
+                _messages.Count == 0)
             {
-                if (!_animationRunning ||
-                    IsDisposed ||
-                    _messages.Count == 0)
-                {
-                    return;
-                }
-
-                double now = _scrollClock.Elapsed.TotalSeconds;
-                double elapsed = Math.Clamp(
-                    now - _lastScrollSeconds,
-                    0.0,
-                    0.050);
-
-                _lastScrollSeconds = now;
-                _scrollX -= ScrollPixelsPerSecond * elapsed;
-
-                // Let WinForms coalesce paint requests instead of forcing a synchronous
-                // repaint every animation pulse. This substantially reduces UI/GPU
-                // pressure while Philo and camera video are active.
-                panel1.Invalidate();
-
-                if (_scrollX + _messageWidth < 0)
-                {
-                    _currentMessageIndex =
-                        (_currentMessageIndex + 1) % _messages.Count;
-
-                    ShowCurrentMessage();
-                }
+                return;
             }
-            finally
+
+            double now = _scrollClock.Elapsed.TotalSeconds;
+            double elapsed = Math.Clamp(
+                now - _lastScrollSeconds,
+                0.0,
+                0.050);
+
+            _lastScrollSeconds = now;
+            _scrollX -= ScrollPixelsPerSecond * elapsed;
+
+            // The animation timer now runs directly on the WinForms UI thread.
+            // Position remains stopwatch-based, so a delayed tick advances to
+            // the correct current position rather than queuing stale frames.
+            panel1.Invalidate();
+
+            if (_scrollX + _messageWidth < 0)
             {
-                Interlocked.Exchange(ref _animationFramePending, 0);
+                _currentMessageIndex =
+                    (_currentMessageIndex + 1) % _messages.Count;
+
+                ShowCurrentMessage();
             }
         }
 
@@ -600,6 +573,7 @@ namespace InfoDisplayApp.Properties
 
             _diagnosticTimer.Change(Timeout.Infinite, Timeout.Infinite);
             _diagnosticTimer.Dispose();
+            _animationTimer.Stop();
             _animationTimer.Dispose();
             _reloadTimer.Dispose();
             _statusTimer.Dispose();
