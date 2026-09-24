@@ -110,16 +110,13 @@ namespace InfoDisplayApp
         {
             try
             {
-                Debug.WriteLine("STARTUP AUDIO: playback scheduled; waiting 3 seconds for startup activity to settle.");
-                await Task.Delay(3000);
-
                 if (IsDisposed || Disposing)
                 {
                     Debug.WriteLine("STARTUP AUDIO: cancelled because frmMain is closing or disposed.");
                     return;
                 }
 
-                Debug.WriteLine("STARTUP AUDIO: NAudio waveOut playback beginning after startup delay.");
+                Debug.WriteLine("STARTUP AUDIO: NAudio waveOut playback beginning immediately.");
 
                 byte[] wavBytes;
                 using (Stream resourceStream = Resources.sfx_startup)
