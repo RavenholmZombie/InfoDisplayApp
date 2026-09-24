@@ -29,6 +29,7 @@ namespace InfoDisplayApp
 
         private bool _startupSoundPlayed;
         private bool _philoStartupDeferred = true;
+        private bool _cameraStartupDeferred = true;
         private bool _alertPollInProgress;
         private bool _emergencyAlertActive;
         private string? _currentAlertId;
@@ -152,7 +153,10 @@ namespace InfoDisplayApp
                 _startupAudioOutput.PlaybackStopped -= PlaybackStopped;
 
                 if (!IsDisposed && !Disposing)
+                {
+                    InitializeDeferredCamera();
                     InitializeDeferredPhilo();
+                }
             }
             catch (Exception ex)
             {
@@ -162,6 +166,24 @@ namespace InfoDisplayApp
             {
                 DisposeStartupAudio();
             }
+        }
+
+        private void InitializeDeferredCamera()
+        {
+            if (!_cameraStartupDeferred || _cameraView != null || IsDisposed || Disposing)
+                return;
+
+            _cameraStartupDeferred = false;
+            Debug.WriteLine("STARTUP AUDIO: initializing deferred LibVLC camera control after playback completion.");
+
+            _cameraView = new ctrlCameras
+            {
+                Dock = DockStyle.Fill,
+                Visible = false
+            };
+
+            pnlTV.Controls.Add(_cameraView);
+            _cameraView.SendToBack();
         }
 
         private void InitializeDeferredPhilo()
@@ -285,13 +307,9 @@ namespace InfoDisplayApp
             _philoView = null;
             pnlTV.BackColor = Color.Black;
 
-            _cameraView = new ctrlCameras
-            {
-                Dock = DockStyle.Fill,
-                Visible = false
-            };
-
-            pnlTV.Controls.Add(_cameraView);
+            // Diagnostic isolation: do not initialize LibVLC/MediaPlayer until
+            // the startup sound has completed.
+            _cameraView = null;
 
             _youtubeView = new ctrlYouTubeWebView
             {
