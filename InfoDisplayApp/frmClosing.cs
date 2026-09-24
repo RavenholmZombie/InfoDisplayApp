@@ -1,4 +1,5 @@
 ﻿using InfoDisplayApp.Properties;
+using InfoDisplayApp.Services;
 using NAudio.Wave;
 using System;
 using System.Collections.Generic;
@@ -119,11 +120,33 @@ namespace InfoDisplayApp
                 wavBytes = copy.ToArray();
             }
 
+            AudioPathology.InspectWave("SHUTDOWN", wavBytes);
+
             _exitAudioStream = new MemoryStream(wavBytes, writable: false);
             _exitAudioReader = new WaveFileReader(_exitAudioStream);
             _exitAudioOutput = new WasapiOut();
             _exitAudioOutput.Init(_exitAudioReader);
+
+            Stopwatch playbackClock = Stopwatch.StartNew();
+            _exitAudioOutput.PlaybackStopped += (_, e) =>
+            {
+                if (_exitAudioReader == null || _exitAudioOutput == null)
+                    return;
+
+                AudioPathology.LogPlaybackStopped(
+                    "SHUTDOWN",
+                    _exitAudioReader,
+                    _exitAudioOutput,
+                    playbackClock,
+                    e.Exception);
+            };
+
             _exitAudioOutput.Play();
+            AudioPathology.LogPlaybackStarted(
+                "SHUTDOWN",
+                _exitAudioReader,
+                _exitAudioOutput,
+                playbackClock);
         }
 
         private void DisposeExitSoundPlayer()
