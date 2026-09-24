@@ -105,7 +105,16 @@ namespace InfoDisplayApp
 
             try
             {
-                Debug.WriteLine("STARTUP AUDIO: playback beginning.");
+                Debug.WriteLine("STARTUP AUDIO: playback scheduled; waiting 3 seconds for startup activity to settle.");
+                await Task.Delay(3000);
+
+                if (IsDisposed || Disposing)
+                {
+                    Debug.WriteLine("STARTUP AUDIO: cancelled because frmMain is closing or disposed.");
+                    return;
+                }
+
+                Debug.WriteLine("STARTUP AUDIO: playback beginning after startup delay.");
 
                 player = new SoundPlayer(Resources.sfx_startup);
                 _startupSoundPlayer = player;
