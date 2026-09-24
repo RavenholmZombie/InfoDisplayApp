@@ -368,5 +368,17 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
 
     private sealed record PingResult(bool Online, long? LatencyMs);
     private sealed record ServiceResult(bool Online, long? LatencyMs);
-    private sealed record Go2RtcStreamResult(string Name, bool ApiResponding, bool Registered, long? ApiLatencyMs, int Producers, int Consumers);\n    private sealed record CameraResult(string Name, string Address, bool Online, long? LatencyMs, bool RtspOnline);
+    private sealed record Go2RtcStreamResult(
+        string Name,
+        bool ApiResponding,
+        bool Registered,
+        long? ApiLatencyMs,
+        int Producers,
+        int Consumers);
+    private sealed record CameraResult(
+        string Name,
+        string Address,
+        bool Online,
+        long? LatencyMs,
+        bool RtspOnline);
 }
