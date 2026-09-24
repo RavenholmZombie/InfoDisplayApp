@@ -41,7 +41,7 @@ namespace InfoDisplayApp
             InitializeComponent();
         }
 
-        private void frmClosing_Load(object sender, EventArgs e)
+        private async void frmClosing_Load(object sender, EventArgs e)
         {
             LogShutdown($"frmClosing_Load entered; restarting={_isRestarting}.");
             _exitSoundPlayer?.Dispose();
@@ -49,8 +49,10 @@ namespace InfoDisplayApp
             _exitSoundPlayer.Load();
             _exitSoundPlayer.Play();
             LogShutdown("Exit sound started.");
-            actionTimer.Start();
-            LogShutdown($"Closing countdown started at {_countdown} seconds; timer interval={actionTimer.Interval}ms.");
+            // Do not use the WinForms actionTimer for shutdown timing. WM_TIMER
+            // delivery has proven unreliable under InfoScreen's media workload.
+            actionTimer.Stop();
+            LogShutdown($"Async closing countdown started at {_countdown} seconds.");
             Cursor = Cursors.WaitCursor;
 
             // Label handling
@@ -64,33 +66,45 @@ namespace InfoDisplayApp
                 // Case - Exiting
                 statusLabel.Text = "See you later!\nClosing to Windows...";
             }
+
+            await RunClosingCountdownAsync();
+        }
+
+        private async Task RunClosingCountdownAsync()
+        {
+            while (_countdown > 0)
+            {
+                await Task.Delay(1000);
+
+                if (IsDisposed || Disposing)
+                    return;
+
+                _countdown--;
+                LogShutdown($"Async closing countdown tick; remaining={_countdown}.");
+            }
+
+            LogShutdown("Async countdown reached zero.");
+            DisposeExitSoundPlayer();
+            LogShutdown("Exit sound disposed.");
+
+            if (_isRestarting)
+            {
+                LogShutdown("Calling Application.Restart().");
+                Application.Restart();
+                LogShutdown("Application.Restart() returned.");
+            }
+            else
+            {
+                LogShutdown("Calling Application.Exit().");
+                Application.Exit();
+                LogShutdown("Application.Exit() returned.");
+            }
         }
 
         private void actionTimer_Tick(object sender, EventArgs e)
         {
-            _countdown--;
-            LogShutdown($"Closing countdown tick; remaining={_countdown}.");
-            if (_countdown <= 0)
-            {
-                actionTimer.Stop();
-                LogShutdown("Countdown reached zero; timer stopped.");
-                DisposeExitSoundPlayer();
-                LogShutdown("Exit sound disposed.");
-
-                if (_isRestarting)
-                {
-                    LogShutdown("Calling Application.Restart().");
-                    Application.Restart();
-                    LogShutdown("Application.Restart() returned.");
-
-                }
-                else
-                {
-                    LogShutdown("Calling Application.Exit().");
-                    Application.Exit();
-                    LogShutdown("Application.Exit() returned.");
-                }
-            }
+            // Intentionally unused. Kept wired in the designer so the diagnostic
+            // fix does not require designer churn; shutdown timing is Task-based.
         }
 
         private void DisposeExitSoundPlayer()
