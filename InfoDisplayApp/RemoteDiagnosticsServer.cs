@@ -29,6 +29,9 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
     private DateTime _lastNetworkAt = DateTime.UtcNow;
     private TimeSpan _lastGo2RtcCpu;
     private DateTime _lastGo2RtcCpuAt = DateTime.UtcNow;
+    // A/B test switch: keep the remote endpoint/control channel alive while
+    // completely disabling background telemetry collection.
+    private const bool EnableTelemetrySampler = false;
     private int _sampleNumber;
     private Go2RtcStreamResult[] _lastGo2RtcStreams = [];
     private Go2RtcProcessResult _lastGo2RtcProcess = new(false, null, null, null, null);
@@ -40,7 +43,8 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
         (_lastRx, _lastTx) = GetNetworkBytes();
         _listener.Start();
         _acceptLoop = Task.Run(AcceptLoopAsync);
-        _sampleLoop = Task.Run(SampleLoopAsync);
+        if (EnableTelemetrySampler)
+            _sampleLoop = Task.Run(SampleLoopAsync);
         Debug.WriteLine($"Remote diagnostics listening on TCP {Port}.");
     }
 
@@ -93,7 +97,13 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
 
                     if (snapshot == null)
                     {
-                        await WriteJsonAsync(stream, 503, new { error = "Telemetry is warming up." });
+                        await WriteJsonAsync(stream, 503, new
+                        {
+                            error = EnableTelemetrySampler
+                                ? "Telemetry is warming up."
+                                : "Telemetry sampler disabled for A/B test.",
+                            samplerEnabled = EnableTelemetrySampler
+                        });
                         return;
                     }
 
