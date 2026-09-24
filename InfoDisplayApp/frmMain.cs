@@ -14,6 +14,7 @@ namespace InfoDisplayApp
         private ctrlTicker? _normalTicker;
         private ctrlEmergencyTicker? _emergencyTicker;
         private frmBrowser? _browserForm;
+        private Control? _mediaHiddenForApps;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -547,11 +548,40 @@ namespace InfoDisplayApp
             if (pnlApps.Visible)
             {
                 pnlApps.Visible = false;
+
+                // Restore whichever media surface was visible before Apps opened.
+                // Keeping the native WebView2/LibVLC surface out of the visible
+                // hierarchy while Apps is on top is an A/B test for HWND
+                // composition/painting contention.
+                if (_mediaHiddenForApps != null && !_mediaHiddenForApps.IsDisposed)
+                {
+                    _mediaHiddenForApps.Visible = true;
+                    _mediaHiddenForApps.BringToFront();
+                }
+
+                _mediaHiddenForApps = null;
             }
             else
             {
+                // WebView2 and LibVLC both host native rendering surfaces. Do not
+                // leave one actively visible underneath pnlApps while testing the
+                // slow-paint issue; hide only the currently visible media control.
+                _mediaHiddenForApps = null;
+
+                if (_philoView?.Visible == true)
+                    _mediaHiddenForApps = _philoView;
+                else if (_cameraView?.Visible == true)
+                    _mediaHiddenForApps = _cameraView;
+                else if (_youtubeView?.Visible == true)
+                    _mediaHiddenForApps = _youtubeView;
+
+                if (_mediaHiddenForApps != null)
+                    _mediaHiddenForApps.Visible = false;
+
                 pnlApps.Visible = true;
                 pnlApps.BringToFront();
+                pnlApps.Invalidate(true);
+                pnlApps.Update();
             }
         }
 
