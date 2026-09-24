@@ -218,9 +218,9 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
         Stopwatch sw = Stopwatch.StartNew();
         try
         {
-            using HttpClient http = new() { Timeout = TimeSpan.FromMilliseconds(1500) };
+            using System.Net.Http.HttpClient http = new() { Timeout = TimeSpan.FromMilliseconds(1500) };
             string url = $"http://127.0.0.1:1984/api/streams?src={Uri.EscapeDataString(name)}";
-            using HttpResponseMessage response = await http.GetAsync(url);
+            using System.Net.Http.HttpResponseMessage response = await http.GetAsync(url);
             string body = await response.Content.ReadAsStringAsync();
 
             bool registered = response.IsSuccessStatusCode &&
