@@ -32,6 +32,24 @@ namespace InfoDisplayApp.Properties
         private bool _timerResolutionRequested;
         private bool _weatherUpdating;
 
+        // Lightweight performance instrumentation. Counters are sampled once per
+        // second and written by a background task so logging does not add more
+        // work to the UI thread we are trying to observe.
+        private readonly Stopwatch _diagnosticClock = Stopwatch.StartNew();
+        private readonly System.Threading.Timer _diagnosticTimer;
+        private long _animationRequests;
+        private long _renderCallbacks;
+        private long _paintEvents;
+        private long _lastAnimationRequests;
+        private long _lastRenderCallbacks;
+        private long _lastPaintEvents;
+        private long _lastUiHeartbeatTicks;
+        private long _worstUiHeartbeatTicks;
+        private int _diagnosticWritePending;
+        private string DiagnosticLogPath =>
+            Path.Combine(AppContext.BaseDirectory, "logs",
+                $"InfoScreen-PERF-{Environment.ProcessId}.log");
+
         private string _rycraftStatus = "Checking...";
         private int _rycraftPlayersOnline;
         private int _rycraftPlayersMax;
@@ -105,6 +123,12 @@ namespace InfoDisplayApp.Properties
                 Timeout.Infinite,
                 Timeout.Infinite);
 
+            _diagnosticTimer = new System.Threading.Timer(
+                DiagnosticTimerCallback,
+                null,
+                Timeout.Infinite,
+                Timeout.Infinite);
+
             _reloadTimer = new System.Windows.Forms.Timer
             {
                 Interval = 10_000
@@ -149,6 +173,9 @@ namespace InfoDisplayApp.Properties
             _reloadTimer.Start();
             _statusTimer.Start();
             _weatherTimer.Start();
+
+            _lastUiHeartbeatTicks = _diagnosticClock.ElapsedTicks;
+            _diagnosticTimer.Change(1000, 1000);
         }
 
         private void LoadTickerMessages()
@@ -296,6 +323,8 @@ namespace InfoDisplayApp.Properties
 
         private void AnimationTimerCallback(object? state)
         {
+            Interlocked.Increment(ref _animationRequests);
+
             if (!_animationRunning ||
                 IsDisposed ||
                 Disposing ||
@@ -323,6 +352,24 @@ namespace InfoDisplayApp.Properties
 
         private void RenderAnimationFrame()
         {
+            Interlocked.Increment(ref _renderCallbacks);
+
+            long nowTicks = _diagnosticClock.ElapsedTicks;
+            long previousTicks = Interlocked.Exchange(ref _lastUiHeartbeatTicks, nowTicks);
+            if (previousTicks != 0)
+            {
+                long gap = nowTicks - previousTicks;
+                long currentWorst = Interlocked.Read(ref _worstUiHeartbeatTicks);
+                while (gap > currentWorst)
+                {
+                    long observed = Interlocked.CompareExchange(
+                        ref _worstUiHeartbeatTicks, gap, currentWorst);
+                    if (observed == currentWorst)
+                        break;
+                    currentWorst = observed;
+                }
+            }
+
             try
             {
                 if (!_animationRunning ||
@@ -362,6 +409,8 @@ namespace InfoDisplayApp.Properties
 
         private void panel1_Paint(object? sender, PaintEventArgs e)
         {
+            Interlocked.Increment(ref _paintEvents);
+
             if (string.IsNullOrEmpty(_renderedMessage))
                 return;
 
@@ -411,6 +460,54 @@ namespace InfoDisplayApp.Properties
                 StopAnimation();
         }
 
+        private void DiagnosticTimerCallback(object? state)
+        {
+            if (IsDisposed || Disposing)
+                return;
+
+            long requests = Interlocked.Read(ref _animationRequests);
+            long renders = Interlocked.Read(ref _renderCallbacks);
+            long paints = Interlocked.Read(ref _paintEvents);
+            long requestDelta = requests - Interlocked.Exchange(ref _lastAnimationRequests, requests);
+            long renderDelta = renders - Interlocked.Exchange(ref _lastRenderCallbacks, renders);
+            long paintDelta = paints - Interlocked.Exchange(ref _lastPaintEvents, paints);
+            long worstTicks = Interlocked.Exchange(ref _worstUiHeartbeatTicks, 0);
+
+            Process process = Process.GetCurrentProcess();
+            string line =
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} " +
+                $"Ticker req={requestDelta}/s render={renderDelta}/s paint={paintDelta}/s " +
+                $"worstUiGap={(worstTicks * 1000.0 / Stopwatch.Frequency):0.0}ms " +
+                $"WS={process.WorkingSet64 / 1048576.0:0.0}MB " +
+                $"handles={process.HandleCount} threads={process.Threads.Count} " +
+                $"gc={GC.GetTotalMemory(false) / 1048576.0:0.0}MB";
+
+            process.Dispose();
+
+            if (Interlocked.Exchange(ref _diagnosticWritePending, 1) != 0)
+                return;
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    string? directory = Path.GetDirectoryName(DiagnosticLogPath);
+                    if (!string.IsNullOrEmpty(directory))
+                        Directory.CreateDirectory(directory);
+
+                    File.AppendAllText(DiagnosticLogPath, line + Environment.NewLine);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Performance diagnostic logging failed: {ex.Message}");
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _diagnosticWritePending, 0);
+                }
+            });
+        }
+
         private void ctrlTicker_Disposed(object? sender, EventArgs e)
         {
             StopAnimation();
@@ -419,6 +516,8 @@ namespace InfoDisplayApp.Properties
             _statusTimer.Stop();
             _weatherTimer.Stop();
 
+            _diagnosticTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            _diagnosticTimer.Dispose();
             _animationTimer.Dispose();
             _reloadTimer.Dispose();
             _statusTimer.Dispose();
