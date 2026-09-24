@@ -12,6 +12,10 @@ namespace InfoDisplayApp
         {
             ApplicationConfiguration.Initialize();
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+
+            using RemoteDiagnosticsServer diagnostics = new();
+            diagnostics.Start();
+
             Application.Run(new StartupApplicationContext());
         }
 
