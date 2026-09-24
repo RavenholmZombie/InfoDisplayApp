@@ -12,6 +12,9 @@ namespace InfoDisplayApp.Services
 
         public void Start()
         {
+            if (!AppSettings.Current.Diagnostics.DisplayMonitor)
+                return;
+
             if (_started)
                 return;
 
