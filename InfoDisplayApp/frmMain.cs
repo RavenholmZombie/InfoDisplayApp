@@ -28,8 +28,6 @@ namespace InfoDisplayApp
         private readonly HashSet<string> _seenAlertIds = new(StringComparer.OrdinalIgnoreCase);
 
         private bool _startupSoundPlayed;
-        private bool _philoStartupDeferred = true;
-        private bool _cameraStartupDeferred = true;
         private bool _alertPollInProgress;
         private bool _emergencyAlertActive;
         private string? _currentAlertId;
@@ -98,6 +96,7 @@ namespace InfoDisplayApp
 
             _startupSoundPlayed = true;
             AudioPathology.BeginSession();
+            AudioEndpointDiagnostics.Start();
             _ = PlayStartupSoundAsync();
 
             _alertPollTimer.Start();
@@ -168,12 +167,7 @@ namespace InfoDisplayApp
 
                 _startupAudioOutput.PlaybackStopped -= PlaybackStopped;
 
-                if (!IsDisposed && !Disposing)
-                {
-                    InitializeDeferredCamera();
-                    InitializeDeferredPhilo();
-                }
-            }
+             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Unable to play startup sound with NAudio: {ex}");
@@ -182,44 +176,6 @@ namespace InfoDisplayApp
             {
                 DisposeStartupAudio();
             }
-        }
-
-        private void InitializeDeferredCamera()
-        {
-            if (!_cameraStartupDeferred || _cameraView != null || IsDisposed || Disposing)
-                return;
-
-            _cameraStartupDeferred = false;
-            Debug.WriteLine("STARTUP AUDIO: initializing deferred LibVLC camera control after playback completion.");
-
-            _cameraView = new ctrlCameras
-            {
-                Dock = DockStyle.Fill,
-                Visible = false
-            };
-
-            pnlTV.Controls.Add(_cameraView);
-            _cameraView.SendToBack();
-        }
-
-        private void InitializeDeferredPhilo()
-        {
-            if (!_philoStartupDeferred || _philoView != null || IsDisposed || Disposing)
-                return;
-
-            _philoStartupDeferred = false;
-            Debug.WriteLine("STARTUP AUDIO: initializing deferred Philo/WebView2 after playback completion.");
-
-            _philoView = new ctrlPhiloWebView
-            {
-                Dock = DockStyle.Fill,
-                Visible = true
-            };
-
-            pnlTV.Controls.Add(_philoView);
-            _philoView.SetMuted(_emergencyAlertActive);
-            _philoView.BringToFront();
-            UpdateModeButtons(true);
         }
 
         private void DisposeStartupAudio()
@@ -319,13 +275,19 @@ namespace InfoDisplayApp
 
         private void frmMain_Load(object sender, EventArgs e)
         {
-            // Diagnostic isolation: keep Philo/WebView2 uninitialized until the startup WAV completes.
-            _philoView = null;
-            pnlTV.BackColor = Color.Black;
+            _philoView = new ctrlPhiloWebView
+            {
+                Dock = DockStyle.Fill,
+                Visible = true
+            };
+            pnlTV.Controls.Add(_philoView);
 
-            // Diagnostic isolation: do not initialize LibVLC/MediaPlayer until
-            // the startup sound has completed.
-            _cameraView = null;
+            _cameraView = new ctrlCameras
+            {
+                Dock = DockStyle.Fill,
+                Visible = false
+            };
+            pnlTV.Controls.Add(_cameraView);
 
             _youtubeView = new ctrlYouTubeWebView
             {
@@ -334,6 +296,7 @@ namespace InfoDisplayApp
             };
 
             pnlTV.Controls.Add(_youtubeView);
+            _philoView.BringToFront();
 
             ctrlTimeDate ctrlTimeDate = new ctrlTimeDate
             {
