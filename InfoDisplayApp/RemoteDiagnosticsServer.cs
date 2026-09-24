@@ -14,6 +14,10 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly Stopwatch _uptime = Stopwatch.StartNew();
     private Task? _acceptLoop;
+    private Task? _sampleLoop;
+    private readonly object _snapshotLock = new();
+    private object? _latestSnapshot;
+    private long _sampleSequence;
     private TimeSpan _lastCpu;
     private DateTime _lastCpuAt = DateTime.UtcNow;
     private long _lastRx;
@@ -26,6 +30,7 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
         (_lastRx, _lastTx) = GetNetworkBytes();
         _listener.Start();
         _acceptLoop = Task.Run(AcceptLoopAsync);
+        _sampleLoop = Task.Run(SampleLoopAsync);
         Debug.WriteLine($"Remote diagnostics listening on TCP {Port}.");
     }
 
@@ -72,7 +77,16 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
             {
                 if (method == "GET" && path == "/api/diagnostics")
                 {
-                    object snapshot = await BuildSnapshotAsync();
+                    object? snapshot;
+                    lock (_snapshotLock)
+                        snapshot = _latestSnapshot;
+
+                    if (snapshot == null)
+                    {
+                        await WriteJsonAsync(stream, 503, new { error = "Telemetry is warming up." });
+                        return;
+                    }
+
                     await WriteJsonAsync(stream, 200, snapshot);
                     return;
                 }
@@ -93,6 +107,26 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
                 Debug.WriteLine($"Diagnostics request failed: {ex}");
                 await WriteJsonAsync(stream, 500, new { error = ex.Message });
             }
+        }
+    }
+
+    private async Task SampleLoopAsync()
+    {
+        while (!_cts.IsCancellationRequested)
+        {
+            try
+            {
+                object snapshot = await BuildSnapshotAsync();
+                lock (_snapshotLock)
+                    _latestSnapshot = snapshot;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Diagnostic sample failed: {ex}");
+            }
+
+            try { await Task.Delay(1000, _cts.Token); }
+            catch (OperationCanceledException) { break; }
         }
     }
 
@@ -131,6 +165,11 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
 
         ServiceResult go2rtcApi = await TcpProbeAsync("127.0.0.1", 1984);
         ServiceResult go2rtcRtsp = await TcpProbeAsync("127.0.0.1", 8554);
+        Go2RtcStreamResult[] go2rtcStreams =
+        [
+            await ProbeGo2RtcStreamAsync("cheddar_camera"),
+            await ProbeGo2RtcStreamAsync("front_door")
+        ];
 
         CameraResult[] cameras =
         [
@@ -141,6 +180,7 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
 
         return new
         {
+            sequence = Interlocked.Increment(ref _sampleSequence),
             timestampUtc = now,
             server = new
             {
@@ -166,10 +206,68 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
                 apiOnline = go2rtcApi.Online,
                 apiLatencyMs = go2rtcApi.LatencyMs,
                 rtspOnline = go2rtcRtsp.Online,
-                rtspLatencyMs = go2rtcRtsp.LatencyMs
+                rtspLatencyMs = go2rtcRtsp.LatencyMs,
+                streams = go2rtcStreams
             },
             cameras
         };
+    }
+
+    private static async Task<Go2RtcStreamResult> ProbeGo2RtcStreamAsync(string name)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        try
+        {
+            using HttpClient http = new() { Timeout = TimeSpan.FromMilliseconds(1500) };
+            string url = $"http://127.0.0.1:1984/api/streams?src={Uri.EscapeDataString(name)}";
+            using HttpResponseMessage response = await http.GetAsync(url);
+            string body = await response.Content.ReadAsStringAsync();
+
+            bool registered = response.IsSuccessStatusCode &&
+                              !string.IsNullOrWhiteSpace(body) &&
+                              body != "{}" &&
+                              body.Contains(name, StringComparison.OrdinalIgnoreCase);
+
+            int producers = 0;
+            int consumers = 0;
+            try
+            {
+                using JsonDocument json = JsonDocument.Parse(body);
+                CountGo2RtcEndpoints(json.RootElement, ref producers, ref consumers);
+            }
+            catch (JsonException) { }
+
+            return new(name, response.IsSuccessStatusCode, registered,
+                sw.ElapsedMilliseconds, producers, consumers);
+        }
+        catch
+        {
+            return new(name, false, false, null, 0, 0);
+        }
+    }
+
+    private static void CountGo2RtcEndpoints(
+        JsonElement element, ref int producers, ref int consumers)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                if (property.NameEquals("producers") &&
+                    property.Value.ValueKind == JsonValueKind.Array)
+                    producers += property.Value.GetArrayLength();
+                else if (property.NameEquals("consumers") &&
+                         property.Value.ValueKind == JsonValueKind.Array)
+                    consumers += property.Value.GetArrayLength();
+
+                CountGo2RtcEndpoints(property.Value, ref producers, ref consumers);
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement child in element.EnumerateArray())
+                CountGo2RtcEndpoints(child, ref producers, ref consumers);
+        }
     }
 
     private static async Task<CameraResult> ProbeCameraAsync(string name, string address)
@@ -270,5 +368,5 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
 
     private sealed record PingResult(bool Online, long? LatencyMs);
     private sealed record ServiceResult(bool Online, long? LatencyMs);
-    private sealed record CameraResult(string Name, string Address, bool Online, long? LatencyMs, bool RtspOnline);
+    private sealed record Go2RtcStreamResult(string Name, bool ApiResponding, bool Registered, long? ApiLatencyMs, int Producers, int Consumers);\n    private sealed record CameraResult(string Name, string Address, bool Online, long? LatencyMs, bool RtspOnline);
 }
