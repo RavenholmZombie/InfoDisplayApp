@@ -1,5 +1,4 @@
 using Microsoft.Win32;
-using System.Management;
 using System.Runtime.InteropServices;
 
 namespace InfoDisplayApp.Services
@@ -9,7 +8,6 @@ namespace InfoDisplayApp.Services
         private const int SM_CMONITORS = 80;
         private const int SM_REMOTESESSION = 0x1000;
 
-        private ManagementEventWatcher? _deviceChangeWatcher;
         private bool _started;
 
         public void Start()
@@ -25,21 +23,6 @@ namespace InfoDisplayApp.Services
             SystemEvents.DisplaySettingsChanged += SystemEvents_DisplaySettingsChanged;
             SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
 
-            try
-            {
-                _deviceChangeWatcher = new ManagementEventWatcher(
-                    new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent"));
-                _deviceChangeWatcher.EventArrived += DeviceChangeWatcher_EventArrived;
-                _deviceChangeWatcher.Start();
-                AudioPathology.Log("DISPLAY: Win32_DeviceChangeEvent watcher started.");
-            }
-            catch (Exception ex)
-            {
-                AudioPathology.Log($"DISPLAY: Win32_DeviceChangeEvent watcher failed: {ex}");
-                _deviceChangeWatcher?.Dispose();
-                _deviceChangeWatcher = null;
-            }
-
             AudioPathology.Log("DISPLAY: SystemEvents display/session callbacks subscribed.");
         }
 
@@ -52,22 +35,6 @@ namespace InfoDisplayApp.Services
             SystemEvents.DisplaySettingsChanging -= SystemEvents_DisplaySettingsChanging;
             SystemEvents.DisplaySettingsChanged -= SystemEvents_DisplaySettingsChanged;
             SystemEvents.SessionSwitch -= SystemEvents_SessionSwitch;
-
-            if (_deviceChangeWatcher != null)
-            {
-                try
-                {
-                    _deviceChangeWatcher.Stop();
-                    _deviceChangeWatcher.EventArrived -= DeviceChangeWatcher_EventArrived;
-                    _deviceChangeWatcher.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    AudioPathology.Log($"DISPLAY: device watcher disposal failed: {ex}");
-                }
-
-                _deviceChangeWatcher = null;
-            }
 
             AudioPathology.Log("DISPLAY: diagnostics monitor disposed.");
         }
@@ -88,20 +55,6 @@ namespace InfoDisplayApp.Services
         {
             AudioPathology.Log($"DISPLAY EVENT: SessionSwitch reason={e.Reason}.");
             LogSnapshot($"SessionSwitch/{e.Reason}");
-        }
-
-        private void DeviceChangeWatcher_EventArrived(object sender, EventArrivedEventArgs e)
-        {
-            try
-            {
-                uint eventType = Convert.ToUInt32(e.NewEvent.Properties["EventType"]?.Value ?? 0u);
-                AudioPathology.Log($"DISPLAY EVENT: Win32_DeviceChangeEvent type={eventType} ({DescribeDeviceChange(eventType)}).");
-                LogSnapshot($"Win32_DeviceChangeEvent/{eventType}");
-            }
-            catch (Exception ex)
-            {
-                AudioPathology.Log($"DISPLAY EVENT: Win32_DeviceChangeEvent handler failed: {ex}");
-            }
         }
 
         private static void LogSnapshot(string reason)
