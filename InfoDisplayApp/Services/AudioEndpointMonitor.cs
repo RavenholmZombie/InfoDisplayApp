@@ -48,13 +48,13 @@ namespace InfoDisplayApp.Services
             LogCurrentDefaults("after DefaultDeviceChanged");
         }
 
-        private void Notifications_DeviceAdded(object? sender, DeviceAddedEventArgs e)
+        private void Notifications_DeviceAdded(object? sender, DeviceNotificationEventArgs e)
         {
             AudioPathology.Log($"COREAUDIO EVENT: DeviceAdded id='{e.DeviceId}'.");
             LogDevice("added", e.DeviceId);
         }
 
-        private void Notifications_DeviceRemoved(object? sender, DeviceRemovedEventArgs e)
+        private void Notifications_DeviceRemoved(object? sender, DeviceNotificationEventArgs e)
         {
             AudioPathology.Log($"COREAUDIO EVENT: DeviceRemoved id='{e.DeviceId}'.");
             LogCurrentDefaults("after DeviceRemoved");
@@ -67,7 +67,7 @@ namespace InfoDisplayApp.Services
             LogDevice("state changed", e.DeviceId);
         }
 
-        private void Notifications_PropertyValueChanged(object? sender, PropertyValueChangedEventArgs e)
+        private void Notifications_PropertyValueChanged(object? sender, DevicePropertyChangedEventArgs e)
         {
             AudioPathology.Log(
                 $"COREAUDIO EVENT: PropertyValueChanged id='{e.DeviceId}'; " +
