@@ -13,6 +13,10 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
     private readonly TcpListener _listener = new(IPAddress.Any, Port);
     private readonly CancellationTokenSource _cts = new();
     private readonly Stopwatch _uptime = Stopwatch.StartNew();
+    private readonly System.Net.Http.HttpClient _go2rtcHttp = new()
+    {
+        Timeout = TimeSpan.FromMilliseconds(1500)
+    };
     private Task? _acceptLoop;
     private Task? _sampleLoop;
     private readonly object _snapshotLock = new();
@@ -223,24 +227,33 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
     {
         try
         {
-            Process? go2rtc = Process.GetProcessesByName("go2rtc")
-                .OrderByDescending(p => p.WorkingSet64)
-                .FirstOrDefault();
+            Process[] processes = Process.GetProcessesByName("go2rtc");
+            try
+            {
+                Process? go2rtc = processes
+                    .OrderByDescending(p => p.WorkingSet64)
+                    .FirstOrDefault();
 
-            if (go2rtc == null)
-                return new(false, null, null, null, null);
+                if (go2rtc == null)
+                    return new(false, null, null, null, null);
 
-            TimeSpan cpuNow = go2rtc.TotalProcessorTime;
-            double elapsedMs = Math.Max(1, (now - _lastGo2RtcCpuAt).TotalMilliseconds);
-            double cpu = (cpuNow - _lastGo2RtcCpu).TotalMilliseconds /
-                         elapsedMs / Environment.ProcessorCount * 100.0;
+                TimeSpan cpuNow = go2rtc.TotalProcessorTime;
+                double elapsedMs = Math.Max(1, (now - _lastGo2RtcCpuAt).TotalMilliseconds);
+                double cpu = (cpuNow - _lastGo2RtcCpu).TotalMilliseconds /
+                             elapsedMs / Environment.ProcessorCount * 100.0;
 
-            _lastGo2RtcCpu = cpuNow;
-            _lastGo2RtcCpuAt = now;
+                _lastGo2RtcCpu = cpuNow;
+                _lastGo2RtcCpuAt = now;
 
-            return new(true, go2rtc.Id, Math.Round(Math.Max(0, cpu), 1),
-                Math.Round(go2rtc.WorkingSet64 / 1024d / 1024d, 1),
-                go2rtc.Threads.Count);
+                return new(true, go2rtc.Id, Math.Round(Math.Max(0, cpu), 1),
+                    Math.Round(go2rtc.WorkingSet64 / 1024d / 1024d, 1),
+                    go2rtc.Threads.Count);
+            }
+            finally
+            {
+                foreach (Process process in processes)
+                    process.Dispose();
+            }
         }
         catch { return new(false, null, null, null, null); }
     }
@@ -268,14 +281,13 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
         return results.ToArray();
     }
 
-    private static async Task<Go2RtcStreamResult> ProbeGo2RtcStreamAsync(string name)
+    private async Task<Go2RtcStreamResult> ProbeGo2RtcStreamAsync(string name)
     {
         Stopwatch sw = Stopwatch.StartNew();
         try
         {
-            using System.Net.Http.HttpClient http = new() { Timeout = TimeSpan.FromMilliseconds(1500) };
             string url = $"http://127.0.0.1:1984/api/streams?src={Uri.EscapeDataString(name)}";
-            using System.Net.Http.HttpResponseMessage response = await http.GetAsync(url);
+            using System.Net.Http.HttpResponseMessage response = await _go2rtcHttp.GetAsync(url);
             string body = await response.Content.ReadAsStringAsync();
 
             bool registered = response.IsSuccessStatusCode &&
@@ -418,6 +430,7 @@ internal sealed class RemoteDiagnosticsServer : IDisposable
     {
         _cts.Cancel();
         _listener.Stop();
+        _go2rtcHttp.Dispose();
         _cts.Dispose();
     }
 
