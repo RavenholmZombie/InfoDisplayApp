@@ -2,77 +2,77 @@ using NAudio.CoreAudioApi;
 
 namespace InfoDisplayApp.Services
 {
-    internal sealed class AudioEndpointMonitor : MMNotificationClient, IDisposable
+    internal sealed class AudioEndpointMonitor : IDisposable
     {
         private readonly MMDeviceEnumerator _enumerator = new();
-        private bool _registered;
+        private readonly MMDeviceNotificationClient _notifications;
+
+        public AudioEndpointMonitor()
+        {
+            // NAudio 3.1 moved the raw IMMNotificationClient API internal.
+            // CreateNotificationClient is the supported public notification surface.
+            _notifications = _enumerator.CreateNotificationClient(useSynchronizationContext: false);
+        }
 
         public void Start()
         {
-            if (_registered)
-                return;
-
             AudioPathology.Log("COREAUDIO: endpoint monitor starting.");
             LogCurrentDefaults("initial");
 
-            _enumerator.RegisterEndpointNotificationCallback(this);
-            _registered = true;
-            AudioPathology.Log("COREAUDIO: endpoint notification callback registered.");
+            _notifications.DefaultDeviceChanged += Notifications_DefaultDeviceChanged;
+            _notifications.DeviceAdded += Notifications_DeviceAdded;
+            _notifications.DeviceRemoved += Notifications_DeviceRemoved;
+            _notifications.DeviceStateChanged += Notifications_DeviceStateChanged;
+            _notifications.PropertyValueChanged += Notifications_PropertyValueChanged;
+
+            AudioPathology.Log("COREAUDIO: endpoint notification events subscribed.");
         }
 
         public void Dispose()
         {
-            if (_registered)
-            {
-                try
-                {
-                    _enumerator.UnregisterEndpointNotificationCallback(this);
-                    AudioPathology.Log("COREAUDIO: endpoint notification callback unregistered.");
-                }
-                catch (Exception ex)
-                {
-                    AudioPathology.Log($"COREAUDIO: callback unregister failed: {ex}");
-                }
-
-                _registered = false;
-            }
-
+            _notifications.DefaultDeviceChanged -= Notifications_DefaultDeviceChanged;
+            _notifications.DeviceAdded -= Notifications_DeviceAdded;
+            _notifications.DeviceRemoved -= Notifications_DeviceRemoved;
+            _notifications.DeviceStateChanged -= Notifications_DeviceStateChanged;
+            _notifications.PropertyValueChanged -= Notifications_PropertyValueChanged;
+            _notifications.Dispose();
             _enumerator.Dispose();
+            AudioPathology.Log("COREAUDIO: endpoint notification monitor disposed.");
         }
 
-        public override void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
+        private void Notifications_DefaultDeviceChanged(object? sender, DefaultDeviceChangedEventArgs e)
         {
             AudioPathology.Log(
-                $"COREAUDIO EVENT: DefaultDeviceChanged flow={flow}; role={role}; id='{defaultDeviceId}'.");
-            LogDevice("new default", defaultDeviceId);
+                $"COREAUDIO EVENT: DefaultDeviceChanged flow={e.Flow}; role={e.Role}; id='{e.DeviceId}'.");
+            LogDevice("new default", e.DeviceId);
             LogCurrentDefaults("after DefaultDeviceChanged");
         }
 
-        public override void OnDeviceAdded(string pwstrDeviceId)
+        private void Notifications_DeviceAdded(object? sender, DeviceAddedEventArgs e)
         {
-            AudioPathology.Log($"COREAUDIO EVENT: DeviceAdded id='{pwstrDeviceId}'.");
-            LogDevice("added", pwstrDeviceId);
+            AudioPathology.Log($"COREAUDIO EVENT: DeviceAdded id='{e.DeviceId}'.");
+            LogDevice("added", e.DeviceId);
         }
 
-        public override void OnDeviceRemoved(string deviceId)
+        private void Notifications_DeviceRemoved(object? sender, DeviceRemovedEventArgs e)
         {
-            AudioPathology.Log($"COREAUDIO EVENT: DeviceRemoved id='{deviceId}'.");
+            AudioPathology.Log($"COREAUDIO EVENT: DeviceRemoved id='{e.DeviceId}'.");
             LogCurrentDefaults("after DeviceRemoved");
         }
 
-        public override void OnDeviceStateChanged(string deviceId, DeviceState newState)
+        private void Notifications_DeviceStateChanged(object? sender, DeviceStateChangedEventArgs e)
         {
             AudioPathology.Log(
-                $"COREAUDIO EVENT: DeviceStateChanged id='{deviceId}'; newState={newState}.");
-            LogDevice("state changed", deviceId);
+                $"COREAUDIO EVENT: DeviceStateChanged id='{e.DeviceId}'; newState={e.NewState}.");
+            LogDevice("state changed", e.DeviceId);
         }
 
-        public override void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key)
+        private void Notifications_PropertyValueChanged(object? sender, PropertyValueChangedEventArgs e)
         {
             AudioPathology.Log(
-                $"COREAUDIO EVENT: PropertyValueChanged id='{pwstrDeviceId}'; " +
-                $"property={key.formatId}/{key.propertyId}.");
-            LogDevice("property changed", pwstrDeviceId);
+                $"COREAUDIO EVENT: PropertyValueChanged id='{e.DeviceId}'; " +
+                $"property={e.PropertyKey.formatId}/{e.PropertyKey.propertyId}.");
+            LogDevice("property changed", e.DeviceId);
         }
 
         private void LogCurrentDefaults(string reason)
@@ -124,7 +124,12 @@ namespace InfoDisplayApp.Services
 
         private static string SafeFormat(MMDevice device)
         {
-            try { return device.AudioClient.MixFormat.ToString(); }
+            try
+            {
+#pragma warning disable CS0618
+                return device.AudioClient.MixFormat.ToString();
+#pragma warning restore CS0618
+            }
             catch (Exception ex) { return $"<unavailable: {ex.GetType().Name}>"; }
         }
     }
