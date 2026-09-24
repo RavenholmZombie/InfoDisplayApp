@@ -1,6 +1,7 @@
 using InfoDisplayApp.Properties;
 using InfoDisplayApp.Services;
 using System.Diagnostics;
+using System.IO;
 using System.Media;
 
 namespace InfoDisplayApp
@@ -30,6 +31,24 @@ namespace InfoDisplayApp
         private string? _currentAlertId;
 
         public string tickerMode = "normal";
+
+        private string ShutdownLogPath =>
+            Path.Combine(AppContext.BaseDirectory, "logs",
+                $"InfoScreen-SHUTDOWN-{Environment.ProcessId}.log");
+
+        private void LogShutdown(string message)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(ShutdownLogPath)!);
+                File.AppendAllText(ShutdownLogPath,
+                    $"{DateTime.Now:O} frmMain {message}{Environment.NewLine}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to write shutdown diagnostics: {ex}");
+            }
+        }
 
         private Color _startColor;
         private Color _targetColor;
@@ -490,15 +509,21 @@ namespace InfoDisplayApp
         /// </summary>
         public void PrepareForShutdown()
         {
+            LogShutdown("PrepareForShutdown entered.");
             _alertPollTimer.Stop();
+            LogShutdown("Alert poll timer stopped.");
 
             // Mute first so shutdown is silent even if a player takes a moment
             // to release its underlying media session.
+            LogShutdown("Muting application audio.");
             SetApplicationAudioMuted(true);
+            LogShutdown("Application audio muted.");
 
             try
             {
+                LogShutdown("Stopping camera.");
                 _cameraView?.StopCamera();
+                LogShutdown("Camera stop returned.");
             }
             catch (Exception ex)
             {
@@ -515,9 +540,18 @@ namespace InfoDisplayApp
             // which owns the ctrlAppsPanel currently executing the Close/Restart
             // click handler. Disposing every pnlTV child here tears down the caller
             // mid-event and can freeze shutdown with ObjectDisposedException.
+            LogShutdown("Disposing Philo media control.");
             DisposeTvMediaControl(ref _philoView);
+            LogShutdown("Philo media control disposed.");
+
+            LogShutdown("Disposing camera media control.");
             DisposeTvMediaControl(ref _cameraView);
+            LogShutdown("Camera media control disposed.");
+
+            LogShutdown("Disposing YouTube media control.");
             DisposeTvMediaControl(ref _youtubeView);
+            LogShutdown("YouTube media control disposed.");
+            LogShutdown("PrepareForShutdown completed.");
         }
 
         private void DisposeTvMediaControl<T>(ref T? control)
@@ -589,22 +623,28 @@ namespace InfoDisplayApp
 
         private void frmMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            LogShutdown($"frmMain_FormClosing entered; reason={e.CloseReason}.");
             if (_appsForm != null && !_appsForm.IsDisposed)
             {
                 _appsForm.Close();
                 _appsForm.Dispose();
                 _appsForm = null;
+                LogShutdown("Apps overlay closed and disposed.");
             }
 
             _alertPollTimer.Stop();
             _alertPollTimer.Dispose();
+            LogShutdown("Alert poll timer disposed.");
 
             try { _startupSoundPlayer?.Stop(); }
             catch { }
             _startupSoundPlayer?.Dispose();
             _startupSoundPlayer = null;
+            LogShutdown("Startup sound player disposed.");
 
+            LogShutdown("Ending emergency alert sequence.");
             EndEmergencyAlertSequence();
+            LogShutdown("Emergency alert sequence ended; frmMain_FormClosing completed.");
         }
     }
 }
