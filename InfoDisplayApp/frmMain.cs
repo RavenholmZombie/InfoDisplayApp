@@ -97,6 +97,7 @@ namespace InfoDisplayApp
                 return;
 
             _startupSoundPlayed = true;
+            AudioPathology.BeginSession();
             _ = PlayStartupSoundAsync();
 
             _alertPollTimer.Start();
@@ -127,16 +128,26 @@ namespace InfoDisplayApp
                     wavBytes = copy.ToArray();
                 }
 
+                AudioPathology.InspectWave("STARTUP", wavBytes);
+
                 _startupAudioStream = new MemoryStream(wavBytes, writable: false);
                 _startupAudioReader = new WaveFileReader(_startupAudioStream);
                 _startupAudioOutput = new WasapiOut();
                 _startupAudioOutput.Init(_startupAudioReader);
 
+                Stopwatch playbackClock = Stopwatch.StartNew();
                 TaskCompletionSource completion =
                     new(TaskCreationOptions.RunContinuationsAsynchronously);
 
                 void PlaybackStopped(object? sender, StoppedEventArgs e)
                 {
+                    AudioPathology.LogPlaybackStopped(
+                        "STARTUP",
+                        _startupAudioReader,
+                        _startupAudioOutput,
+                        playbackClock,
+                        e.Exception);
+
                     if (e.Exception != null)
                         completion.TrySetException(e.Exception);
                     else
@@ -145,6 +156,11 @@ namespace InfoDisplayApp
 
                 _startupAudioOutput.PlaybackStopped += PlaybackStopped;
                 _startupAudioOutput.Play();
+                AudioPathology.LogPlaybackStarted(
+                    "STARTUP",
+                    _startupAudioReader,
+                    _startupAudioOutput,
+                    playbackClock);
                 Debug.WriteLine("STARTUP AUDIO: NAudio WASAPI Play() started.");
 
                 await completion.Task;
