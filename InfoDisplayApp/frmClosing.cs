@@ -48,6 +48,8 @@ namespace InfoDisplayApp
             if (_countdown <= 0)
             {
                 actionTimer.Stop();
+                DisposeExitSoundPlayer();
+
                 if (_isRestarting)
                 {
                     Application.Restart();
@@ -60,17 +62,12 @@ namespace InfoDisplayApp
             }
         }
 
-        protected override void Dispose(bool disposing)
+        private void DisposeExitSoundPlayer()
         {
-            if (disposing)
-            {
-                try { _exitSoundPlayer?.Stop(); }
-                catch { }
-                _exitSoundPlayer?.Dispose();
-                _exitSoundPlayer = null;
-            }
-
-            base.Dispose(disposing);
+            try { _exitSoundPlayer?.Stop(); }
+            catch { }
+            _exitSoundPlayer?.Dispose();
+            _exitSoundPlayer = null;
         }
 
         public bool setRestarting(bool isRestarting)
