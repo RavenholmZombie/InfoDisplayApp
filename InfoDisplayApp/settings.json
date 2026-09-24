@@ -1,0 +1,9 @@
+{
+  "diagnostics": {
+    "audioPathology": false,
+    "coreAudioMonitor": false,
+    "displayMonitor": false,
+    "remoteServer": true,
+    "remoteTelemetry": true
+  }
+}
