@@ -15,6 +15,7 @@ namespace InfoDisplayApp
         private ctrlEmergencyTicker? _emergencyTicker;
         private frmBrowser? _browserForm;
         private frmApps? _appsForm;
+        private SoundPlayer? _startupSoundPlayer;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -76,9 +77,10 @@ namespace InfoDisplayApp
 
             try
             {
-                using SoundPlayer player = new(Resources.sfx_startup);
-                player.Load();
-                player.Play();
+                _startupSoundPlayer?.Dispose();
+                _startupSoundPlayer = new SoundPlayer(Resources.sfx_startup);
+                _startupSoundPlayer.Load();
+                _startupSoundPlayer.Play();
             }
             catch (Exception ex)
             {
@@ -596,6 +598,12 @@ namespace InfoDisplayApp
 
             _alertPollTimer.Stop();
             _alertPollTimer.Dispose();
+
+            try { _startupSoundPlayer?.Stop(); }
+            catch { }
+            _startupSoundPlayer?.Dispose();
+            _startupSoundPlayer = null;
+
             EndEmergencyAlertSequence();
         }
     }
