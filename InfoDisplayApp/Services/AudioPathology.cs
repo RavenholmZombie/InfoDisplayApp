@@ -40,7 +40,7 @@ namespace InfoDisplayApp.Services
         public static void LogPlaybackStarted(
             string specimen,
             WaveFileReader reader,
-            WasapiOut output,
+            IWavePlayer output,
             Stopwatch clock)
         {
             Log($"{specimen}: PLAY called at +{clock.Elapsed.TotalMilliseconds:F1}ms; " +
@@ -51,7 +51,7 @@ namespace InfoDisplayApp.Services
         public static void LogPlaybackStopped(
             string specimen,
             WaveFileReader reader,
-            WasapiOut output,
+            IWavePlayer output,
             Stopwatch clock,
             Exception? exception)
         {
