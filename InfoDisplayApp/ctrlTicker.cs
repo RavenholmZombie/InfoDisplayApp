@@ -38,6 +38,8 @@ namespace InfoDisplayApp.Properties
         private readonly Stopwatch _diagnosticClock = Stopwatch.StartNew();
         private readonly System.Threading.Timer _diagnosticTimer;
         private long _animationRequests;
+        private long _droppedAnimationRequests;
+        private long _lastDroppedAnimationRequests;
         private long _renderCallbacks;
         private long _paintEvents;
         private long _lastAnimationRequests;
@@ -48,6 +50,7 @@ namespace InfoDisplayApp.Properties
         private int _diagnosticWritePending;
         private long _uiHeartbeatPostedTicks;
         private long _uiHeartbeatWorstTicks;
+        private long _uiHeartbeatLastCompletedTicks;
         private int _uiHeartbeatPending;
         private TimeSpan _lastProcessCpuTime;
         private long _lastDiagnosticTimestamp;
@@ -342,7 +345,10 @@ namespace InfoDisplayApp.Properties
             }
 
             if (Interlocked.Exchange(ref _animationFramePending, 1) != 0)
+            {
+                Interlocked.Increment(ref _droppedAnimationRequests);
                 return;
+            }
 
             try
             {
@@ -497,6 +503,7 @@ namespace InfoDisplayApp.Properties
                             currentWorst = observed;
                         }
 
+                        Interlocked.Exchange(ref _uiHeartbeatLastCompletedTicks, delay);
                         Interlocked.Exchange(ref _uiHeartbeatPending, 0);
                     }));
                 }
@@ -513,13 +520,20 @@ namespace InfoDisplayApp.Properties
             long requests = Interlocked.Read(ref _animationRequests);
             long renders = Interlocked.Read(ref _renderCallbacks);
             long paints = Interlocked.Read(ref _paintEvents);
+            long dropped = Interlocked.Read(ref _droppedAnimationRequests);
             long requestDelta = requests - Interlocked.Exchange(ref _lastAnimationRequests, requests);
             long renderDelta = renders - Interlocked.Exchange(ref _lastRenderCallbacks, renders);
             long paintDelta = paints - Interlocked.Exchange(ref _lastPaintEvents, paints);
+            long droppedDelta = dropped - Interlocked.Exchange(ref _lastDroppedAnimationRequests, dropped);
             long worstTicks = Interlocked.Exchange(ref _worstUiHeartbeatTicks, 0);
 
             long heartbeatTicks = Interlocked.Exchange(ref _uiHeartbeatWorstTicks, 0);
+            long heartbeatLastTicks = Interlocked.Read(ref _uiHeartbeatLastCompletedTicks);
             bool heartbeatPending = Volatile.Read(ref _uiHeartbeatPending) != 0;
+            long heartbeatPostedTicks = Interlocked.Read(ref _uiHeartbeatPostedTicks);
+            double heartbeatOutstandingMs = heartbeatPending && heartbeatPostedTicks != 0
+                ? (Stopwatch.GetTimestamp() - heartbeatPostedTicks) * 1000.0 / Stopwatch.Frequency
+                : 0.0;
 
             using Process process = Process.GetCurrentProcess();
             long diagnosticNow = Stopwatch.GetTimestamp();
@@ -536,13 +550,16 @@ namespace InfoDisplayApp.Properties
             _lastDiagnosticTimestamp = diagnosticNow;
             _lastProcessCpuTime = cpuNow;
 
-            string heartbeatText = heartbeatPending
-                ? "PENDING"
-                : $"{heartbeatTicks * 1000.0 / Stopwatch.Frequency:0.0}ms";
+            string heartbeatText =
+                $"last={heartbeatLastTicks * 1000.0 / Stopwatch.Frequency:0.0}ms," +
+                $"worst={heartbeatTicks * 1000.0 / Stopwatch.Frequency:0.0}ms," +
+                (heartbeatPending
+                    ? $"pending={heartbeatOutstandingMs:0.0}ms"
+                    : "pending=no");
 
             string line =
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} " +
-                $"Ticker req={requestDelta}/s render={renderDelta}/s paint={paintDelta}/s " +
+                $"Ticker req={requestDelta}/s render={renderDelta}/s paint={paintDelta}/s drop={droppedDelta}/s " +
                 $"tickerGap={(worstTicks * 1000.0 / Stopwatch.Frequency):0.0}ms " +
                 $"uiHeartbeat={heartbeatText} cpu={processCpuPercent:0.0}% " +
                 $"WS={process.WorkingSet64 / 1048576.0:0.0}MB " +
