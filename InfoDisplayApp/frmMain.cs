@@ -1,8 +1,8 @@
 using InfoDisplayApp.Properties;
 using InfoDisplayApp.Services;
+using NAudio.Wave;
 using System.Diagnostics;
 using System.IO;
-using System.Media;
 
 namespace InfoDisplayApp
 {
@@ -16,7 +16,9 @@ namespace InfoDisplayApp
         private ctrlEmergencyTicker? _emergencyTicker;
         private frmBrowser? _browserForm;
         private frmApps? _appsForm;
-        private SoundPlayer? _startupSoundPlayer;
+        private WasapiOut? _startupAudioOutput;
+        private WaveFileReader? _startupAudioReader;
+        private MemoryStream? _startupAudioStream;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -101,8 +103,6 @@ namespace InfoDisplayApp
 
         private async Task PlayStartupSoundAsync()
         {
-            SoundPlayer? player = null;
-
             try
             {
                 Debug.WriteLine("STARTUP AUDIO: playback scheduled; waiting 3 seconds for startup activity to settle.");
@@ -114,35 +114,66 @@ namespace InfoDisplayApp
                     return;
                 }
 
-                Debug.WriteLine("STARTUP AUDIO: playback beginning after startup delay.");
+                Debug.WriteLine("STARTUP AUDIO: NAudio WASAPI playback beginning after startup delay.");
 
-                player = new SoundPlayer(Resources.sfx_startup);
-                _startupSoundPlayer = player;
-
-                await Task.Run(() =>
+                byte[] wavBytes;
+                using (Stream resourceStream = Resources.sfx_startup)
+                using (MemoryStream copy = new())
                 {
-                    Debug.WriteLine("STARTUP AUDIO: PlaySync entered.");
-                    player.Load();
-                    player.PlaySync();
-                    Debug.WriteLine("STARTUP AUDIO: PlaySync completed.");
-                });
+                    resourceStream.Position = 0;
+                    resourceStream.CopyTo(copy);
+                    wavBytes = copy.ToArray();
+                }
+
+                _startupAudioStream = new MemoryStream(wavBytes, writable: false);
+                _startupAudioReader = new WaveFileReader(_startupAudioStream);
+                _startupAudioOutput = new WasapiOut();
+                _startupAudioOutput.Init(_startupAudioReader);
+
+                TaskCompletionSource completion =
+                    new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                void PlaybackStopped(object? sender, StoppedEventArgs e)
+                {
+                    if (e.Exception != null)
+                        completion.TrySetException(e.Exception);
+                    else
+                        completion.TrySetResult();
+                }
+
+                _startupAudioOutput.PlaybackStopped += PlaybackStopped;
+                _startupAudioOutput.Play();
+                Debug.WriteLine("STARTUP AUDIO: NAudio WASAPI Play() started.");
+
+                await completion.Task;
+                Debug.WriteLine("STARTUP AUDIO: NAudio WASAPI playback completed.");
+
+                _startupAudioOutput.PlaybackStopped -= PlaybackStopped;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Unable to play startup sound: {ex}");
+                Debug.WriteLine($"Unable to play startup sound with NAudio: {ex}");
             }
             finally
             {
-                // Only clear/dispose the player if it is still the instance owned
-                // by this playback operation. FormClosing may have stopped and
-                // disposed it first.
-                if (ReferenceEquals(_startupSoundPlayer, player))
-                {
-                    _startupSoundPlayer = null;
-                    player?.Dispose();
-                    Debug.WriteLine("STARTUP AUDIO: player disposed.");
-                }
+                DisposeStartupAudio();
             }
+        }
+
+        private void DisposeStartupAudio()
+        {
+            try { _startupAudioOutput?.Stop(); }
+            catch { }
+
+            _startupAudioOutput?.Dispose();
+            _startupAudioReader?.Dispose();
+            _startupAudioStream?.Dispose();
+
+            _startupAudioOutput = null;
+            _startupAudioReader = null;
+            _startupAudioStream = null;
+
+            Debug.WriteLine("STARTUP AUDIO: NAudio resources disposed.");
         }
 
         private Color RandomColor()
@@ -671,11 +702,8 @@ namespace InfoDisplayApp
             _alertPollTimer.Dispose();
             LogShutdown("Alert poll timer disposed.");
 
-            try { _startupSoundPlayer?.Stop(); }
-            catch { }
-            _startupSoundPlayer?.Dispose();
-            _startupSoundPlayer = null;
-            LogShutdown("Startup sound player disposed.");
+            DisposeStartupAudio();
+            LogShutdown("Startup NAudio player disposed.");
 
             LogShutdown("Ending emergency alert sequence.");
             EndEmergencyAlertSequence();
