@@ -1,5 +1,5 @@
 ﻿$Server      = "INFOSCREEN"
-$Source      = "C:\Users\chris\source\repos\InfoDisplayApp\InfoDisplayApp\bin\Release\net10.0-windows\publish"
+$Source      = "C:\Users\chris\source\repos\InfoDisplayApp\InfoDisplayApp\bin\Release\net10.0-windows"
 $Destination = "\\INFOSCREEN\ServerShare\InfoScreen"
 
 # These directories survive deployment.
