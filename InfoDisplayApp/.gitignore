@@ -24,6 +24,7 @@ obj/
 
 # Ignore publish profiles generally
 *.pubxml
+!Properties/PublishProfiles/FolderProfile1.pubxml
 
 # But track InfoScreen's shared folder-publish profile
 !InfoDisplayApp/Properties/PublishProfiles/FolderProfile1.pubxml
