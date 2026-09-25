@@ -362,3 +362,5 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /InfoDisplayApp/status.conf
+/InfoDisplayApp/Build/Deploy InfoScreen.bat
+/InfoDisplayApp/Build/Deploy InfoScreen.ps1
