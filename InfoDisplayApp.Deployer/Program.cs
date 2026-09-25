@@ -5,7 +5,6 @@ namespace InfoDisplayApp.Deployer;
 internal static class Program
 {
     private const string BatchFileName = "Deploy InfoScreen.bat";
-    private const string PublishProfileName = "FolderProfile1";
 
     private static int Main()
     {
@@ -45,12 +44,6 @@ internal static class Program
                 return 1;
             }
 
-            if (!File.Exists(publishProfilePath))
-            {
-                WriteError($"Publish profile was not found:{Environment.NewLine}{publishProfilePath}");
-                return 1;
-            }
-
             if (!File.Exists(batchPath))
             {
                 WriteError($"Deployment launcher was not found:{Environment.NewLine}{batchPath}");
@@ -62,21 +55,20 @@ internal static class Program
             Console.WriteLine("==========================================");
             Console.WriteLine();
             Console.WriteLine($"Project:         {projectPath}");
-            Console.WriteLine($"Publish profile: {PublishProfileName}");
             Console.WriteLine($"Launcher:        {batchPath}");
             Console.WriteLine();
 
-            int publishExitCode = PublishInfoScreen(projectPath, solutionRoot);
+            int buildExitCode = BuildInfoScreen(projectPath, solutionRoot);
 
-            if (publishExitCode != 0)
+            if (buildExitCode != 0)
             {
-                WriteError($"Publishing failed with exit code {publishExitCode}. Deployment aborted.");
-                return publishExitCode;
+                WriteError($"Release build failed with exit code {buildExitCode}. Deployment aborted.");
+                return buildExitCode;
             }
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine();
-            Console.WriteLine("InfoScreen published successfully.");
+            Console.WriteLine("InfoScreen Release build completed successfully.");
             Console.ResetColor();
             Console.WriteLine();
             Console.WriteLine("Handing deployment over to the existing launcher...");
@@ -107,34 +99,35 @@ internal static class Program
         }
     }
 
-    private static int PublishInfoScreen(string projectPath, string solutionRoot)
+    private static int BuildInfoScreen(string projectPath, string solutionRoot)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("Publishing InfoScreen...");
+        Console.WriteLine("Building InfoScreen (Release)...");
         Console.ResetColor();
         Console.WriteLine();
 
-        ProcessStartInfo publishStartInfo = new()
+        ProcessStartInfo buildStartInfo = new()
         {
             FileName = "dotnet",
             WorkingDirectory = solutionRoot,
             UseShellExecute = false
         };
 
-        publishStartInfo.ArgumentList.Add("publish");
-        publishStartInfo.ArgumentList.Add(projectPath);
-        publishStartInfo.ArgumentList.Add("-p:PublishProfile=" + PublishProfileName);
+        buildStartInfo.ArgumentList.Add("build");
+        buildStartInfo.ArgumentList.Add(projectPath);
+        buildStartInfo.ArgumentList.Add("-c");
+        buildStartInfo.ArgumentList.Add("Release");
 
-        using Process? publishProcess = Process.Start(publishStartInfo);
+        using Process? buildProcess = Process.Start(buildStartInfo);
 
-        if (publishProcess == null)
+        if (buildProcess == null)
         {
-            WriteError("Could not start dotnet publish.");
+            WriteError("Could not start dotnet build.");
             return 1;
         }
 
-        publishProcess.WaitForExit();
-        return publishProcess.ExitCode;
+        buildProcess.WaitForExit();
+        return buildProcess.ExitCode;
     }
 
     private static string? FindSolutionRoot()
