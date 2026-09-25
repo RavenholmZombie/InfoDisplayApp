@@ -25,13 +25,6 @@ internal static class Program
                 "InfoDisplayApp",
                 "InfoDisplayApp.csproj");
 
-            string publishProfilePath = Path.Combine(
-                solutionRoot,
-                "InfoDisplayApp",
-                "Properties",
-                "PublishProfiles",
-                $"{PublishProfileName}.pubxml");
-
             string batchPath = Path.Combine(
                 solutionRoot,
                 "InfoDisplayApp",
