@@ -38,6 +38,10 @@ namespace InfoDisplayApp.Properties
 
                 _mediaPlayer.EndReached += MediaPlayer_EndReached;
                 _mediaPlayer.EncounteredError += MediaPlayer_EncounteredError;
+                _mediaPlayer.Playing += (s, args) =>
+                {
+                    BringToFront();
+                };
 
                 string introPath = Path.Combine(
                     AppContext.BaseDirectory, "Resources", "intro.mov");
