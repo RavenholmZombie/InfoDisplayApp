@@ -30,7 +30,6 @@
         {
             lblStatus = new Label();
             pboxSpinner = new PictureBox();
-            thunderProgressBar1 = new ReaLTaiizor.Controls.ThunderProgressBar();
             ((System.ComponentModel.ISupportInitialize)pboxSpinner).BeginInit();
             SuspendLayout();
             // 
@@ -38,12 +37,12 @@
             // 
             lblStatus.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             lblStatus.BackColor = Color.Transparent;
-            lblStatus.Font = new Font("Segoe UI Semibold", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            lblStatus.Font = new Font("Segoe UI Variable Text Semibold", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             lblStatus.Location = new Point(9, 237);
             lblStatus.Name = "lblStatus";
             lblStatus.Size = new Size(783, 33);
             lblStatus.TabIndex = 0;
-            lblStatus.Text = "Loading";
+            lblStatus.Text = "Loading Weather";
             lblStatus.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // pboxSpinner
@@ -56,27 +55,12 @@
             pboxSpinner.TabIndex = 1;
             pboxSpinner.TabStop = false;
             // 
-            // thunderProgressBar1
-            // 
-            thunderProgressBar1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            thunderProgressBar1.BackColor = Color.Transparent;
-            thunderProgressBar1.ForeColor = Color.WhiteSmoke;
-            thunderProgressBar1.Location = new Point(246, 273);
-            thunderProgressBar1.Maximum = 100;
-            thunderProgressBar1.Name = "thunderProgressBar1";
-            thunderProgressBar1.ShowPercentage = false;
-            thunderProgressBar1.Size = new Size(308, 18);
-            thunderProgressBar1.TabIndex = 2;
-            thunderProgressBar1.Text = "Overall Progress";
-            thunderProgressBar1.Value = 0;
-            // 
             // frmNewLoading
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.Black;
             ClientSize = new Size(800, 450);
-            Controls.Add(thunderProgressBar1);
             Controls.Add(pboxSpinner);
             Controls.Add(lblStatus);
             ForeColor = Color.White;
@@ -94,6 +78,5 @@
 
         private Label lblStatus;
         private PictureBox pboxSpinner;
-        private ReaLTaiizor.Controls.ThunderProgressBar thunderProgressBar1;
     }
 }
