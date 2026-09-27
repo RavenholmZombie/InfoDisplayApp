@@ -37,16 +37,17 @@
             // 
             lblStatus.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             lblStatus.BackColor = Color.Transparent;
-            lblStatus.Font = new Font("Segoe UI Variable Text Semibold", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            lblStatus.Font = new Font("Segoe UI Semibold", 26F, FontStyle.Bold);
             lblStatus.Location = new Point(9, 237);
             lblStatus.Name = "lblStatus";
-            lblStatus.Size = new Size(783, 33);
+            lblStatus.Size = new Size(783, 52);
             lblStatus.TabIndex = 0;
             lblStatus.Text = "Loading Weather";
             lblStatus.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // pboxSpinner
             // 
+            pboxSpinner.Anchor = AnchorStyles.None;
             pboxSpinner.Image = Resources.spinner;
             pboxSpinner.Location = new Point(376, 186);
             pboxSpinner.Name = "pboxSpinner";
