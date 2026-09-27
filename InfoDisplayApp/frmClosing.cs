@@ -42,7 +42,7 @@ namespace InfoDisplayApp
         public frmClosing()
         {
             InitializeComponent();
-            Cursor.Hide();
+            Cursor = Cursors.None;
         }
 
         private async void frmClosing_Load(object sender, EventArgs e)
@@ -54,7 +54,6 @@ namespace InfoDisplayApp
             // delivery has proven unreliable under InfoScreen's media workload.
             actionTimer.Stop();
             LogShutdown($"Async closing countdown started at {_countdown} seconds.");
-            Cursor = Cursors.WaitCursor;
 
             // Label handling
             if (_isRestarting)
