@@ -65,6 +65,7 @@ namespace InfoDisplayApp
                 // Case - Exiting
                 statusLabel.Text = "See you later!\nClosing to Windows...";
             }
+            Cursor.Hide();
 
             await RunClosingCountdownAsync();
         }
