@@ -32,6 +32,7 @@ namespace InfoDisplayApp.Properties
                 // rather than relying on the MediaPlayer defaults or prior VLC state.
                 _mediaPlayer.Mute = false;
                 _mediaPlayer.Volume = 100;
+                _mediaPlayer.Fullscreen = true;
 
                 videoView.MediaPlayer = _mediaPlayer;
 
