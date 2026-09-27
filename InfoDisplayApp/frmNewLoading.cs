@@ -5,7 +5,7 @@ namespace InfoDisplayApp.Properties
         public frmNewLoading()
         {
             InitializeComponent();
-            Cursor = Cursors.None;
+            Cursor = new Cursor(IntPtr.Zero);
             Opacity = 1.0;
         }
 
