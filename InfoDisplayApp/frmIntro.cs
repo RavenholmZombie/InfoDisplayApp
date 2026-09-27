@@ -15,6 +15,7 @@ namespace InfoDisplayApp.Properties
         public frmIntro()
         {
             InitializeComponent();
+            Cursor.Hide();
         }
 
         private void frmIntro_Load(object sender, EventArgs e)
