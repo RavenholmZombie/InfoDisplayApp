@@ -11,6 +11,7 @@
   <ItemGroup>
     <None Remove="camera.conf" />
     <None Remove="camera.example.conf" />
+    <None Remove="Resources\intro.mov" />
     <None Remove="status.conf" />
     <None Remove="settings.json" />
     <None Remove="ticker.txt" />
@@ -22,6 +23,9 @@
     </Content>
     <Content Include="camera.example.conf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\intro.mov">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="status.conf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
