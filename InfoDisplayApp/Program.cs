@@ -174,11 +174,6 @@ namespace InfoDisplayApp
                     _mainForm.BringToFront();
                     _mainForm.Activate();
 
-                    // Cursor.Hide() is counter-based in WinForms. The startup
-                    // transition hides it once, so balance that hide when the
-                    // interactive main UI becomes active again.
-                    Cursor.Show();
-
                     _startupCompleted = true;
 
                     _loading.FormClosed -= Loading_FormClosed;
