@@ -54,6 +54,7 @@
             Name = "frmIntro";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "frmIntro";
+            TopMost = true;
             WindowState = FormWindowState.Maximized;
             Load += frmIntro_Load;
             ((System.ComponentModel.ISupportInitialize)videoView).EndInit();
