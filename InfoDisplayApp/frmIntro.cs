@@ -25,6 +25,12 @@ namespace InfoDisplayApp.Properties
 
                 _libVlc = new LibVLC("--no-video-title-show");
                 _mediaPlayer = new MediaPlayer(_libVlc);
+
+                // The intro carries its own soundtrack. Explicitly enable VLC audio
+                // rather than relying on the MediaPlayer defaults or prior VLC state.
+                _mediaPlayer.Mute = false;
+                _mediaPlayer.Volume = 100;
+
                 videoView.MediaPlayer = _mediaPlayer;
 
                 _mediaPlayer.EndReached += MediaPlayer_EndReached;
