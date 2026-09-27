@@ -104,7 +104,9 @@ namespace InfoDisplayApp
 
                     _mainWasTopMost = _mainForm.TopMost;
                     _mainForm.TopMost = false;
-                    _mainForm.Opacity = 0;
+                    // Keep the dashboard fully rendered behind the loading screen.
+                    // The reveal is performed by fading the loading screen away.
+                    _mainForm.Opacity = 1.0;
                     _mainForm.ShowInTaskbar = false;
                     _mainForm.Enabled = false;
                     _mainForm.Shown += MainForm_Shown;
@@ -200,11 +202,15 @@ namespace InfoDisplayApp
                 if (_mainForm == null || _loading == null)
                     return;
 
-                // Put the loading window behind the transparent main form first.
-                // As frmMain gains opacity, the loading UI remains visible through
-                // it, producing a natural reveal instead of fading both windows.
-                _loading.SendToBack();
+                // Keep frmMain fully rendered underneath frmNewLoading. Fading the
+                // top loading window exposes the finished dashboard naturally and
+                // avoids WinForms' unreliable transparent-window reveal behavior.
+                _mainForm.Opacity = 1.0;
                 _mainForm.BringToFront();
+                _loading.BringToFront();
+
+                double loadingStartOpacity =
+                    Math.Clamp(_loading.Opacity, 0.0, 1.0);
 
                 int stepDelay = Math.Max(
                     1,
@@ -216,12 +222,14 @@ namespace InfoDisplayApp
                     double eased =
                         progress * progress * (3.0 - (2.0 * progress));
 
-                    _mainForm.Opacity = eased;
+                    _loading.Opacity =
+                        loadingStartOpacity * (1.0 - eased);
 
                     await Task.Delay(stepDelay);
                 }
 
-                _mainForm.Opacity = 1.0;
+                _loading.Opacity = 0.0;
+                _mainForm.BringToFront();
             }
 
             private void Intro_FormClosed(object? sender, FormClosedEventArgs e)
