@@ -175,7 +175,8 @@ namespace InfoDisplayApp
                     _startupCompleted = true;
 
                     _loading.FormClosed -= Loading_FormClosed;
-                    _loading.Close();
+                    _loading.Dispose();
+                    _loading = null;
 
                     _intro.FormClosed -= Intro_FormClosed;
                     _intro.Close();
@@ -199,8 +200,11 @@ namespace InfoDisplayApp
                 if (_mainForm == null || _loading == null)
                     return;
 
-                double loadingStartOpacity =
-                    Math.Clamp(_loading.Opacity, 0.0, 1.0);
+                // Put the loading window behind the transparent main form first.
+                // As frmMain gains opacity, the loading UI remains visible through
+                // it, producing a natural reveal instead of fading both windows.
+                _loading.SendToBack();
+                _mainForm.BringToFront();
 
                 int stepDelay = Math.Max(
                     1,
@@ -213,14 +217,11 @@ namespace InfoDisplayApp
                         progress * progress * (3.0 - (2.0 * progress));
 
                     _mainForm.Opacity = eased;
-                    _loading.Opacity =
-                        loadingStartOpacity * (1.0 - eased);
 
                     await Task.Delay(stepDelay);
                 }
 
                 _mainForm.Opacity = 1.0;
-                _loading.Opacity = 0.0;
             }
 
             private void Intro_FormClosed(object? sender, FormClosedEventArgs e)
