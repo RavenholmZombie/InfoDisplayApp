@@ -1,7 +1,8 @@
 using InfoDisplayApp.Properties;
 using InfoDisplayApp.Services;
+using NAudio.Wave;
 using System.Diagnostics;
-using System.Media;
+using System.IO;
 
 namespace InfoDisplayApp
 {
@@ -14,6 +15,11 @@ namespace InfoDisplayApp
         private ctrlTicker? _normalTicker;
         private ctrlEmergencyTicker? _emergencyTicker;
         private frmBrowser? _browserForm;
+        private frmApps? _appsForm;
+        private WaveOutEvent? _startupAudioOutput;
+        private WaveFileReader? _startupAudioReader;
+        private MemoryStream? _startupAudioStream;
+        private DisplayDiagnosticsMonitor? _displayDiagnosticsMonitor;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -28,6 +34,24 @@ namespace InfoDisplayApp
         private string? _currentAlertId;
 
         public string tickerMode = "normal";
+
+        private string ShutdownLogPath =>
+            Path.Combine(AppContext.BaseDirectory, "logs",
+                $"InfoScreen-SHUTDOWN-{Environment.ProcessId}.log");
+
+        private void LogShutdown(string message)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(ShutdownLogPath)!);
+                File.AppendAllText(ShutdownLogPath,
+                    $"{DateTime.Now:O} frmMain {message}{Environment.NewLine}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to write shutdown diagnostics: {ex}");
+            }
+        }
 
         private Color _startColor;
         private Color _targetColor;
@@ -72,20 +96,102 @@ namespace InfoDisplayApp
                 return;
 
             _startupSoundPlayed = true;
-
-            try
-            {
-                using SoundPlayer player = new(Resources.sfx_startup);
-                player.Load();
-                player.Play();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Unable to play startup sound: {ex}");
-            }
+            AudioPathology.BeginSession();
+            AudioEndpointDiagnostics.Start();
+            _displayDiagnosticsMonitor ??= new DisplayDiagnosticsMonitor();
+            _displayDiagnosticsMonitor.Start();
+            _ = PlayStartupSoundAsync();
 
             _alertPollTimer.Start();
             _ = PollAlertsAsync();
+        }
+
+        private async Task PlayStartupSoundAsync()
+        {
+            try
+            {
+                if (IsDisposed || Disposing)
+                {
+                    Debug.WriteLine("STARTUP AUDIO: cancelled because frmMain is closing or disposed.");
+                    return;
+                }
+
+                Debug.WriteLine("STARTUP AUDIO: NAudio waveOut playback beginning immediately.");
+
+                byte[] wavBytes;
+                using (Stream resourceStream = Resources.sfx_startup)
+                using (MemoryStream copy = new())
+                {
+                    resourceStream.Position = 0;
+                    resourceStream.CopyTo(copy);
+                    wavBytes = copy.ToArray();
+                }
+
+                AudioPathology.InspectWave("STARTUP", wavBytes);
+
+                _startupAudioStream = new MemoryStream(wavBytes, writable: false);
+                _startupAudioReader = new WaveFileReader(_startupAudioStream);
+                _startupAudioOutput = new WaveOutEvent();
+                _startupAudioOutput.Init(_startupAudioReader);
+
+                Stopwatch playbackClock = Stopwatch.StartNew();
+                TaskCompletionSource completion =
+                    new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                void PlaybackStopped(object? sender, StoppedEventArgs e)
+                {
+                    AudioPathology.LogPlaybackStopped(
+                        "STARTUP",
+                        _startupAudioReader,
+                        _startupAudioOutput,
+                        playbackClock,
+                        e.Exception);
+
+                    if (e.Exception != null)
+                        completion.TrySetException(e.Exception);
+                    else
+                        completion.TrySetResult();
+                }
+
+                _startupAudioOutput.PlaybackStopped += PlaybackStopped;
+                _startupAudioOutput.Play();
+                AudioPathology.LogPlaybackStarted(
+                    "STARTUP",
+                    _startupAudioReader,
+                    _startupAudioOutput,
+                    playbackClock);
+                Debug.WriteLine("STARTUP AUDIO: NAudio waveOut Play() started.");
+
+                await completion.Task;
+                Debug.WriteLine("STARTUP AUDIO: NAudio WASAPI playback completed.");
+
+                _startupAudioOutput.PlaybackStopped -= PlaybackStopped;
+
+             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to play startup sound with NAudio: {ex}");
+            }
+            finally
+            {
+                DisposeStartupAudio();
+            }
+        }
+
+        private void DisposeStartupAudio()
+        {
+            try { _startupAudioOutput?.Stop(); }
+            catch { }
+
+            _startupAudioOutput?.Dispose();
+            _startupAudioReader?.Dispose();
+            _startupAudioStream?.Dispose();
+
+            _startupAudioOutput = null;
+            _startupAudioReader = null;
+            _startupAudioStream = null;
+
+            Debug.WriteLine("STARTUP AUDIO: NAudio resources disposed.");
         }
 
         private Color RandomColor()
@@ -174,7 +280,6 @@ namespace InfoDisplayApp
                 Dock = DockStyle.Fill,
                 Visible = true
             };
-
             pnlTV.Controls.Add(_philoView);
 
             _cameraView = new ctrlCameras
@@ -182,7 +287,6 @@ namespace InfoDisplayApp
                 Dock = DockStyle.Fill,
                 Visible = false
             };
-
             pnlTV.Controls.Add(_cameraView);
 
             _youtubeView = new ctrlYouTubeWebView
@@ -212,13 +316,18 @@ namespace InfoDisplayApp
             };
             pnlWeather.Controls.Add(ctrlWeather);
 
+            // pnlApps remains in the designer as a positioning/sizing anchor only.
+            // The actual Apps UI lives in its own top-level borderless window so
+            // it does not overlap WebView2/LibVLC native child HWNDs.
+            pnlApps.Visible = false;
+
             _appsPanel = new ctrlAppsPanel
             {
                 Dock = DockStyle.Fill
             };
 
-            pnlApps.Controls.Add(_appsPanel);
-            pnlApps.Visible = false;
+            _appsForm = new frmApps(_appsPanel);
+            PositionAppsForm();
 
             UpdateModeButtons(true);
         }
@@ -482,15 +591,21 @@ namespace InfoDisplayApp
         /// </summary>
         public void PrepareForShutdown()
         {
+            LogShutdown("PrepareForShutdown entered.");
             _alertPollTimer.Stop();
+            LogShutdown("Alert poll timer stopped.");
 
             // Mute first so shutdown is silent even if a player takes a moment
             // to release its underlying media session.
+            LogShutdown("Muting application audio.");
             SetApplicationAudioMuted(true);
+            LogShutdown("Application audio muted.");
 
             try
             {
+                LogShutdown("Stopping camera.");
                 _cameraView?.StopCamera();
+                LogShutdown("Camera stop returned.");
             }
             catch (Exception ex)
             {
@@ -507,9 +622,18 @@ namespace InfoDisplayApp
             // which owns the ctrlAppsPanel currently executing the Close/Restart
             // click handler. Disposing every pnlTV child here tears down the caller
             // mid-event and can freeze shutdown with ObjectDisposedException.
+            LogShutdown("Disposing Philo media control.");
             DisposeTvMediaControl(ref _philoView);
+            LogShutdown("Philo media control disposed.");
+
+            LogShutdown("Disposing camera media control.");
             DisposeTvMediaControl(ref _cameraView);
+            LogShutdown("Camera media control disposed.");
+
+            LogShutdown("Disposing YouTube media control.");
             DisposeTvMediaControl(ref _youtubeView);
+            LogShutdown("YouTube media control disposed.");
+            LogShutdown("PrepareForShutdown completed.");
         }
 
         private void DisposeTvMediaControl<T>(ref T? control)
@@ -544,15 +668,27 @@ namespace InfoDisplayApp
 
         private void pnlBtnApps_Click(object sender, EventArgs e)
         {
-            if (pnlApps.Visible)
+            if (_appsForm == null || _appsForm.IsDisposed)
+                return;
+
+            if (_appsForm.Visible)
             {
-                pnlApps.Visible = false;
+                _appsForm.Hide();
+                return;
             }
-            else
-            {
-                pnlApps.Visible = true;
-                pnlApps.BringToFront();
-            }
+
+            PositionAppsForm();
+            _appsForm.Show(this);
+            _appsForm.BringToFront();
+        }
+
+        private void PositionAppsForm()
+        {
+            if (_appsForm == null || _appsForm.IsDisposed || !IsHandleCreated)
+                return;
+
+            Point screenLocation = pnlApps.PointToScreen(Point.Empty);
+            _appsForm.Bounds = new Rectangle(screenLocation, pnlApps.Size);
         }
 
         private void pnlBtnApps_MouseEnter(object sender, EventArgs e)
@@ -569,9 +705,29 @@ namespace InfoDisplayApp
 
         private void frmMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            LogShutdown($"frmMain_FormClosing entered; reason={e.CloseReason}.");
+            if (_appsForm != null && !_appsForm.IsDisposed)
+            {
+                _appsForm.Close();
+                _appsForm.Dispose();
+                _appsForm = null;
+                LogShutdown("Apps overlay closed and disposed.");
+            }
+
             _alertPollTimer.Stop();
             _alertPollTimer.Dispose();
+            LogShutdown("Alert poll timer disposed.");
+
+            _displayDiagnosticsMonitor?.Dispose();
+            _displayDiagnosticsMonitor = null;
+            LogShutdown("Display diagnostics monitor disposed.");
+
+            DisposeStartupAudio();
+            LogShutdown("Startup NAudio player disposed.");
+
+            LogShutdown("Ending emergency alert sequence.");
             EndEmergencyAlertSequence();
+            LogShutdown("Emergency alert sequence ended; frmMain_FormClosing completed.");
         }
     }
 }

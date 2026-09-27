@@ -37,21 +37,21 @@
             // 
             // statusLabel
             // 
-            statusLabel.Dock = DockStyle.Fill;
+            statusLabel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             statusLabel.Font = new Font("Segoe UI Semibold", 26F, FontStyle.Bold);
-            statusLabel.Location = new Point(0, 0);
+            statusLabel.Location = new Point(219, 225);
             statusLabel.Name = "statusLabel";
-            statusLabel.Size = new Size(799, 545);
+            statusLabel.Size = new Size(361, 128);
             statusLabel.TabIndex = 0;
             statusLabel.Text = "See you later!\r\nClosing to Windows...";
             statusLabel.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // pictureBox1
             // 
-            pictureBox1.Anchor = AnchorStyles.Bottom;
+            pictureBox1.Anchor = AnchorStyles.None;
             pictureBox1.BackgroundImageLayout = ImageLayout.Stretch;
-            pictureBox1.Image = Properties.Resources.loading;
-            pictureBox1.Location = new Point(369, 367);
+            pictureBox1.Image = Properties.Resources.spinner;
+            pictureBox1.Location = new Point(362, 183);
             pictureBox1.Name = "pictureBox1";
             pictureBox1.Size = new Size(60, 60);
             pictureBox1.SizeMode = PictureBoxSizeMode.StretchImage;
@@ -68,7 +68,7 @@
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.Black;
-            ClientSize = new Size(799, 545);
+            ClientSize = new Size(799, 579);
             Controls.Add(pictureBox1);
             Controls.Add(statusLabel);
             ForeColor = Color.White;

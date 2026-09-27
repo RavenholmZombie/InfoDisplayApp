@@ -1,23 +1,38 @@
 using System.Diagnostics;
+using InfoDisplayApp.Properties;
+using InfoDisplayApp.Services;
 
 namespace InfoDisplayApp
 {
     internal static class Program
     {
-        /// <summary>
-        ///  The main entry point for the application.
-        /// </summary>
         [STAThread]
         static void Main()
         {
             ApplicationConfiguration.Initialize();
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-            Application.Run(new StartupApplicationContext());
+
+            RemoteDiagnosticsServer? diagnosticsServer = null;
+
+            try
+            {
+                if (AppSettings.Current.Diagnostics.RemoteServer)
+                {
+                    diagnosticsServer = new RemoteDiagnosticsServer();
+                    diagnosticsServer.Start();
+                }
+
+                Application.Run(new StartupApplicationContext());
+            }
+            finally
+            {
+                diagnosticsServer?.Dispose();
+            }
         }
 
         private sealed class StartupApplicationContext : ApplicationContext
         {
-            private static readonly TimeSpan MinimumSplashDuration =
+            private static readonly TimeSpan MinimumLoadingDuration =
                 TimeSpan.FromSeconds(3.5);
 
             private static readonly TimeSpan CrossFadeDuration =
@@ -25,55 +40,91 @@ namespace InfoDisplayApp
 
             private const int CrossFadeSteps = 26;
 
-            private readonly frmSplash _splash;
-            private readonly Stopwatch _startupClock = new();
+            private readonly frmIntro _intro;
+            private frmNewLoading? _loading;
+            private readonly Stopwatch _loadingClock = new();
             private frmMain? _mainForm;
             private bool _mainWasTopMost;
             private bool _startupCompleted;
+            private bool _transitioningFromIntro;
 
             public StartupApplicationContext()
             {
-                _splash = new frmSplash();
-                _splash.Shown += Splash_Shown;
-                _splash.FormClosed += Splash_FormClosed;
-                _splash.Show();
+                _intro = new frmIntro();
+                _intro.IntroCompleted += Intro_Completed;
+                _intro.FormClosed += Intro_FormClosed;
+                MainForm = _intro;
+                _intro.Show();
             }
 
-            private async void Splash_Shown(object? sender, EventArgs e)
+            private async void Intro_Completed(object? sender, EventArgs e)
             {
-                _splash.Shown -= Splash_Shown;
-                _startupClock.Restart();
+                if (_transitioningFromIntro)
+                    return;
+
+                _transitioningFromIntro = true;
+                _intro.IntroCompleted -= Intro_Completed;
 
                 try
                 {
-                    _splash.SetStartupStatus("Preparing Info Display...", 15);
+                    _loading = new frmNewLoading();
+                    _loading.FormClosed += Loading_FormClosed;
+                    _loading.Show();
+                    _loading.BringToFront();
+                    _loading.Activate();
+
+                    await Task.Yield();
+
+                    _loadingClock.Restart();
+                    _intro.Hide();
+
+                    await StartMainAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"InfoDisplay startup transition failed: {ex}");
+                    ExitThread();
+                }
+            }
+
+            private async Task StartMainAsync()
+            {
+                if (_loading == null)
+                    return;
+
+                try
+                {
+                    SetLoadingStep("Info Display...");
                     await Task.Delay(350);
+
+                    await Task.Yield();
 
                     _mainForm = new frmMain();
                     AppMessages.Initialize(_mainForm);
 
                     _mainWasTopMost = _mainForm.TopMost;
                     _mainForm.TopMost = false;
-                    _mainForm.Opacity = 0;
+                    // Keep the dashboard fully rendered behind the loading screen.
+                    // The reveal is performed by fading the loading screen away.
+                    _mainForm.Opacity = 1.0;
                     _mainForm.ShowInTaskbar = false;
                     _mainForm.Enabled = false;
                     _mainForm.Shown += MainForm_Shown;
 
                     MainForm = _mainForm;
 
-                    _splash.SetStartupStatus("Loading display modules...", 40);
+                    SetLoadingStep("display modules...");
                     await Task.Delay(350);
-                    _splash.SetStartupStatus("Starting media services...", 60);
 
-                    // Showing the form while fully transparent gives WinForms and
-                    // the child controls their normal Load/Shown lifecycle without
-                    // exposing a half-built dashboard to the TV.
+                    SetLoadingStep("media services...");
+                    await Task.Yield();
+
                     _mainForm.Show();
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"InfoDisplay startup failed: {ex}");
-                    _splash.SetStartupStatus("Startup failed.", 100);
+                    SetLoadingStep("failed.");
 
                     MessageBox.Show(
                         $"InfoDisplay could not finish starting.\r\n\r\n{ex.Message}",
@@ -87,37 +138,30 @@ namespace InfoDisplayApp
 
             private async void MainForm_Shown(object? sender, EventArgs e)
             {
-                if (_mainForm == null || _startupCompleted)
+                if (_mainForm == null || _loading == null || _startupCompleted)
                     return;
 
                 _mainForm.Shown -= MainForm_Shown;
 
                 try
                 {
-                    _splash.SetStartupStatus("Loading weather and status services...", 75);
+                    SetLoadingStep("weather and status services...");
                     await Task.Delay(250);
 
-                    // Do not reveal the dashboard until the ticker has completed its
-                    // initial status/weather work and has a real rendered message
-                    // ready for the scrolling animation.
-                    _splash.SetStartupStatus("Preparing text ticker...", 85);
+                    SetLoadingStep("text ticker...");
                     await _mainForm.WaitForStartupReadyAsync();
 
-                    _splash.SetStartupStatus("Finishing startup...", 95);
+                    SetLoadingStep("final startup tasks...");
 
-                    // Keep the deliberate boot-screen pacing even if all of the
-                    // real initialization work finishes unusually quickly.
-                    TimeSpan remaining = MinimumSplashDuration - _startupClock.Elapsed;
+                    TimeSpan remaining =
+                        MinimumLoadingDuration - _loadingClock.Elapsed;
+
                     if (remaining > TimeSpan.Zero)
                         await Task.Delay(remaining);
 
-                    _splash.SetStartupStatus("Ready", 100);
+                    SetLoadingStep("complete...");
                     await Task.Delay(150);
 
-                    // A borderless Maximized WinForms window still uses the screen's
-                    // working area, which leaves the Windows taskbar uncovered.
-                    // Switch to Normal and explicitly occupy the monitor's full bounds
-                    // so InfoDisplay behaves like a true kiosk/fullscreen application.
                     Screen targetScreen = Screen.FromHandle(_mainForm.Handle);
                     _mainForm.WindowState = FormWindowState.Normal;
                     _mainForm.Bounds = targetScreen.Bounds;
@@ -131,10 +175,14 @@ namespace InfoDisplayApp
                     _mainForm.Activate();
 
                     _startupCompleted = true;
-                    _splash.Close();
 
-                    // The sound now happens only after the fully-loaded main form
-                    // has actually finished fading in and is visible to the user.
+                    _loading.FormClosed -= Loading_FormClosed;
+                    _loading.Dispose();
+                    _loading = null;
+
+                    _intro.FormClosed -= Intro_FormClosed;
+                    _intro.Close();
+
                     _mainForm.NotifyStartupVisible();
                 }
                 catch (Exception ex)
@@ -144,12 +192,31 @@ namespace InfoDisplayApp
                 }
             }
 
+            private void SetLoadingStep(string step)
+            {
+                _loading?.SetStartupStatus(step);
+            }
+
             private async Task CrossFadeToMainAsync()
             {
-                if (_mainForm == null)
+                if (_mainForm == null || _loading == null)
                     return;
 
-                double splashStartOpacity = Math.Clamp(_splash.Opacity, 0.0, 1.0);
+                // Keep frmMain fully rendered underneath frmNewLoading. Fading the
+                // top loading window exposes the finished dashboard naturally and
+                // avoids WinForms' unreliable transparent-window reveal behavior.
+                _mainForm.Opacity = 1.0;
+                _mainForm.BringToFront();
+                _loading.BringToFront();
+
+                // frmIntro hides the cursor once at startup. Keep that hide in
+                // effect while frmMain is prepared behind the loading screen,
+                // then balance it exactly once when the loading fade begins.
+                Cursor.Show();
+
+                double loadingStartOpacity =
+                    Math.Clamp(_loading.Opacity, 0.0, 1.0);
+
                 int stepDelay = Math.Max(
                     1,
                     (int)(CrossFadeDuration.TotalMilliseconds / CrossFadeSteps));
@@ -157,24 +224,27 @@ namespace InfoDisplayApp
                 for (int step = 0; step <= CrossFadeSteps; step++)
                 {
                     double progress = (double)step / CrossFadeSteps;
-                    double eased = progress * progress * (3.0 - (2.0 * progress));
+                    double eased =
+                        progress * progress * (3.0 - (2.0 * progress));
 
-                    _mainForm.Opacity = eased;
-                    _splash.Opacity = splashStartOpacity * (1.0 - eased);
+                    _loading.Opacity =
+                        loadingStartOpacity * (1.0 - eased);
 
                     await Task.Delay(stepDelay);
                 }
 
-                _mainForm.Opacity = 1.0;
-                _splash.Opacity = 0.0;
+                _loading.Opacity = 0.0;
+                _mainForm.BringToFront();
             }
 
-            private void Splash_FormClosed(object? sender, FormClosedEventArgs e)
+            private void Intro_FormClosed(object? sender, FormClosedEventArgs e)
             {
-                _splash.FormClosed -= Splash_FormClosed;
+                if (!_startupCompleted && _loading == null)
+                    ExitThread();
+            }
 
-                // If the splash disappears before the normal reveal path finishes,
-                // do not leave an invisible main window/process behind.
+            private void Loading_FormClosed(object? sender, FormClosedEventArgs e)
+            {
                 if (!_startupCompleted)
                     ExitThread();
             }

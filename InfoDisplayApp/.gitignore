@@ -21,3 +21,7 @@ obj/
 # Temporary files
 *.tmp
 *.log
+
+# Ignore publish profiles generally
+*.pubxml
+!Properties/PublishProfiles/FolderProfile1.pubxml

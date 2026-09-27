@@ -11,7 +11,9 @@
   <ItemGroup>
     <None Remove="camera.conf" />
     <None Remove="camera.example.conf" />
+    <None Remove="Resources\intro.mov" />
     <None Remove="status.conf" />
+    <None Remove="settings.json" />
     <None Remove="ticker.txt" />
   </ItemGroup>
 
@@ -22,7 +24,13 @@
     <Content Include="camera.example.conf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Resources\intro.mov">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="status.conf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="settings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ticker.txt">
@@ -36,9 +44,10 @@
     <PackageReference Include="MCStatus.NET" Version="1.0.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
     <PackageReference Include="MineStat" Version="3.1.2" />
+    <PackageReference Include="NAudio" Version="3.1.0" />
     <PackageReference Include="ReaLTaiizor" Version="3.8.2.1" />
     <PackageReference Include="System.Speech" Version="10.0.12" />
-    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.24" />
   </ItemGroup>
 
   <ItemGroup>

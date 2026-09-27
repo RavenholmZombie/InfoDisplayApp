@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Diagnostics;
+using System.IO;
 using System.Text;
 using System.Windows.Forms;
 
@@ -11,6 +13,23 @@ namespace InfoDisplayApp
 {
     public partial class ctrlAppsPanel : UserControl
     {
+        private string ShutdownLogPath =>
+            Path.Combine(AppContext.BaseDirectory, "logs",
+                $"InfoScreen-SHUTDOWN-{Environment.ProcessId}.log");
+
+        private void LogShutdown(string message)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(ShutdownLogPath)!);
+                File.AppendAllText(ShutdownLogPath,
+                    $"{DateTime.Now:O} ctrlAppsPanel {message}{Environment.NewLine}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to write shutdown diagnostics: {ex}");
+            }
+        }
         public ctrlAppsPanel()
         {
             InitializeComponent();
@@ -125,12 +144,17 @@ namespace InfoDisplayApp
         {
             if (AppMessages.AskYesNo("Do you wish to close InfoScreen?"))
             {
+                LogShutdown("Close confirmed.");
                 frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
+                LogShutdown("Calling PrepareForShutdown().");
                 mainForm?.PrepareForShutdown();
+                LogShutdown("PrepareForShutdown() returned.");
 
                 frmClosing frmClosing = new frmClosing();
                 frmClosing.setRestarting(false);
+                LogShutdown("Showing frmClosing for exit.");
                 frmClosing.ShowDialog(this);
+                LogShutdown("frmClosing exit dialog returned.");
             }
         }
 
@@ -148,12 +172,17 @@ namespace InfoDisplayApp
         {
             if (AppMessages.AskYesNo("Do you wish to restart InfoScreen?"))
             {
+                LogShutdown("Restart confirmed.");
                 frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
+                LogShutdown("Calling PrepareForShutdown().");
                 mainForm?.PrepareForShutdown();
+                LogShutdown("PrepareForShutdown() returned.");
 
                 frmClosing frmClosing = new frmClosing();
                 frmClosing.setRestarting(true);
+                LogShutdown("Showing frmClosing for restart.");
                 frmClosing.ShowDialog(this);
+                LogShutdown("frmClosing restart dialog returned.");
             }
         }
 

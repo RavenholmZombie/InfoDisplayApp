@@ -258,6 +258,7 @@
             // lblBtnClose
             // 
             lblBtnClose.AutoSize = true;
+            lblBtnClose.BackColor = Color.Transparent;
             lblBtnClose.ForeColor = Color.White;
             lblBtnClose.Location = new Point(26, 5);
             lblBtnClose.Name = "lblBtnClose";
@@ -281,6 +282,7 @@
             // lblBtnRestart
             // 
             lblBtnRestart.AutoSize = true;
+            lblBtnRestart.BackColor = Color.Transparent;
             lblBtnRestart.ForeColor = Color.White;
             lblBtnRestart.Location = new Point(21, 5);
             lblBtnRestart.Name = "lblBtnRestart";
@@ -292,7 +294,7 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            BackColor = Color.Transparent;
+            BackColor = SystemColors.GrayText;
             BackgroundImage = Properties.Resources.glass_bl;
             BackgroundImageLayout = ImageLayout.Stretch;
             Controls.Add(dbpBtnRestart);
