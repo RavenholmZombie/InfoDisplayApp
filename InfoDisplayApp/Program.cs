@@ -209,6 +209,11 @@ namespace InfoDisplayApp
                 _mainForm.BringToFront();
                 _loading.BringToFront();
 
+                // frmIntro hides the cursor once at startup. Keep that hide in
+                // effect while frmMain is prepared behind the loading screen,
+                // then balance it exactly once when the loading fade begins.
+                Cursor.Show();
+
                 double loadingStartOpacity =
                     Math.Clamp(_loading.Opacity, 0.0, 1.0);
 
