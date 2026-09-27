@@ -15,7 +15,7 @@ namespace InfoDisplayApp.Properties
 
             if (InvokeRequired)
             {
-                BeginInvoke(() => SetStartupStatus(step));
+                BeginInvoke((Action)(() => SetStartupStatus(step)));
                 return;
             }
 
