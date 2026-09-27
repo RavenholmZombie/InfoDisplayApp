@@ -1,11 +1,3 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
-using System.Windows.Forms;
-
 namespace InfoDisplayApp.Properties
 {
     public partial class frmNewLoading : Form
@@ -13,6 +5,21 @@ namespace InfoDisplayApp.Properties
         public frmNewLoading()
         {
             InitializeComponent();
+            Opacity = 1.0;
+        }
+
+        public void SetStartupStatus(string step)
+        {
+            if (IsDisposed)
+                return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(() => SetStartupStatus(step));
+                return;
+            }
+
+            lblStatus.Text = $"Loading {step}";
         }
     }
 }
