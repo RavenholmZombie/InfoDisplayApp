@@ -127,14 +127,8 @@
   <data name="weather_lightshowers" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_lightshowers.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="sfx_alarm" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\sfx_alarm.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
   <data name="refresh_highlight" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\refresh_highlight.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="sfx_question" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\sfx_question.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="zapotec" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\zapotec.bmp;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -148,23 +142,11 @@
   <data name="weather_lightning" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_lightning.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="glass_btn_close_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass_btn_close_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
   <data name="philo_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\philo_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="weather_thunderstorm" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_thunderstorm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="restart_icn_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\restart_icn_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="restart_icn_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\restart_icn_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="exit_icn_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\exit_icn_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="logo_philo" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\logo_philo.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -175,17 +157,14 @@
   <data name="weather_thunder" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_thunder.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="alert_end" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\alert_end.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
   <data name="weather_snow" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_snow.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="weather_sunny" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_sunny.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="glass_btn_close_hover" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass_btn_close_hover.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="alarm" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\alarm.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="weather_rain" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_rain.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -193,23 +172,8 @@
   <data name="weather_hail" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_hail.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="exit_icn_normal" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\exit_icn_normal.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
   <data name="tapo_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\tapo_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="glass_btn_restart_hover" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass_btn_restart_hover.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="sfx_startup" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\sfx_startup.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="glass_btn_restart_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass_btn_restart_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="glass" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="weather_partlycloudy" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_partlycloudy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -217,20 +181,11 @@
   <data name="refresh_click" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\refresh_click.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="63f9ed41-5b51-46ea-b416-fcdec03ab288" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\63f9ed41-5b51-46ea-b416-fcdec03ab288.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
   <data name="Coffee Bean" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\Coffee Bean.bmp;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="alert_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\alert_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="controls_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\controls_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="loading" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\loading.gif;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="glass_long" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_long.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="weather_cloudy" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_cloudy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -241,38 +196,26 @@
   <data name="exp_color_bg" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\exp_color_bg.gif;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="info_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\info_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="sfx_exit" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\sfx_exit.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  <data name="weather_lightsnow" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\weather_lightsnow.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="weather_fog" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_fog.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="intro_anim" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\intro_anim.mp4;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
   <data name="glass_bl" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\glass_bl.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="sfx_error" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\sfx_error.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  <data name="glass_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="error_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\error_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="glass" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="glass_long" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass_long.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="63f9ed41-5b51-46ea-b416-fcdec03ab288" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\63f9ed41-5b51-46ea-b416-fcdec03ab288.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="alarm" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\alarm.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="sfx_information" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\sfx_information.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="weather_lightsnow" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\weather_lightsnow.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="refresh_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\refresh_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="weather_mostlycloudy" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_mostlycloudy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -280,17 +223,71 @@
   <data name="weather_lightrain" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\weather_lightrain.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="controls_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\controls_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="alert_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\alert_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="error_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\error_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="info_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\info_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="alert_icn_msg" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\alert_icn_msg.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="refresh_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\refresh_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="exit_icn_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\exit_icn_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="glass_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\glass_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="exit_icn_normal" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\exit_icn_normal.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="restart_icn_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\restart_icn_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="restart_icn_hov" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\restart_icn_hov.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="glass_btn_close_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_btn_close_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="glass_btn_close_hover" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_btn_close_hover.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="glass_btn_restart_norm" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_btn_restart_norm.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="glass_btn_restart_hover" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\glass_btn_restart_hover.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="sfx_exit" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\sfx_exit.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="sfx_error" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\sfx_error.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="sfx_alarm" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\sfx_alarm.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="sfx_startup" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\sfx_startup.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="sfx_question" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\sfx_question.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="sfx_information" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\sfx_information.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="loading" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\loading.gif;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="browser_icn" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\browser_icn.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="alert_end" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\alert_end.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="spinner" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\spinner.gif;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
