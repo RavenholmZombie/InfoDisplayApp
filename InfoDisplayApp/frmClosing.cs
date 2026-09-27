@@ -42,7 +42,7 @@ namespace InfoDisplayApp
         public frmClosing()
         {
             InitializeComponent();
-            Cursor = Cursors.None;
+            Cursor = new Cursor(IntPtr.Zero);
         }
 
         private async void frmClosing_Load(object sender, EventArgs e)
