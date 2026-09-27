@@ -66,7 +66,7 @@ namespace InfoDisplayApp.Properties
 
             if (InvokeRequired)
             {
-                BeginInvoke(CompleteIntro);
+                BeginInvoke((Action)CompleteIntro);
                 return;
             }
 
