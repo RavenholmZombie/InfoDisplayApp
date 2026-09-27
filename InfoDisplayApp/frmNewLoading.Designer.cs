@@ -49,9 +49,9 @@
             // 
             pboxSpinner.Anchor = AnchorStyles.None;
             pboxSpinner.Image = Resources.spinner;
-            pboxSpinner.Location = new Point(376, 186);
+            pboxSpinner.Location = new Point(370, 185);
             pboxSpinner.Name = "pboxSpinner";
-            pboxSpinner.Size = new Size(48, 48);
+            pboxSpinner.Size = new Size(60, 60);
             pboxSpinner.SizeMode = PictureBoxSizeMode.StretchImage;
             pboxSpinner.TabIndex = 1;
             pboxSpinner.TabStop = false;
