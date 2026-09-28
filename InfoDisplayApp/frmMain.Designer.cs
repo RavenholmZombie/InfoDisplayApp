@@ -71,7 +71,7 @@
             // pnlTV
             // 
             pnlTV.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            pnlTV.BackColor = Color.Black;
+            pnlTV.BackColor = SystemColors.Control;
             pnlTV.Controls.Add(pnlApps);
             pnlTV.Location = new Point(0, 0);
             pnlTV.Name = "pnlTV";
@@ -116,7 +116,7 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            BackColor = Color.Black;
+            BackColor = SystemColors.Control;
             BackgroundImage = Properties.Resources.glass_bl;
             BackgroundImageLayout = ImageLayout.Stretch;
             ClientSize = new Size(1103, 634);
