@@ -7,6 +7,8 @@ namespace InfoDisplayApp;
 public partial class ctrlAppsPanel : UserControl
 {
     private readonly AppletManager _appletManager = new();
+    private readonly TextBox _searchBox = new();
+    private List<AppletDefinition> _installedApplets = new();
     private static readonly System.Net.Http.HttpClient IconClient = new() { Timeout = TimeSpan.FromSeconds(10) };
 
     private string ShutdownLogPath =>
@@ -26,6 +28,8 @@ public partial class ctrlAppsPanel : UserControl
         lblBtnRestart.MouseLeave += dbpBtnRestart_MouseLeave;
         lblBtnRestart.Cursor = Cursors.Hand;
 
+        ConfigureSearchBox();
+
         flowLayoutPanel1.AutoScroll = true;
         flowLayoutPanel1.WrapContents = true;
         // Four fixed rows: entries fill top-to-bottom, then start a new column.
@@ -38,23 +42,64 @@ public partial class ctrlAppsPanel : UserControl
 
     public void RebuildApps()
     {
+        _installedApplets = _appletManager.GetInstalledApplets().ToList();
+        ApplySearchFilter();
+    }
+
+    private void ConfigureSearchBox()
+    {
+        _searchBox.Name = "txtAppSearch";
+        _searchBox.PlaceholderText = "Search apps...";
+        _searchBox.Font = new Font("Segoe UI", 11F);
+        _searchBox.Location = new Point(panel1.Left, 51);
+        _searchBox.Size = new Size(panel1.Width, 27);
+        _searchBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        _searchBox.TextChanged += (_, _) => ApplySearchFilter();
+
+        Controls.Add(_searchBox);
+        _searchBox.BringToFront();
+
+        // Make room between the new search field and the app grid.
+        panel1.Top = 86;
+        panel1.Height = Math.Max(100, Height - panel1.Top - 15);
+    }
+
+    private void ApplySearchFilter()
+    {
+        if (flowLayoutPanel1.IsDisposed)
+            return;
+
+        string query = _searchBox.Text.Trim();
+        bool searching = query.Length > 0;
+
         flowLayoutPanel1.SuspendLayout();
         try
         {
             flowLayoutPanel1.Controls.Clear();
 
-            AddSystemApp("Tapo", Resources.tapo_icn, () => Main()?.ShowCameraMode());
-            AddSystemApp("Browser", Resources.browser_icn, () => Main()?.ShowBrowserMode());
-            AddSystemApp("TEST ALERT", Resources.alert_icn, () => Main()?.TriggerNationalPeriodicTest());
-            AddSystemApp("InfoStore", Resources.store_icn, OpenInfoStore);
+            // System entries participate in search too, so "Browser", "Tapo",
+            // "InfoStore", etc. are just as easy to find as installed applets.
+            AddSystemAppIfMatch("Tapo", Resources.tapo_icn, () => Main()?.ShowCameraMode(), query);
+            AddSystemAppIfMatch("Browser", Resources.browser_icn, () => Main()?.ShowBrowserMode(), query);
+            AddSystemAppIfMatch("TEST ALERT", Resources.alert_icn, () => Main()?.TriggerNationalPeriodicTest(), query);
+            AddSystemAppIfMatch("InfoStore", Resources.store_icn, OpenInfoStore, query);
 
-            foreach (AppletDefinition applet in _appletManager.GetInstalledApplets())
+            foreach (AppletDefinition applet in _installedApplets.Where(a =>
+                         !searching || a.Name.Contains(query, StringComparison.OrdinalIgnoreCase)))
+            {
                 AddApplet(applet);
+            }
         }
         finally
         {
             flowLayoutPanel1.ResumeLayout(true);
         }
+    }
+
+    private void AddSystemAppIfMatch(string name, Image icon, Action action, string query)
+    {
+        if (query.Length == 0 || name.Contains(query, StringComparison.OrdinalIgnoreCase))
+            AddSystemApp(name, icon, action);
     }
 
     private frmMain? Main() => Application.OpenForms.OfType<frmMain>().FirstOrDefault();
