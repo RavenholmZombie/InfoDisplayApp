@@ -445,6 +445,16 @@ namespace InfoDisplayApp.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap store_icn {
+            get {
+                object obj = ResourceManager.GetObject("store_icn", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap sunny_icon_23522 {
             get {
                 object obj = ResourceManager.GetObject("sunny-icon-23522", resourceCulture);

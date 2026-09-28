@@ -41,7 +41,7 @@ public partial class ctrlAppsPanel : UserControl
             AddSystemApp("Tapo", Resources.tapo_icn, () => Main()?.ShowCameraMode());
             AddSystemApp("Browser", Resources.browser_icn, () => Main()?.ShowBrowserMode());
             AddSystemApp("TEST ALERT", Resources.alert_icn, () => Main()?.TriggerNationalPeriodicTest());
-            AddSystemApp("InfoStore", Resources.browser_icn, OpenInfoStore);
+            AddSystemApp("InfoStore", Resources.store_icn, OpenInfoStore);
 
             foreach (AppletDefinition applet in _appletManager.GetInstalledApplets())
                 AddApplet(applet);
