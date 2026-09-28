@@ -28,8 +28,11 @@ public partial class ctrlAppsPanel : UserControl
 
         flowLayoutPanel1.AutoScroll = true;
         flowLayoutPanel1.WrapContents = true;
-        flowLayoutPanel1.FlowDirection = FlowDirection.LeftToRight;
-        flowLayoutPanel1.Padding = new Padding(8, 8, 0, 8);
+        // Three fixed rows: entries fill top-to-bottom, then start a new column.
+        // Horizontal scrolling handles any number of installed applets without
+        // allowing a fourth row to appear.
+        flowLayoutPanel1.FlowDirection = FlowDirection.TopDown;
+        flowLayoutPanel1.Padding = new Padding(8, 6, 8, 0);
         RebuildApps();
     }
 
@@ -87,15 +90,15 @@ public partial class ctrlAppsPanel : UserControl
         // PictureBox itself is centered explicitly rather than relying on the
         // artwork dimensions.
         const int tileWidth = 86;
-        const int tileHeight = 104;
+        const int tileHeight = 92;
         const int iconSize = 50;
         const int iconTop = 10;
-        const int labelTop = 64;
+        const int labelTop = 62;
 
         Panel tile = new()
         {
             Size = new Size(tileWidth, tileHeight),
-            Margin = new Padding(3, 3, 12, 3),
+            Margin = new Padding(3, 2, 9, 2),
             Cursor = Cursors.Hand
         };
 
@@ -112,7 +115,7 @@ public partial class ctrlAppsPanel : UserControl
         {
             AutoEllipsis = true,
             Location = new Point(2, labelTop),
-            Size = new Size(tileWidth - 4, 36),
+            Size = new Size(tileWidth - 4, 28),
             Text = name,
             TextAlign = ContentAlignment.TopCenter,
             Cursor = Cursors.Hand
