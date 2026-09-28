@@ -12,6 +12,7 @@ public sealed class frmInfoStore : Form
     private readonly AppletRepositoryService _repository = new();
 
     public event EventHandler? AppletsChanged;
+    public event EventHandler? CloseRequested;
 
     private bool _initialized;
 
@@ -55,7 +56,7 @@ public sealed class frmInfoStore : Form
             JsonElement root = doc.RootElement;
             string action = root.GetProperty("action").GetString() ?? "";
 
-            if (action == "close") { Hide(); return; }
+            if (action == "close") { CloseRequested?.Invoke(this, EventArgs.Empty); return; }
             if (action == "refresh") { await SendCatalogAsync(); return; }
             if (!root.TryGetProperty("id", out JsonElement idElement)) return;
 
