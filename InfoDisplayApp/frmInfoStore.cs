@@ -103,13 +103,26 @@ public sealed class frmInfoStore : Form
 
     private static string BuildHtml() => """
 <!doctype html><html><head><meta charset="utf-8"><style>
-body{font-family:Segoe UI,Arial;background:#121212;color:#fff;margin:0}header{display:flex;align-items:center;padding:18px 24px;background:#202020;position:sticky;top:0}
-h1{margin:0;flex:1;font-size:26px}.top{background:#444;color:#fff;border:0;border-radius:6px;padding:10px 16px;margin-left:8px;cursor:pointer}
-#status{padding:18px 24px;color:#bbb}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:0 24px 24px}
-.card{background:#242424;border-radius:10px;padding:18px;display:grid;grid-template-columns:64px 1fr;gap:14px}.icon{width:64px;height:64px;border-radius:10px;object-fit:contain;background:#333}
-.name{font-size:20px;font-weight:600}.meta{color:#aaa;font-size:12px;margin-top:2px}.desc{color:#ddd;margin:10px 0;grid-column:1/3}
-.action{grid-column:1/3;border:0;border-radius:6px;padding:10px;cursor:pointer;font-weight:600}.install{background:#3b82f6;color:#fff}.uninstall{background:#5a3030;color:#fff}
-</style></head><body><header><h1>InfoStore</h1><button class="top" onclick="refresh()">Refresh</button><button class="top" onclick="send('close')">Close</button></header>
+:root{font-size:20px}
+*{box-sizing:border-box}
+body{font-family:Segoe UI,Arial;background:#121212;color:#fff;margin:0;overflow-x:hidden}
+header{display:flex;align-items:center;padding:22px 30px;background:#202020;position:sticky;top:0;z-index:5;min-height:92px}
+.brand{display:flex;align-items:center;gap:16px;flex:1}
+.store-icon{width:58px;height:58px;object-fit:contain}
+h1{margin:0;font-size:34px;line-height:1}
+.top{background:#444;color:#fff;border:0;border-radius:8px;padding:14px 22px;margin-left:12px;cursor:pointer;font-size:18px;font-weight:600;min-width:110px}
+#status{padding:24px 30px 18px;color:#bbb;font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:22px;padding:0 30px 30px;max-width:1500px}
+.card{background:#242424;border-radius:14px;padding:22px;display:grid;grid-template-columns:88px 1fr;gap:18px;min-height:260px}
+.icon{width:88px;height:88px;border-radius:14px;object-fit:contain;background:#333}
+.name{font-size:27px;font-weight:600;line-height:1.15;margin-top:3px}
+.meta{color:#aaa;font-size:16px;margin-top:7px}
+.desc{color:#ddd;margin:14px 0 4px;grid-column:1/3;font-size:20px;line-height:1.35}
+.action{grid-column:1/3;border:0;border-radius:8px;padding:14px;cursor:pointer;font-weight:700;font-size:19px;min-height:52px}
+.install{background:#3b82f6;color:#fff}.uninstall{background:#6b3434;color:#fff}
+@media (min-width:1600px){:root{font-size:22px}.grid{grid-template-columns:repeat(auto-fill,minmax(440px,1fr));max-width:1700px}.card{min-height:285px}}
+</style></head><body>
+<header><div class="brand"><img class="store-icon" src="https://raw.githubusercontent.com/RavenholmZombie/InfoScreenAppRepository/main/AppIcons/infostore.png" onerror="this.style.display='none'"><h1>InfoStore</h1></div><button class="top" onclick="refresh()">Refresh</button><button class="top" onclick="send('close')">Close</button></header>
 <div id="status">Loading applets...</div><div id="apps" class="grid"></div><script>
 const send=(action,id)=>chrome.webview.postMessage(id?{action,id}:{action});const refresh=()=>{document.getElementById('status').textContent='Loading applets...';send('refresh')};
 chrome.webview.addEventListener('message',e=>{const m=e.data;if(m.type==='error'){document.getElementById('status').textContent=m.message;return}if(m.type!=='catalog')return;
@@ -118,5 +131,5 @@ for(const a of m.apps){const c=document.createElement('div');c.className='card';
 c.innerHTML='<img class="icon" src="'+(a.IconUrl||'')+'" onerror="this.style.visibility=\'hidden\'"><div><div class="name">'+a.Name+'</div><div class="meta">v'+a.Version+' - '+(a.Author||'Unknown author')+'</div></div><div class="desc">'+(a.Description||'')+'</div><button class="action '+(a.installed?'uninstall':'install')+'">'+(a.installed?'Uninstall':'Install')+'</button>';
 c.querySelector('button').onclick=()=>send(a.installed?'uninstall':'install',a.Id);box.appendChild(c);}});
 refresh();</script></body></html>
-""";
+"""
 }
