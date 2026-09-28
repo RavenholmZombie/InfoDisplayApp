@@ -9,6 +9,7 @@ namespace InfoDisplayApp
     public partial class frmMain : Form
     {
         private ctrlAppletWebView? _appletView;
+        private frmInfoStore? _infoStore;
         private ctrlCameras? _cameraView;
         private ctrlAppsPanel? _appsPanel;
         private ctrlTicker? _normalTicker;
@@ -284,10 +285,17 @@ namespace InfoDisplayApp
             _cameraView = new ctrlCameras
             {
                 Dock = DockStyle.Fill,
-                Visible = true
+                Visible = false
             };
             pnlTV.Controls.Add(_cameraView);
-            _cameraView.BringToFront();
+
+            // With Philo/YouTube no longer hard-coded, start on the first
+            // installed applet when one exists instead of leaving pnlTV black.
+            AppletDefinition? startupApplet = new AppletManager()
+                .GetInstalledApplets()
+                .FirstOrDefault();
+            if (startupApplet != null)
+                BeginInvoke((Action)(() => ShowApplet(startupApplet)));
 
             ctrlTimeDate ctrlTimeDate = new ctrlTimeDate
             {
@@ -488,6 +496,7 @@ namespace InfoDisplayApp
 
             try
             {
+                _infoStore?.Hide();
                 _cameraView.SetMuted(true);
                 _cameraView.StopCamera();
                 _cameraView.Visible = false;
@@ -506,11 +515,42 @@ namespace InfoDisplayApp
             }
         }
 
+        public void ShowInfoStore()
+        {
+            if (_appletView == null || _cameraView == null)
+                return;
+
+            _appsForm?.Hide();
+            _cameraView.SetMuted(true);
+            _cameraView.StopCamera();
+            _cameraView.Visible = false;
+            _appletView.SetMuted(true);
+            _appletView.Visible = false;
+
+            if (_infoStore == null || _infoStore.IsDisposed)
+            {
+                _infoStore = new frmInfoStore
+                {
+                    Dock = DockStyle.Fill,
+                    TopLevel = false,
+                    FormBorderStyle = FormBorderStyle.None,
+                    Visible = false
+                };
+                _infoStore.AppletsChanged += (_, _) => _appsPanel?.RebuildApps();
+                pnlTV.Controls.Add(_infoStore);
+            }
+
+            _infoStore.Show();
+            _infoStore.BringToFront();
+            UpdateModeButtons(true);
+        }
+
         public void ShowBrowserMode()
         {
             if (_appletView == null || _cameraView == null)
                 return;
 
+            _infoStore?.Hide();
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
             _cameraView.Visible = false;
@@ -540,6 +580,7 @@ namespace InfoDisplayApp
             if (_appletView == null || _cameraView == null)
                 return;
 
+            _infoStore?.Hide();
             _appletView.Visible = false;
             _appletView.SetMuted(true);
 
