@@ -28,9 +28,9 @@ public partial class ctrlAppsPanel : UserControl
 
         flowLayoutPanel1.AutoScroll = true;
         flowLayoutPanel1.WrapContents = true;
-        // Three fixed rows: entries fill top-to-bottom, then start a new column.
-        // Horizontal scrolling handles any number of installed applets without
-        // allowing a fourth row to appear.
+        // Four fixed rows: entries fill top-to-bottom, then start a new column.
+        // The drawer is wide enough for the normal app set; scrolling remains
+        // available only if the installed collection eventually outgrows it.
         flowLayoutPanel1.FlowDirection = FlowDirection.TopDown;
         flowLayoutPanel1.Padding = new Padding(8, 6, 8, 0);
         RebuildApps();
