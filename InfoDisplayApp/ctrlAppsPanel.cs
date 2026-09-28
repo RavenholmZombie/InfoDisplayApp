@@ -1,201 +1,193 @@
-﻿using InfoDisplayApp.Properties;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
+using InfoDisplayApp.Properties;
+using InfoDisplayApp.Services;
 using System.Diagnostics;
-using System.IO;
-using System.Text;
-using System.Windows.Forms;
 
-namespace InfoDisplayApp
+namespace InfoDisplayApp;
+
+public partial class ctrlAppsPanel : UserControl
 {
-    public partial class ctrlAppsPanel : UserControl
+    private readonly AppletManager _appletManager = new();
+    private static readonly HttpClient IconClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+
+    private string ShutdownLogPath =>
+        Path.Combine(AppContext.BaseDirectory, "logs", $"InfoScreen-SHUTDOWN-{Environment.ProcessId}.log");
+
+    public ctrlAppsPanel()
     {
-        private string ShutdownLogPath =>
-            Path.Combine(AppContext.BaseDirectory, "logs",
-                $"InfoScreen-SHUTDOWN-{Environment.ProcessId}.log");
+        InitializeComponent();
 
-        private void LogShutdown(string message)
+        lblBtnClose.Click += dbpBtnClose_Click;
+        lblBtnClose.MouseEnter += dbpBtnClose_MouseEnter;
+        lblBtnClose.MouseLeave += dbpBtnClose_MouseLeave;
+        lblBtnClose.Cursor = Cursors.Hand;
+
+        lblBtnRestart.Click += dbpBtnRestart_Click;
+        lblBtnRestart.MouseEnter += dbpBtnRestart_MouseEnter;
+        lblBtnRestart.MouseLeave += dbpBtnRestart_MouseLeave;
+        lblBtnRestart.Cursor = Cursors.Hand;
+
+        flowLayoutPanel1.AutoScroll = true;
+        flowLayoutPanel1.WrapContents = true;
+        RebuildApps();
+    }
+
+    public void RebuildApps()
+    {
+        flowLayoutPanel1.SuspendLayout();
+        try
         {
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(ShutdownLogPath)!);
-                File.AppendAllText(ShutdownLogPath,
-                    $"{DateTime.Now:O} ctrlAppsPanel {message}{Environment.NewLine}");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Unable to write shutdown diagnostics: {ex}");
-            }
+            flowLayoutPanel1.Controls.Clear();
+
+            AddSystemApp("Tapo", Resources.tapo_icn, () => Main()?.ShowCameraMode());
+            AddSystemApp("Browser", Resources.browser_icn, () => Main()?.ShowBrowserMode());
+            AddSystemApp("TEST ALERT", Resources.alert_icn, () => Main()?.TriggerNationalPeriodicTest());
+            AddSystemApp("InfoStore", Resources.browser_icn, OpenInfoStore);
+
+            foreach (AppletDefinition applet in _appletManager.GetInstalledApplets())
+                AddApplet(applet);
         }
-        public ctrlAppsPanel()
+        finally
         {
-            InitializeComponent();
-
-            // Philo
-            icnPhilo.Click += appPnlPhilo_Click;
-            lblPhilo.Click += appPnlPhilo_Click;
-            lblBtnRestart.Cursor = Cursors.Hand;
-
-            // YouTube
-            icnYouTube.Click += appPnlYouTube_Click;
-            lblYouTube.Click += appPnlYouTube_Click;
-            lblBtnRestart.Cursor = Cursors.Hand;
-
-            // EAS test
-            icnEAS.Click += appPnlEAS_Click;
-            lblEAS.Click += appPnlEAS_Click;
-            lblBtnRestart.Cursor = Cursors.Hand;
-
-            // Tapo
-            icnTapo.Click += appPnlTapo_Click;
-            lblTapo.Click += appPnlTapo_Click;
-            lblBtnRestart.Cursor = Cursors.Hand;
-
-            // Quit Button
-            lblBtnClose.Click += dbpBtnClose_Click;
-            lblBtnClose.MouseEnter += dbpBtnClose_MouseEnter;
-            lblBtnClose.MouseLeave += dbpBtnClose_MouseLeave;
-            lblBtnClose.Cursor = Cursors.Hand;
-
-            // Restart Button
-            lblBtnRestart.Click += dbpBtnRestart_Click;
-            lblBtnRestart.MouseEnter += dbpBtnRestart_MouseEnter;
-            lblBtnRestart.MouseLeave += dbpBtnRestart_MouseLeave;
-            lblBtnRestart.Cursor = Cursors.Hand;
-
-            // Browser Button
-            lblBrowser.Click += appPnlBrowser_Click;
-            icnBrowser.Click += appPnlBrowser_Click;
-            lblBtnRestart.Cursor = Cursors.Hand;
-        }
-
-        private void appPnlPhilo_Click(object sender, EventArgs e)
-        {
-            SendAppChange(sender, e, "Philo");
-        }
-
-        private void appPnlYouTube_Click(object sender, EventArgs e)
-        {
-            SendAppChange(sender, e, "YouTube");
-        }
-
-        private void appPnlTapo_Click(object sender, EventArgs e)
-        {
-            SendAppChange(sender, e, "Tapo");
-        }
-
-        private void appPnlEAS_Click(object sender, EventArgs e)
-        {
-            frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
-            mainForm?.TriggerNationalPeriodicTest();
-        }
-
-        private void SendAppChange(object sender, EventArgs e, String appName)
-        {
-            frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
-
-            if (mainForm == null)
-                return;
-
-            try
-            {
-                if (appName == "Philo")
-                {
-                    mainForm.ShowPhiloMode();
-                }
-                else if (appName == "YouTube")
-                {
-                    mainForm.ShowYouTubeMode();
-                }
-                else if (appName == "Tapo")
-                {
-                    mainForm.ShowCameraMode();
-                }
-                else if (appName == "browser")
-                {
-                    mainForm.ShowBrowserMode();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error sending app change to main form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void ctrlAppsPanel_Load(object sender, EventArgs e)
-        {
-
-        }
-
-        private void dbpBtnClose_MouseEnter(object sender, EventArgs e)
-        {
-            dbpBtnClose.BackgroundImage = Resources.glass_btn_close_hover;
-        }
-
-        private void dbpBtnClose_MouseLeave(object sender, EventArgs e)
-        {
-            dbpBtnClose.BackgroundImage = Resources.glass_btn_close_norm;
-        }
-
-        private void dbpBtnClose_Click(object sender, EventArgs e)
-        {
-            if (AppMessages.AskYesNo("Do you wish to close InfoScreen?"))
-            {
-                LogShutdown("Close confirmed.");
-                frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
-                LogShutdown("Calling PrepareForShutdown().");
-                mainForm?.PrepareForShutdown();
-                LogShutdown("PrepareForShutdown() returned.");
-
-                frmClosing frmClosing = new frmClosing();
-                frmClosing.setRestarting(false);
-                LogShutdown("Showing frmClosing for exit.");
-                frmClosing.ShowDialog(this);
-                LogShutdown("frmClosing exit dialog returned.");
-            }
-        }
-
-        private void dbpBtnRestart_MouseEnter(object sender, EventArgs e)
-        {
-            dbpBtnRestart.BackgroundImage = Resources.glass_btn_restart_hover;
-        }
-
-        private void dbpBtnRestart_MouseLeave(object sender, EventArgs e)
-        {
-            dbpBtnRestart.BackgroundImage = Resources.glass_btn_restart_norm;
-        }
-
-        private void dbpBtnRestart_Click(object sender, EventArgs e)
-        {
-            if (AppMessages.AskYesNo("Do you wish to restart InfoScreen?"))
-            {
-                LogShutdown("Restart confirmed.");
-                frmMain? mainForm = Application.OpenForms.OfType<frmMain>().FirstOrDefault();
-                LogShutdown("Calling PrepareForShutdown().");
-                mainForm?.PrepareForShutdown();
-                LogShutdown("PrepareForShutdown() returned.");
-
-                frmClosing frmClosing = new frmClosing();
-                frmClosing.setRestarting(true);
-                LogShutdown("Showing frmClosing for restart.");
-                frmClosing.ShowDialog(this);
-                LogShutdown("frmClosing restart dialog returned.");
-            }
-        }
-
-        private void appPnlBrowser_Click(object sender, EventArgs e)
-        {
-            SendAppChange(sender, e, "browser");
-        }
-
-        private void aloneButton1_Click(object sender, EventArgs e)
-        {
-            frmSplash frmSplash = new frmSplash();
-            frmSplash.ShowDialog(this);
-            frmSplash.BringToFront();
+            flowLayoutPanel1.ResumeLayout(true);
         }
     }
+
+    private frmMain? Main() => Application.OpenForms.OfType<frmMain>().FirstOrDefault();
+
+    private void AddSystemApp(string name, Image icon, Action action)
+    {
+        Panel tile = CreateTile(name, icon, action);
+        flowLayoutPanel1.Controls.Add(tile);
+    }
+
+    private void AddApplet(AppletDefinition applet)
+    {
+        PictureBox iconBox;
+        Panel tile = CreateTile(applet.Name, SystemIcons.Application.ToBitmap(),
+            () => Main()?.ShowApplet(applet), out iconBox);
+        flowLayoutPanel1.Controls.Add(tile);
+
+        if (!string.IsNullOrWhiteSpace(applet.IconUrl))
+            _ = LoadRemoteIconAsync(iconBox, applet.IconUrl);
+    }
+
+    private Panel CreateTile(string name, Image icon, Action action) =>
+        CreateTile(name, icon, action, out _);
+
+    private Panel CreateTile(string name, Image icon, Action action, out PictureBox iconBox)
+    {
+        Panel tile = new()
+        {
+            Size = new Size(82, 98),
+            Margin = new Padding(3),
+            Cursor = Cursors.Hand
+        };
+
+        iconBox = new PictureBox
+        {
+            Image = icon,
+            Location = new Point(17, 12),
+            Size = new Size(49, 49),
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Cursor = Cursors.Hand
+        };
+
+        Label label = new()
+        {
+            AutoEllipsis = true,
+            Location = new Point(3, 64),
+            Size = new Size(76, 30),
+            Text = name,
+            TextAlign = ContentAlignment.TopCenter,
+            Cursor = Cursors.Hand
+        };
+
+        void Click(object? sender, EventArgs e) => action();
+        tile.Click += Click;
+        iconBox.Click += Click;
+        label.Click += Click;
+
+        tile.Controls.Add(label);
+        tile.Controls.Add(iconBox);
+        return tile;
+    }
+
+    private static async Task LoadRemoteIconAsync(PictureBox box, string url)
+    {
+        try
+        {
+            byte[] bytes = await IconClient.GetByteArrayAsync(url);
+            using MemoryStream stream = new(bytes);
+            using Image image = Image.FromStream(stream);
+            if (!box.IsDisposed) box.Image = new Bitmap(image);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Unable to load applet icon {url}: {ex.Message}");
+        }
+    }
+
+    private void OpenInfoStore()
+    {
+        using frmInfoStore store = new();
+        store.AppletsChanged += (_, _) => RebuildApps();
+        store.ShowDialog(FindForm());
+        RebuildApps();
+    }
+
+    private void LogShutdown(string message)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(ShutdownLogPath)!);
+            File.AppendAllText(ShutdownLogPath, $"{DateTime.Now:O} ctrlAppsPanel {message}{Environment.NewLine}");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Unable to write shutdown diagnostics: {ex}");
+        }
+    }
+
+    private void ctrlAppsPanel_Load(object sender, EventArgs e) { }
+
+    private void dbpBtnClose_MouseEnter(object sender, EventArgs e) =>
+        dbpBtnClose.BackgroundImage = Resources.glass_btn_close_hover;
+
+    private void dbpBtnClose_MouseLeave(object sender, EventArgs e) =>
+        dbpBtnClose.BackgroundImage = Resources.glass_btn_close_norm;
+
+    private void dbpBtnRestart_MouseEnter(object sender, EventArgs e) =>
+        dbpBtnRestart.BackgroundImage = Resources.glass_btn_restart_hover;
+
+    private void dbpBtnRestart_MouseLeave(object sender, EventArgs e) =>
+        dbpBtnRestart.BackgroundImage = Resources.glass_btn_restart_norm;
+
+    private void dbpBtnClose_Click(object sender, EventArgs e)
+    {
+        if (!AppMessages.AskYesNo("Do you wish to close InfoScreen?")) return;
+        LogShutdown("Close confirmed.");
+        frmMain? mainForm = Main();
+        mainForm?.PrepareForShutdown();
+        using frmClosing closing = new();
+        closing.setRestarting(false);
+        closing.ShowDialog(this);
+    }
+
+    private void dbpBtnRestart_Click(object sender, EventArgs e)
+    {
+        if (!AppMessages.AskYesNo("Do you wish to restart InfoScreen?")) return;
+        LogShutdown("Restart confirmed.");
+        frmMain? mainForm = Main();
+        mainForm?.PrepareForShutdown();
+        using frmClosing closing = new();
+        closing.setRestarting(true);
+        closing.ShowDialog(this);
+    }
+
+    // Kept for designer event bindings left in the legacy layout. The dynamic
+    // panel clears those legacy tiles immediately after InitializeComponent().
+    private void appPnlPhilo_Click(object sender, EventArgs e) { }
+    private void appPnlYouTube_Click(object sender, EventArgs e) { }
+    private void appPnlTapo_Click(object sender, EventArgs e) { }
+    private void appPnlBrowser_Click(object sender, EventArgs e) { }
 }
