@@ -28,6 +28,8 @@ public partial class ctrlAppsPanel : UserControl
 
         flowLayoutPanel1.AutoScroll = true;
         flowLayoutPanel1.WrapContents = true;
+        flowLayoutPanel1.FlowDirection = FlowDirection.LeftToRight;
+        flowLayoutPanel1.Padding = new Padding(8, 8, 0, 8);
         RebuildApps();
     }
 
@@ -93,7 +95,7 @@ public partial class ctrlAppsPanel : UserControl
         Panel tile = new()
         {
             Size = new Size(tileWidth, tileHeight),
-            Margin = new Padding(3),
+            Margin = new Padding(3, 3, 12, 3),
             Cursor = Cursors.Hand
         };
 
