@@ -13,11 +13,12 @@ public sealed class frmInfoStore : Form
 
     public event EventHandler? AppletsChanged;
 
+    private bool _initialized;
+
     public frmInfoStore()
     {
         Text = "InfoStore";
         FormBorderStyle = FormBorderStyle.None;
-        WindowState = FormWindowState.Maximized;
         BackColor = Color.FromArgb(18, 18, 18);
         Controls.Add(_webView);
         Shown += frmInfoStore_Shown;
@@ -25,12 +26,19 @@ public sealed class frmInfoStore : Form
 
     private async void frmInfoStore_Shown(object? sender, EventArgs e)
     {
+        if (_initialized)
+        {
+            await SendCatalogAsync();
+            return;
+        }
+
         try
         {
             await _webView.EnsureCoreWebView2Async();
             _webView.CoreWebView2.WebMessageReceived -= WebMessageReceived;
             _webView.CoreWebView2.WebMessageReceived += WebMessageReceived;
             _webView.NavigateToString(BuildHtml());
+            _initialized = true;
         }
         catch (Exception ex)
         {
@@ -47,7 +55,7 @@ public sealed class frmInfoStore : Form
             JsonElement root = doc.RootElement;
             string action = root.GetProperty("action").GetString() ?? "";
 
-            if (action == "close") { Close(); return; }
+            if (action == "close") { Hide(); return; }
             if (action == "refresh") { await SendCatalogAsync(); return; }
             if (!root.TryGetProperty("id", out JsonElement idElement)) return;
 
