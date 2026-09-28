@@ -505,6 +505,7 @@ namespace InfoDisplayApp
                 _appletView.Visible = true;
                 _appletView.BringToFront();
                 _appletView.SetMuted(_emergencyAlertActive);
+                _appletView.ConfigureMediaPlayback(applet.Capabilities?.MediaPlayback == true);
                 await _appletView.NavigateAsync(applet.Url);
                 SaveLastApp("applet", applet.Id);
 
