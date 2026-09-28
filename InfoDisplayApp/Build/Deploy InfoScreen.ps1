@@ -5,7 +5,8 @@ $Destination = "\\INFOSCREEN\ServerShare\InfoScreen"
 # These directories survive deployment.
 $PreserveDirectories = @(
     "InfoDisplayApp.exe.WebView2",
-    "logs"
+    "logs",
+    "applets"
 )
 
 Write-Host ""
@@ -166,7 +167,8 @@ Write-Host ""
 
 $ExcludedSourceDirectories = @(
     "$Source\InfoDisplayApp.exe.WebView2",
-    "$Source\logs"
+    "$Source\logs",
+    "$Source\applets"
 )
 
 & robocopy `
@@ -368,6 +370,7 @@ Write-Host ""
 Write-Host "Fresh application files deployed." -ForegroundColor Green
 Write-Host "WebView2 data preserved." -ForegroundColor Green
 Write-Host "Logs preserved." -ForegroundColor Green
+Write-Host "Installed applets preserved." -ForegroundColor Green
 Write-Host ""
 Write-Host "InfoScreen is running." -ForegroundColor Green
 Write-Host ""
