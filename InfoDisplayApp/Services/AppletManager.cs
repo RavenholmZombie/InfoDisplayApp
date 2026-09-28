@@ -1,0 +1,54 @@
+using System.Text.Json;
+
+namespace InfoDisplayApp.Services;
+
+public sealed class AppletManager
+{
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true, WriteIndented = true };
+    public string AppletsDirectory { get; } = Path.Combine(AppContext.BaseDirectory, "applets");
+
+    public AppletManager() => Directory.CreateDirectory(AppletsDirectory);
+
+    public IReadOnlyList<AppletDefinition> GetInstalledApplets()
+    {
+        Directory.CreateDirectory(AppletsDirectory);
+        List<AppletDefinition> applets = new();
+        foreach (string file in Directory.EnumerateFiles(AppletsDirectory, "*.json"))
+        {
+            try
+            {
+                AppletDefinition? applet = JsonSerializer.Deserialize<AppletDefinition>(File.ReadAllText(file), JsonOptions);
+                if (applet != null && IsValid(applet)) applets.Add(applet);
+            }
+            catch { }
+        }
+        return applets.OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    public bool IsInstalled(string id) => GetInstalledApplets().Any(a => a.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+    public async Task InstallAsync(AppletDefinition applet)
+    {
+        if (!IsValid(applet)) throw new InvalidDataException("The applet definition is incomplete or invalid.");
+        string destination = Path.Combine(AppletsDirectory, GetSafeId(applet.Id) + ".json");
+        await File.WriteAllTextAsync(destination, JsonSerializer.Serialize(applet, JsonOptions));
+    }
+
+    public void Uninstall(string id)
+    {
+        string destination = Path.Combine(AppletsDirectory, GetSafeId(id) + ".json");
+        if (File.Exists(destination)) File.Delete(destination);
+    }
+
+    public static bool IsValid(AppletDefinition applet) =>
+        !string.IsNullOrWhiteSpace(applet.Id) && !string.IsNullOrWhiteSpace(applet.Name) &&
+        Uri.TryCreate(applet.Url, UriKind.Absolute, out Uri? uri) &&
+        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    private static string GetSafeId(string id)
+    {
+        string safe = new(id.Where(c => char.IsLetterOrDigit(c) || c is '-' or '_').ToArray());
+        if (string.IsNullOrWhiteSpace(safe)) throw new InvalidDataException("Applet ID does not contain a usable filename.");
+        return safe;
+    }
+}
