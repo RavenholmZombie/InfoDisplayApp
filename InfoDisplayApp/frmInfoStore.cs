@@ -131,5 +131,5 @@ for(const a of m.apps){const c=document.createElement('div');c.className='card';
 c.innerHTML='<img class="icon" src="'+(a.IconUrl||'')+'" onerror="this.style.visibility=\'hidden\'"><div><div class="name">'+a.Name+'</div><div class="meta">v'+a.Version+' - '+(a.Author||'Unknown author')+'</div></div><div class="desc">'+(a.Description||'')+'</div><button class="action '+(a.installed?'uninstall':'install')+'">'+(a.installed?'Uninstall':'Install')+'</button>';
 c.querySelector('button').onclick=()=>send(a.installed?'uninstall':'install',a.Id);box.appendChild(c);}});
 refresh();</script></body></html>
-"""
+""";
 }
