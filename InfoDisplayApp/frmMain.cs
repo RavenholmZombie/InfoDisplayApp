@@ -569,13 +569,17 @@ namespace InfoDisplayApp
             try
             {
                 _browserForm.ShowDialog(this);
-                _browserForm.BringToFront();
             }
             finally
             {
                 _browserForm.Dispose();
                 _browserForm = null;
             }
+
+            // Browser is transient just like InfoStore. Closing it should reveal
+            // the last real TV-panel app rather than the blank pnlTV underneath.
+            if (!TryRestoreLastContent())
+                ShowAppletLandingPage();
 
             UpdateModeButtons(true);
         }
