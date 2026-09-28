@@ -5,7 +5,7 @@ namespace InfoDisplayApp.Services;
 public sealed class AppletManager
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true, WriteIndented = true };
-    private static readonly HttpClient IconClient = new() { Timeout = TimeSpan.FromSeconds(15) };
+    private static readonly System.Net.Http.HttpClient IconClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
     public string AppletsDirectory { get; } = Path.Combine(AppContext.BaseDirectory, "applets");
     public string IconsDirectory => Path.Combine(AppletsDirectory, "icons");
