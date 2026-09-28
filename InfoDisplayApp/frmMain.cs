@@ -10,6 +10,7 @@ namespace InfoDisplayApp
     {
         private ctrlAppletWebView? _appletView;
         private frmInfoStore? _infoStore;
+        private Panel? _appletLandingPage;
         private ctrlCameras? _cameraView;
         private ctrlAppsPanel? _appsPanel;
         private ctrlTicker? _normalTicker;
@@ -496,6 +497,7 @@ namespace InfoDisplayApp
             try
             {
                 _infoStore?.Hide();
+                if (_appletLandingPage != null) _appletLandingPage.Visible = false;
                 _cameraView.SetMuted(true);
                 _cameraView.StopCamera();
                 _cameraView.Visible = false;
@@ -521,6 +523,7 @@ namespace InfoDisplayApp
                 return;
 
             _appsForm?.Hide();
+            if (_appletLandingPage != null) _appletLandingPage.Visible = false;
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
             _cameraView.Visible = false;
@@ -537,12 +540,12 @@ namespace InfoDisplayApp
                     Visible = false
                 };
                 _infoStore.AppletsChanged += (_, _) => _appsPanel?.RebuildApps();
+                _infoStore.CloseRequested += (_, _) => CloseInfoStore();
                 pnlTV.Controls.Add(_infoStore);
             }
 
             _infoStore.Show();
             _infoStore.BringToFront();
-            SaveLastApp("infostore");
             UpdateModeButtons(true);
         }
 
@@ -552,6 +555,7 @@ namespace InfoDisplayApp
                 return;
 
             _infoStore?.Hide();
+            if (_appletLandingPage != null) _appletLandingPage.Visible = false;
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
             _cameraView.Visible = false;
@@ -582,6 +586,7 @@ namespace InfoDisplayApp
                 return;
 
             _infoStore?.Hide();
+            if (_appletLandingPage != null) _appletLandingPage.Visible = false;
             _appletView.Visible = false;
             _appletView.SetMuted(true);
 
@@ -598,43 +603,55 @@ namespace InfoDisplayApp
 
         private void RestoreLastApp()
         {
+            if (TryRestoreLastContent())
+                return;
+
+            ShowAppletLandingPage();
+        }
+
+        private void CloseInfoStore()
+        {
+            _infoStore?.Hide();
+
+            if (TryRestoreLastContent())
+                return;
+
+            ShowAppletLandingPage();
+        }
+
+        private bool TryRestoreLastContent()
+        {
             try
             {
-                if (File.Exists(LastAppStatePath))
+                if (!File.Exists(LastAppStatePath))
+                    return false;
+
+                using System.Text.Json.JsonDocument doc =
+                    System.Text.Json.JsonDocument.Parse(File.ReadAllText(LastAppStatePath));
+
+                string type = doc.RootElement.TryGetProperty("type", out var typeElement)
+                    ? typeElement.GetString() ?? ""
+                    : "";
+                string id = doc.RootElement.TryGetProperty("id", out var idElement)
+                    ? idElement.GetString() ?? ""
+                    : "";
+
+                if (type.Equals("tapo", StringComparison.OrdinalIgnoreCase))
                 {
-                    using System.Text.Json.JsonDocument doc =
-                        System.Text.Json.JsonDocument.Parse(File.ReadAllText(LastAppStatePath));
+                    ShowCameraMode();
+                    return true;
+                }
 
-                    string type = doc.RootElement.TryGetProperty("type", out var typeElement)
-                        ? typeElement.GetString() ?? ""
-                        : "";
-                    string id = doc.RootElement.TryGetProperty("id", out var idElement)
-                        ? idElement.GetString() ?? ""
-                        : "";
+                if (type.Equals("applet", StringComparison.OrdinalIgnoreCase))
+                {
+                    AppletDefinition? applet = new AppletManager()
+                        .GetInstalledApplets()
+                        .FirstOrDefault(a => a.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
-                    if (type.Equals("tapo", StringComparison.OrdinalIgnoreCase))
+                    if (applet != null)
                     {
-                        ShowCameraMode();
-                        return;
-                    }
-
-                    if (type.Equals("infostore", StringComparison.OrdinalIgnoreCase))
-                    {
-                        ShowInfoStore();
-                        return;
-                    }
-
-                    if (type.Equals("applet", StringComparison.OrdinalIgnoreCase))
-                    {
-                        AppletDefinition? applet = new AppletManager()
-                            .GetInstalledApplets()
-                            .FirstOrDefault(a => a.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
-
-                        if (applet != null)
-                        {
-                            ShowApplet(applet);
-                            return;
-                        }
+                        ShowApplet(applet);
+                        return true;
                     }
                 }
             }
@@ -643,16 +660,53 @@ namespace InfoDisplayApp
                 Debug.WriteLine($"Unable to restore last app: {ex}");
             }
 
-            // Missing/corrupt state, or an applet that was uninstalled:
-            // fall back to the first installed applet so pnlTV is still useful.
-            AppletDefinition? fallback = new AppletManager()
-                .GetInstalledApplets()
-                .FirstOrDefault();
+            return false;
+        }
 
-            if (fallback != null)
-                ShowApplet(fallback);
-            else
-                ShowCameraMode();
+        private void ShowAppletLandingPage()
+        {
+            _infoStore?.Hide();
+
+            if (_appletView != null)
+            {
+                _appletView.SetMuted(true);
+                _appletView.Visible = false;
+            }
+
+            if (_cameraView != null)
+            {
+                _cameraView.SetMuted(true);
+                _cameraView.StopCamera();
+                _cameraView.Visible = false;
+            }
+
+            if (_appletLandingPage == null || _appletLandingPage.IsDisposed)
+            {
+                _appletLandingPage = new Panel
+                {
+                    Dock = DockStyle.Fill,
+                    BackColor = Color.FromArgb(18, 18, 18)
+                };
+
+                Label title = new()
+                {
+                    AutoSize = false,
+                    Dock = DockStyle.Fill,
+                    Text = "Open the Apps Drawer and choose an Applet",
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    ForeColor = Color.White,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 26F, FontStyle.Regular, GraphicsUnit.Point)
+                };
+
+                _appletLandingPage.Controls.Add(title);
+                pnlTV.Controls.Add(_appletLandingPage);
+            }
+
+            _appletLandingPage.Visible = true;
+            _appletLandingPage.BringToFront();
+            _appsForm?.Hide();
+            UpdateModeButtons(true);
         }
 
         private void SaveLastApp(string type, string? id = null)
