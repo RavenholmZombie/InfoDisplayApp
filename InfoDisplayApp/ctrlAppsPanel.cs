@@ -147,10 +147,7 @@ public partial class ctrlAppsPanel : UserControl
 
     private void OpenInfoStore()
     {
-        using frmInfoStore store = new();
-        store.AppletsChanged += (_, _) => RebuildApps();
-        store.ShowDialog(FindForm());
-        RebuildApps();
+        Main()?.ShowInfoStore();
     }
 
     private void LogShutdown(string message)
