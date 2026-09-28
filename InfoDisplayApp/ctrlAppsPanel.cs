@@ -67,6 +67,10 @@ public partial class ctrlAppsPanel : UserControl
             () => Main()?.ShowApplet(applet), out iconBox);
         flowLayoutPanel1.Controls.Add(tile);
 
+        string? cachedIcon = _appletManager.GetCachedIconPath(applet.Id);
+        if (cachedIcon != null && TryLoadIcon(iconBox, cachedIcon))
+            return;
+
         if (!string.IsNullOrWhiteSpace(applet.IconUrl))
             _ = LoadRemoteIconAsync(iconBox, applet.IconUrl);
     }
@@ -110,6 +114,20 @@ public partial class ctrlAppsPanel : UserControl
         tile.Controls.Add(label);
         tile.Controls.Add(iconBox);
         return tile;
+    }
+
+    private static bool TryLoadIcon(PictureBox box, string path)
+    {
+        try
+        {
+            using Image image = Image.FromFile(path);
+            box.Image = new Bitmap(image);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static async Task LoadRemoteIconAsync(PictureBox box, string url)
