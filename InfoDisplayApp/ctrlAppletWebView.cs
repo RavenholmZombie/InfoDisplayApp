@@ -10,7 +10,9 @@ public sealed class ctrlAppletWebView : UserControl
 
     public ctrlAppletWebView()
     {
-        _webView = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.Black };
+        // Keep the host background consistent with a normal browser. A black default
+        // background bleeds through any page areas whose CSS background is transparent.
+        _webView = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.White };
         Controls.Add(_webView);
         _webView.CoreWebView2InitializationCompleted += WebView_Initialized;
     }
@@ -34,6 +36,14 @@ public sealed class ctrlAppletWebView : UserControl
 
     private void WebView_Initialized(object? sender, CoreWebView2InitializationCompletedEventArgs e)
     {
-        if (e.IsSuccess && _webView.CoreWebView2 != null) _webView.CoreWebView2.IsMuted = _muted;
+        if (e.IsSuccess && _webView.CoreWebView2 != null)
+        {
+            _webView.CoreWebView2.IsMuted = _muted;
+
+            // Applets are arbitrary websites, so don't force InfoScreen's dark host
+            // appearance onto them. Light matches normal browser rendering and keeps
+            // transparent/unstyled page backgrounds from becoming black.
+            _webView.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Light;
+        }
     }
 }
