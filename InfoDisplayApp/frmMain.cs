@@ -8,9 +8,8 @@ namespace InfoDisplayApp
 {
     public partial class frmMain : Form
     {
-        private ctrlPhiloWebView? _philoView;
+        private ctrlAppletWebView? _appletView;
         private ctrlCameras? _cameraView;
-        private ctrlYouTubeWebView? _youtubeView;
         private ctrlAppsPanel? _appsPanel;
         private ctrlTicker? _normalTicker;
         private ctrlEmergencyTicker? _emergencyTicker;
@@ -275,28 +274,20 @@ namespace InfoDisplayApp
 
         private void frmMain_Load(object sender, EventArgs e)
         {
-            _philoView = new ctrlPhiloWebView
+            _appletView = new ctrlAppletWebView
             {
                 Dock = DockStyle.Fill,
-                Visible = true
+                Visible = false
             };
-            pnlTV.Controls.Add(_philoView);
+            pnlTV.Controls.Add(_appletView);
 
             _cameraView = new ctrlCameras
             {
                 Dock = DockStyle.Fill,
-                Visible = false
+                Visible = true
             };
             pnlTV.Controls.Add(_cameraView);
-
-            _youtubeView = new ctrlYouTubeWebView
-            {
-                Dock = DockStyle.Fill,
-                Visible = false
-            };
-
-            pnlTV.Controls.Add(_youtubeView);
-            _philoView.BringToFront();
+            _cameraView.BringToFront();
 
             ctrlTimeDate ctrlTimeDate = new ctrlTimeDate
             {
@@ -475,18 +466,14 @@ namespace InfoDisplayApp
         {
             if (muted)
             {
-                _philoView?.SetMuted(true);
-                _youtubeView?.SetMuted(true);
+                _appletView?.SetMuted(true);
                 _cameraView?.SetMuted(true);
                 _browserForm?.SetMuted(true);
                 return;
             }
 
-            if (_philoView != null)
-                _philoView.SetMuted(!_philoView.Visible);
-
-            if (_youtubeView != null)
-                _youtubeView.SetMuted(!_youtubeView.Visible);
+            if (_appletView != null)
+                _appletView.SetMuted(!_appletView.Visible);
 
             if (_cameraView != null)
                 _cameraView.SetMuted(!_cameraView.Visible);
@@ -494,38 +481,41 @@ namespace InfoDisplayApp
             _browserForm?.SetMuted(false);
         }
 
-        public void ShowPhiloMode()
+        public async void ShowApplet(AppletDefinition applet)
         {
-            if (_philoView == null || _cameraView == null)
+            if (_appletView == null || _cameraView == null)
                 return;
 
-            _cameraView.SetMuted(true);
-            _cameraView.StopCamera();
-            _cameraView.Visible = false;
-            _youtubeView?.SetMuted(true);
-            if (_youtubeView != null)
-                _youtubeView.Visible = false;
+            try
+            {
+                _cameraView.SetMuted(true);
+                _cameraView.StopCamera();
+                _cameraView.Visible = false;
 
-            _philoView.SetMuted(_emergencyAlertActive);
-            _philoView.Visible = true;
-            _philoView.BringToFront();
-            pnlApps.Hide();
+                _appletView.Visible = true;
+                _appletView.BringToFront();
+                _appletView.SetMuted(_emergencyAlertActive);
+                await _appletView.NavigateAsync(applet.Url);
 
-            UpdateModeButtons(true);
+                _appsForm?.Hide();
+                UpdateModeButtons(true);
+            }
+            catch (Exception ex)
+            {
+                AppMessages.Error($"Unable to open {applet.Name}: {ex.Message}");
+            }
         }
 
         public void ShowBrowserMode()
         {
-            if (_youtubeView == null || _cameraView == null || _philoView == null)
+            if (_appletView == null || _cameraView == null)
                 return;
 
             _cameraView.SetMuted(true);
             _cameraView.StopCamera();
             _cameraView.Visible = false;
-            _philoView.SetMuted(true);
-            _youtubeView.Visible = true;
-            _youtubeView.SetMuted(true);
-            _youtubeView.BringToFront();
+            _appletView.SetMuted(true);
+            _appletView.Visible = false;
             pnlApps.Hide();
 
             _browserForm = new frmBrowser();
@@ -547,14 +537,11 @@ namespace InfoDisplayApp
 
         public void ShowCameraMode()
         {
-            if (_philoView == null || _cameraView == null)
+            if (_appletView == null || _cameraView == null)
                 return;
 
-            _philoView.Visible = false;
-            _philoView.SetMuted(true);
-            _youtubeView?.SetMuted(true);
-            if (_youtubeView != null)
-                _youtubeView.Visible = false;
+            _appletView.Visible = false;
+            _appletView.SetMuted(true);
 
             _cameraView.Visible = true;
             _cameraView.BringToFront();
@@ -566,25 +553,7 @@ namespace InfoDisplayApp
             UpdateModeButtons(false);
         }
 
-        public void ShowYouTubeMode()
-        {
-            if (_youtubeView == null || _cameraView == null || _philoView == null)
-                return;
-
-            _cameraView.SetMuted(true);
-            _cameraView.StopCamera();
-            _cameraView.Visible = false;
-            _philoView.SetMuted(true);
-
-            _youtubeView.Visible = true;
-            _youtubeView.SetMuted(_emergencyAlertActive);
-            _youtubeView.BringToFront();
-            pnlApps.Hide();
-
-            UpdateModeButtons(true);
-        }
-
-        /// <summary>
+         /// <summary>
         /// Stops and disposes all media hosted by the TV panel before the closing
         /// screen appears. This is used for both exit and restart so no stream
         /// audio continues underneath frmClosing.
@@ -622,18 +591,15 @@ namespace InfoDisplayApp
             // which owns the ctrlAppsPanel currently executing the Close/Restart
             // click handler. Disposing every pnlTV child here tears down the caller
             // mid-event and can freeze shutdown with ObjectDisposedException.
-            LogShutdown("Disposing Philo media control.");
-            DisposeTvMediaControl(ref _philoView);
-            LogShutdown("Philo media control disposed.");
+            LogShutdown("Disposing applet WebView control.");
+            DisposeTvMediaControl(ref _appletView);
+            LogShutdown("Applet WebView control disposed.");
 
             LogShutdown("Disposing camera media control.");
             DisposeTvMediaControl(ref _cameraView);
             LogShutdown("Camera media control disposed.");
 
-            LogShutdown("Disposing YouTube media control.");
-            DisposeTvMediaControl(ref _youtubeView);
-            LogShutdown("YouTube media control disposed.");
-            LogShutdown("PrepareForShutdown completed.");
+             LogShutdown("PrepareForShutdown completed.");
         }
 
         private void DisposeTvMediaControl<T>(ref T? control)
