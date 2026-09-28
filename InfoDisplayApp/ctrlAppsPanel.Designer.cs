@@ -74,7 +74,7 @@
             panel1.ForeColor = Color.Black;
             panel1.Location = new Point(15, 61);
             panel1.Name = "panel1";
-            panel1.Size = new Size(267, 220);
+            panel1.Size = new Size(351, 288);
             panel1.TabIndex = 0;
             // 
             // flowLayoutPanel1
@@ -87,7 +87,7 @@
             flowLayoutPanel1.Controls.Add(appPnlBrowser);
             flowLayoutPanel1.Location = new Point(0, 0);
             flowLayoutPanel1.Name = "flowLayoutPanel1";
-            flowLayoutPanel1.Size = new Size(265, 218);
+            flowLayoutPanel1.Size = new Size(349, 286);
             flowLayoutPanel1.TabIndex = 0;
             // 
             // appPnlTapo
@@ -271,7 +271,7 @@
             dbpBtnRestart.BackgroundImage = Properties.Resources.glass_btn_restart_norm;
             dbpBtnRestart.BackgroundImageLayout = ImageLayout.Stretch;
             dbpBtnRestart.Controls.Add(lblBtnRestart);
-            dbpBtnRestart.Location = new Point(156, 18);
+            dbpBtnRestart.Location = new Point(240, 18);
             dbpBtnRestart.Name = "dbpBtnRestart";
             dbpBtnRestart.Size = new Size(125, 24);
             dbpBtnRestart.TabIndex = 4;
@@ -302,7 +302,7 @@
             Controls.Add(panel1);
             DoubleBuffered = true;
             Name = "ctrlAppsPanel";
-            Size = new Size(297, 304);
+            Size = new Size(381, 372);
             Load += ctrlAppsPanel_Load;
             panel1.ResumeLayout(false);
             flowLayoutPanel1.ResumeLayout(false);
