@@ -7,7 +7,7 @@ namespace InfoDisplayApp;
 public partial class ctrlAppsPanel : UserControl
 {
     private readonly AppletManager _appletManager = new();
-    private static readonly HttpClient IconClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private static readonly System.Net.Http.HttpClient IconClient = new() { Timeout = TimeSpan.FromSeconds(10) };
 
     private string ShutdownLogPath =>
         Path.Combine(AppContext.BaseDirectory, "logs", $"InfoScreen-SHUTDOWN-{Environment.ProcessId}.log");
