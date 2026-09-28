@@ -38,10 +38,7 @@ namespace InfoDisplayApp.Properties
 
                 _mediaPlayer.EndReached += MediaPlayer_EndReached;
                 _mediaPlayer.EncounteredError += MediaPlayer_EncounteredError;
-                _mediaPlayer.Playing += (s, args) =>
-                {
-                    BringToFront();
-                };
+                _mediaPlayer.Playing += MediaPlayer_Playing;
 
                 string introPath = Path.Combine(
                     AppContext.BaseDirectory, "Resources", "intro.mov");
@@ -59,6 +56,24 @@ namespace InfoDisplayApp.Properties
                 Debug.WriteLine($"Intro playback failed: {ex}");
                 CompleteIntro();
             }
+        }
+
+        private void MediaPlayer_Playing(object? sender, EventArgs e)
+        {
+            if (IsDisposed || Disposing)
+                return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke((Action)(() =>
+                {
+                    if (!IsDisposed && !Disposing)
+                        BringToFront();
+                }));
+                return;
+            }
+
+            BringToFront();
         }
 
         private void MediaPlayer_EndReached(object? sender, EventArgs e)
@@ -96,6 +111,7 @@ namespace InfoDisplayApp.Properties
             {
                 _mediaPlayer.EndReached -= MediaPlayer_EndReached;
                 _mediaPlayer.EncounteredError -= MediaPlayer_EncounteredError;
+                _mediaPlayer.Playing -= MediaPlayer_Playing;
                 _mediaPlayer.Stop();
             }
 
