@@ -80,9 +80,19 @@ public partial class ctrlAppsPanel : UserControl
 
     private Panel CreateTile(string name, Image icon, Action action, out PictureBox iconBox)
     {
+        // Keep every drawer entry on the same fixed tile geometry. Some service
+        // artwork has very different source aspect ratios/canvas padding, so the
+        // PictureBox itself is centered explicitly rather than relying on the
+        // artwork dimensions.
+        const int tileWidth = 86;
+        const int tileHeight = 104;
+        const int iconSize = 50;
+        const int iconTop = 10;
+        const int labelTop = 64;
+
         Panel tile = new()
         {
-            Size = new Size(82, 98),
+            Size = new Size(tileWidth, tileHeight),
             Margin = new Padding(3),
             Cursor = Cursors.Hand
         };
@@ -90,8 +100,8 @@ public partial class ctrlAppsPanel : UserControl
         iconBox = new PictureBox
         {
             Image = icon,
-            Location = new Point(17, 12),
-            Size = new Size(49, 49),
+            Location = new Point((tileWidth - iconSize) / 2, iconTop),
+            Size = new Size(iconSize, iconSize),
             SizeMode = PictureBoxSizeMode.Zoom,
             Cursor = Cursors.Hand
         };
@@ -99,8 +109,8 @@ public partial class ctrlAppsPanel : UserControl
         Label label = new()
         {
             AutoEllipsis = true,
-            Location = new Point(3, 64),
-            Size = new Size(76, 30),
+            Location = new Point(2, labelTop),
+            Size = new Size(tileWidth - 4, 36),
             Text = name,
             TextAlign = ContentAlignment.TopCenter,
             Cursor = Cursors.Hand
