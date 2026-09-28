@@ -516,7 +516,7 @@ namespace InfoDisplayApp
             _cameraView.Visible = false;
             _appletView.SetMuted(true);
             _appletView.Visible = false;
-            pnlApps.Hide();
+            _appsForm?.Hide();
 
             _browserForm = new frmBrowser();
             _browserForm.SetMuted(_emergencyAlertActive);
@@ -548,7 +548,7 @@ namespace InfoDisplayApp
 
             _cameraView.SetMuted(_emergencyAlertActive);
             _cameraView.StartCamera();
-            pnlApps.Hide();
+            _appsForm?.Hide();
 
             UpdateModeButtons(false);
         }
