@@ -33,6 +33,10 @@ namespace InfoDisplayApp
         private bool _emergencyAlertActive;
         private string? _currentAlertId;
 
+        private const string LastAppStateFileName = "last-app.json";
+        private string LastAppStatePath =>
+            Path.Combine(new AppletManager().AppletsDirectory, LastAppStateFileName);
+
         public string tickerMode = "normal";
 
         private string ShutdownLogPath =>
@@ -289,13 +293,8 @@ namespace InfoDisplayApp
             };
             pnlTV.Controls.Add(_cameraView);
 
-            // With Philo/YouTube no longer hard-coded, start on the first
-            // installed applet when one exists instead of leaving pnlTV black.
-            AppletDefinition? startupApplet = new AppletManager()
-                .GetInstalledApplets()
-                .FirstOrDefault();
-            if (startupApplet != null)
-                BeginInvoke((Action)(() => ShowApplet(startupApplet)));
+            // Restore the last TV-panel app after the main form has finished loading.
+            BeginInvoke((Action)RestoreLastApp);
 
             ctrlTimeDate ctrlTimeDate = new ctrlTimeDate
             {
@@ -505,6 +504,7 @@ namespace InfoDisplayApp
                 _appletView.BringToFront();
                 _appletView.SetMuted(_emergencyAlertActive);
                 await _appletView.NavigateAsync(applet.Url);
+                SaveLastApp("applet", applet.Id);
 
                 _appsForm?.Hide();
                 UpdateModeButtons(true);
@@ -542,6 +542,7 @@ namespace InfoDisplayApp
 
             _infoStore.Show();
             _infoStore.BringToFront();
+            SaveLastApp("infostore");
             UpdateModeButtons(true);
         }
 
@@ -589,9 +590,85 @@ namespace InfoDisplayApp
 
             _cameraView.SetMuted(_emergencyAlertActive);
             _cameraView.StartCamera();
+            SaveLastApp("tapo");
             _appsForm?.Hide();
 
             UpdateModeButtons(false);
+        }
+
+        private void RestoreLastApp()
+        {
+            try
+            {
+                if (File.Exists(LastAppStatePath))
+                {
+                    using System.Text.Json.JsonDocument doc =
+                        System.Text.Json.JsonDocument.Parse(File.ReadAllText(LastAppStatePath));
+
+                    string type = doc.RootElement.TryGetProperty("type", out var typeElement)
+                        ? typeElement.GetString() ?? ""
+                        : "";
+                    string id = doc.RootElement.TryGetProperty("id", out var idElement)
+                        ? idElement.GetString() ?? ""
+                        : "";
+
+                    if (type.Equals("tapo", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ShowCameraMode();
+                        return;
+                    }
+
+                    if (type.Equals("infostore", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ShowInfoStore();
+                        return;
+                    }
+
+                    if (type.Equals("applet", StringComparison.OrdinalIgnoreCase))
+                    {
+                        AppletDefinition? applet = new AppletManager()
+                            .GetInstalledApplets()
+                            .FirstOrDefault(a => a.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+                        if (applet != null)
+                        {
+                            ShowApplet(applet);
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to restore last app: {ex}");
+            }
+
+            // Missing/corrupt state, or an applet that was uninstalled:
+            // fall back to the first installed applet so pnlTV is still useful.
+            AppletDefinition? fallback = new AppletManager()
+                .GetInstalledApplets()
+                .FirstOrDefault();
+
+            if (fallback != null)
+                ShowApplet(fallback);
+            else
+                ShowCameraMode();
+        }
+
+        private void SaveLastApp(string type, string? id = null)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(LastAppStatePath)!);
+                string json = System.Text.Json.JsonSerializer.Serialize(
+                    new { type, id },
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(LastAppStatePath, json);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unable to save last app: {ex}");
+            }
         }
 
          /// <summary>
