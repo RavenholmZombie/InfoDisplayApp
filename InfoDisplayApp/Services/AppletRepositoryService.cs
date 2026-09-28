@@ -6,7 +6,7 @@ namespace InfoDisplayApp.Services;
 public sealed class AppletRepositoryService
 {
     private const string RawRoot = "https://raw.githubusercontent.com/RavenholmZombie/InfoScreenAppRepository/main/";
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
+    private readonly System.Net.Http.HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public async Task<IReadOnlyList<AppletDefinition>> GetAvailableAppletsAsync(CancellationToken cancellationToken = default)
