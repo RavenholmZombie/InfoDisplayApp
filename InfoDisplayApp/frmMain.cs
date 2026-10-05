@@ -25,13 +25,18 @@ namespace InfoDisplayApp
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
         private readonly System.Windows.Forms.Timer _alertPollTimer = new System.Windows.Forms.Timer();
+        private readonly System.Windows.Forms.Timer _appletUpdateTimer = new System.Windows.Forms.Timer();
         private readonly NwsAlertService _nwsAlertService = new();
+        private readonly AppletManager _appletManager = new();
+        private readonly AppletRepositoryService _appletRepository = new();
         private readonly Queue<NwsAlertMessage> _pendingAlerts = new();
         private readonly HashSet<string> _seenAlertIds = new(StringComparer.OrdinalIgnoreCase);
 
         private bool _startupSoundPlayed;
         private bool _alertPollInProgress;
         private bool _emergencyAlertActive;
+        private bool _appletUpdateCheckInProgress;
+        private string? _lastPromptedUpdateSignature;
         private string? _currentAlertId;
 
         private const string LastAppStateFileName = "last-app.json";
@@ -90,6 +95,11 @@ namespace InfoDisplayApp
             _alertPollTimer.Interval = 60_000;
             _alertPollTimer.Tick += AlertPollTimer_Tick;
 
+            // Check periodically while InfoScreen is running. The first check is
+            // kicked off once the visible main UI is ready.
+            _appletUpdateTimer.Interval = (int)TimeSpan.FromMinutes(30).TotalMilliseconds;
+            _appletUpdateTimer.Tick += AppletUpdateTimer_Tick;
+
             pboxAppsIcon.MouseEnter += pnlBtnApps_MouseEnter;
             pboxAppsIcon.MouseLeave += pnlBtnApps_MouseLeave;
             pboxAppsIcon.Click += pnlBtnApps_Click;
@@ -109,6 +119,9 @@ namespace InfoDisplayApp
 
             _alertPollTimer.Start();
             _ = PollAlertsAsync();
+
+            _appletUpdateTimer.Start();
+            _ = CheckForAppletUpdatesAsync();
         }
 
         private async Task PlayStartupSoundAsync()
@@ -336,6 +349,60 @@ namespace InfoDisplayApp
             await PollAlertsAsync();
         }
 
+        private async void AppletUpdateTimer_Tick(object? sender, EventArgs e)
+        {
+            await CheckForAppletUpdatesAsync();
+        }
+
+        private async Task CheckForAppletUpdatesAsync()
+        {
+            if (_appletUpdateCheckInProgress || IsDisposed || Disposing)
+                return;
+
+            _appletUpdateCheckInProgress = true;
+            try
+            {
+                IReadOnlyList<AppletUpdate> updates =
+                    await _appletRepository.GetUpdatesAsync(_appletManager);
+
+                if (updates.Count == 0)
+                {
+                    _lastPromptedUpdateSignature = null;
+                    return;
+                }
+
+                string signature = string.Join("|", updates.Select(u =>
+                    $"{u.Available.Id}:{u.Installed.Version}>{u.Available.Version}"));
+
+                // Do not nag every 30 minutes for the exact same set of versions.
+                if (signature == _lastPromptedUpdateSignature)
+                    return;
+
+                _lastPromptedUpdateSignature = signature;
+
+                string summary = updates.Count == 1
+                    ? $"{updates[0].Available.Name} can be updated from version {updates[0].Installed.Version} to {updates[0].Available.Version}."
+                    : $"{updates.Count} installed applets have updates available.";
+
+                if (AppMessages.AskYesNo(
+                    $"{summary}\r\n\r\nWould you like to open the Applet Updates Center now?",
+                    "Yes",
+                    "No"))
+                {
+                    ShowInfoStoreUpdates();
+                }
+            }
+            catch (Exception ex)
+            {
+                // A background repository outage should not interrupt TV viewing.
+                Debug.WriteLine($"Background applet update check failed: {ex}");
+            }
+            finally
+            {
+                _appletUpdateCheckInProgress = false;
+            }
+        }
+
         private async Task PollAlertsAsync(bool replayActiveAlert = false)
         {
             if (_alertPollInProgress || IsDisposed)
@@ -520,6 +587,16 @@ namespace InfoDisplayApp
 
         public void ShowInfoStore()
         {
+            ShowInfoStoreCore(openUpdatesCenter: false);
+        }
+
+        private void ShowInfoStoreUpdates()
+        {
+            ShowInfoStoreCore(openUpdatesCenter: true);
+        }
+
+        private void ShowInfoStoreCore(bool openUpdatesCenter)
+        {
             if (_appletView == null || _cameraView == null)
                 return;
 
@@ -547,6 +624,10 @@ namespace InfoDisplayApp
 
             _infoStore.Show();
             _infoStore.BringToFront();
+
+            if (openUpdatesCenter)
+                _infoStore.ShowUpdatesCenter();
+
             UpdateModeButtons(true);
         }
 
@@ -739,7 +820,8 @@ namespace InfoDisplayApp
         {
             LogShutdown("PrepareForShutdown entered.");
             _alertPollTimer.Stop();
-            LogShutdown("Alert poll timer stopped.");
+            _appletUpdateTimer.Stop();
+            LogShutdown("Alert and applet update timers stopped.");
 
             // Mute first so shutdown is silent even if a player takes a moment
             // to release its underlying media session.
@@ -859,7 +941,9 @@ namespace InfoDisplayApp
 
             _alertPollTimer.Stop();
             _alertPollTimer.Dispose();
-            LogShutdown("Alert poll timer disposed.");
+            _appletUpdateTimer.Stop();
+            _appletUpdateTimer.Dispose();
+            LogShutdown("Alert and applet update timers disposed.");
 
             _displayDiagnosticsMonitor?.Dispose();
             _displayDiagnosticsMonitor = null;
