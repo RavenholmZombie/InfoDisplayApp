@@ -31,6 +31,9 @@ namespace InfoDisplayApp.Properties
         private bool _animationRunning;
         private bool _timerResolutionRequested;
         private bool _weatherUpdating;
+        private bool _offlineMode;
+        private const string OfflineTickerMessage =
+            "InfoScreen is in offline mode. Please check your Internet connection and try again.";
 
         // Lightweight performance instrumentation. Counters are sampled once per
         // second and written by a background task so logging does not add more
@@ -166,11 +169,17 @@ namespace InfoDisplayApp.Properties
 
             LoadStatusConfiguration();
 
-            await Task.WhenAll(
-                UpdateStatusesAsync(),
-                UpdateForecastsAsync());
+            if (!_offlineMode)
+            {
+                await Task.WhenAll(
+                    UpdateStatusesAsync(),
+                    UpdateForecastsAsync());
+            }
 
             LoadTickerMessages();
+
+            if (_offlineMode)
+                ApplyOfflineTickerMessage();
 
             if (_messages.Count > 0)
             {
@@ -187,6 +196,56 @@ namespace InfoDisplayApp.Properties
                 _lastProcessCpuTime = process.TotalProcessorTime;
             _lastDiagnosticTimestamp = Stopwatch.GetTimestamp();
             _diagnosticTimer.Change(1000, 1000);
+        }
+
+        public void SetOfflineMode(bool offline)
+        {
+            if (_offlineMode == offline)
+                return;
+
+            _offlineMode = offline;
+
+            if (offline)
+            {
+                _statusTimer.Stop();
+                _weatherTimer.Stop();
+                ApplyOfflineTickerMessage();
+                return;
+            }
+
+            LoadTickerMessages();
+            if (_messages.Count > 0)
+            {
+                ShowCurrentMessage();
+                StartAnimation();
+            }
+
+            _statusTimer.Start();
+            _weatherTimer.Start();
+            _ = RefreshOnlineDataAsync();
+        }
+
+        private async Task RefreshOnlineDataAsync()
+        {
+            try
+            {
+                await Task.WhenAll(UpdateStatusesAsync(), UpdateForecastsAsync());
+                if (!_offlineMode)
+                    ShowCurrentMessage();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ticker online refresh failed: {ex}");
+            }
+        }
+
+        private void ApplyOfflineTickerMessage()
+        {
+            _messages.Clear();
+            _messages.Add(OfflineTickerMessage);
+            _currentMessageIndex = 0;
+            ShowCurrentMessage();
+            StartAnimation();
         }
 
         private void LoadTickerMessages()
@@ -465,6 +524,12 @@ namespace InfoDisplayApp.Properties
 
         private void ReloadTimer_Tick(object? sender, EventArgs e)
         {
+            if (_offlineMode)
+            {
+                ApplyOfflineTickerMessage();
+                return;
+            }
+
             LoadTickerMessages();
 
             if (_messages.Count > 0 && !_animationRunning)
@@ -908,6 +973,7 @@ namespace InfoDisplayApp.Properties
 
         private async void WeatherTimer_Tick(object? sender, EventArgs e)
         {
+            if (_offlineMode) return;
             _weatherTimer.Stop();
 
             try
@@ -1417,6 +1483,7 @@ namespace InfoDisplayApp.Properties
             object? sender,
             EventArgs e)
         {
+            if (_offlineMode) return;
             _statusTimer.Stop();
 
             try
