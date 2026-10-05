@@ -52,6 +52,56 @@ public sealed class AppletRepositoryService
             .ToList();
     }
 
+    public async Task<IReadOnlyList<AppletUpdate>> GetUpdatesAsync(
+        AppletManager manager,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<AppletDefinition> installed = manager.GetInstalledApplets();
+        if (installed.Count == 0)
+            return Array.Empty<AppletUpdate>();
+
+        IReadOnlyList<AppletDefinition> available = await GetAvailableAppletsAsync(cancellationToken);
+        Dictionary<string, AppletDefinition> repository = available
+            .ToDictionary(a => a.Id, StringComparer.OrdinalIgnoreCase);
+
+        List<AppletUpdate> updates = new();
+        foreach (AppletDefinition local in installed)
+        {
+            if (repository.TryGetValue(local.Id, out AppletDefinition? remote) &&
+                CompareVersions(remote.Version, local.Version) > 0)
+            {
+                updates.Add(new AppletUpdate(local, remote));
+            }
+        }
+
+        return updates.OrderBy(u => u.Available.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    public static int CompareVersions(string? left, string? right)
+    {
+        static int[] Parts(string? value) =>
+            (value ?? "")
+            .Split(new[] { '.', '-', '+' }, StringSplitOptions.RemoveEmptyEntries)
+            .TakeWhile(part => int.TryParse(part, out _))
+            .Select(int.Parse)
+            .ToArray();
+
+        int[] a = Parts(left);
+        int[] b = Parts(right);
+        int count = Math.Max(a.Length, b.Length);
+
+        for (int i = 0; i < count; i++)
+        {
+            int av = i < a.Length ? a[i] : 0;
+            int bv = i < b.Length ? b[i] : 0;
+            int comparison = av.CompareTo(bv);
+            if (comparison != 0)
+                return comparison;
+        }
+
+        return string.Compare(left ?? "", right ?? "", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static System.Net.Http.HttpClient CreateHttpClient()
     {
         System.Net.Http.HttpClient client = new()
@@ -74,3 +124,6 @@ public sealed class AppletRepositoryService
         public string DownloadUrl { get; set; } = "";
     }
 }
+
+
+public sealed record AppletUpdate(AppletDefinition Installed, AppletDefinition Available);
