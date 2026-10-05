@@ -27,6 +27,7 @@ public sealed class ConnectivityService : IDisposable
 
     public bool IsOnline { get; private set; } = true;
     public event EventHandler<bool>? ConnectivityChanged;
+    public event EventHandler<ConnectivityProbeEventArgs>? ProbeStatusChanged;
 
     public ConnectivityService()
     {
@@ -50,7 +51,15 @@ public sealed class ConnectivityService : IDisposable
 
         try
         {
+            ProbeStatusChanged?.Invoke(this,
+                new ConnectivityProbeEventArgs(ConnectivityProbeState.Checking));
+
             bool online = NetworkInterface.GetIsNetworkAvailable() && await ProbeInternetAsync();
+
+            ProbeStatusChanged?.Invoke(this,
+                new ConnectivityProbeEventArgs(
+                    online ? ConnectivityProbeState.Succeeded : ConnectivityProbeState.Failed));
+
             SetState(online);
             return online;
         }
@@ -100,4 +109,18 @@ public sealed class ConnectivityService : IDisposable
         _timer.Dispose();
         _httpClient.Dispose();
     }
+}
+
+
+public enum ConnectivityProbeState
+{
+    Checking,
+    Failed,
+    Succeeded
+}
+
+public sealed class ConnectivityProbeEventArgs : EventArgs
+{
+    public ConnectivityProbeEventArgs(ConnectivityProbeState state) => State = state;
+    public ConnectivityProbeState State { get; }
 }
