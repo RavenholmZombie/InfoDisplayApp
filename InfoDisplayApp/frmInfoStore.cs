@@ -196,8 +196,51 @@ public sealed class frmInfoStore : Form
         }
         catch (Exception ex)
         {
-            Post(new { type = "error", message = "Unable to load the InfoStore repository: " + ex.Message });
+            // The repository may be temporarily unavailable (for example, GitHub
+            // rate limiting). Keep InfoStore useful by showing locally-installed
+            // applets and a generalized repository error banner.
+            IReadOnlyList<AppletDefinition> installedList = _manager.GetInstalledApplets();
+            Post(new
+            {
+                type = "catalog",
+                repositoryError = GetRepositoryErrorMessage(ex),
+                apps = installedList.Select(a => new
+                {
+                    a.Id,
+                    a.Name,
+                    a.Version,
+                    a.Description,
+                    a.IconUrl,
+                    a.Author,
+                    installed = true,
+                    installedVersion = a.Version,
+                    updateAvailable = false
+                })
+            });
+
+            if (_openUpdatesWhenReady)
+            {
+                Post(new { type = "showUpdates" });
+                _openUpdatesWhenReady = false;
+            }
         }
+    }
+
+    private static string GetRepositoryErrorMessage(Exception ex)
+    {
+        if (ex is HttpRequestException http)
+        {
+            if (http.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                return "Remote rate limit exceeded / HTTP 403.";
+
+            if (http.StatusCode.HasValue)
+                return $"Remote server returned HTTP {(int)http.StatusCode.Value}.";
+        }
+
+        if (ex is TaskCanceledException)
+            return "Remote request timed out.";
+
+        return "Remote repository is temporarily unavailable.";
     }
 
     private static void LogUpdateFailure(string message, Exception ex)
@@ -226,7 +269,7 @@ body{font-family:Segoe UI,Arial;background:#121212;color:#fff;margin:0;overflow-
 header{display:flex;align-items:center;padding:22px 30px;background:#202020;position:sticky;top:0;z-index:5;min-height:92px}
 .brand{display:flex;align-items:center;gap:16px;flex:1}.store-icon{width:58px;height:58px;object-fit:contain}
 h1{margin:0;font-size:34px;line-height:1}.top{background:#444;color:#fff;border:0;border-radius:8px;padding:14px 22px;margin-left:12px;cursor:pointer;font-size:18px;font-weight:600;min-width:110px}
-#status{padding:24px 30px 18px;color:#bbb;font-size:20px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:22px;padding:0 30px 30px;max-width:1500px}
+#status{padding:24px 30px 18px;color:#bbb;font-size:20px}.repo-error{display:none;margin:22px 30px 0;padding:18px 22px;background:#8f1d1d;border:2px solid #d94a4a;border-radius:10px;color:#fff;font-size:19px;font-weight:600}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:22px;padding:0 30px 30px;max-width:1500px}
 .card{background:#242424;border-radius:14px;padding:22px;display:grid;grid-template-columns:88px 1fr;gap:18px;min-height:260px}.icon{width:88px;height:88px;border-radius:14px;object-fit:contain;background:#333}
 .name{font-size:27px;font-weight:600;line-height:1.15;margin-top:3px}.meta{color:#aaa;font-size:16px;margin-top:7px}.desc{color:#ddd;margin:14px 0 4px;grid-column:1/3;font-size:20px;line-height:1.35}
 .action{grid-column:1/3;border:0;border-radius:8px;padding:14px;cursor:pointer;font-weight:700;font-size:19px;min-height:52px}.install,.update{background:#3b82f6;color:#fff}.uninstall{background:#6b3434;color:#fff}
@@ -235,7 +278,7 @@ h1{margin:0;font-size:34px;line-height:1}.top{background:#444;color:#fff;border:
 @media (min-width:1600px){:root{font-size:22px}.grid{grid-template-columns:repeat(auto-fill,minmax(440px,1fr));max-width:1700px}.card{min-height:285px}}
 </style></head><body>
 <header><div class="brand"><img class="store-icon" src="https://raw.githubusercontent.com/RavenholmZombie/InfoScreenAppRepository/main/AppIcons/infostore.png" onerror="this.style.display='none'"><h1>InfoStore</h1></div><button class="top" onclick="showUpdates()">Updates</button><button class="top" onclick="refresh()">Refresh</button><button class="top" onclick="send('close')">Close</button></header>
-<div id="catalogPage"><div id="status">Loading applets...</div><div id="apps" class="grid"></div></div>
+<div id="catalogPage"><div id="repoError" class="repo-error"></div><div id="status">Loading applets...</div><div id="apps" class="grid"></div></div>
 <div id="updatesPage"><div class="updates-head"><h2>Applet Updates Center</h2><button id="checkUpdates" class="top" onclick="checkUpdates()">Check for Updates</button><button id="updateAll" class="top" onclick="updateAll()">Update All</button><button class="top" onclick="showCatalog()">Back</button></div><div id="updateStatus"></div><div id="updates" class="grid"></div></div>
 <script>
 let apps=[];
@@ -254,7 +297,7 @@ const updateAll=()=>{document.getElementById('updateAll').disabled=true;send('up
 
 function renderCatalog(){
  const box=document.getElementById('apps');box.innerHTML='';
- document.getElementById('status').textContent=apps.length?(apps.length+' applet(s) available'):'No applets are currently published.';
+ document.getElementById('status').textContent=apps.length?(apps.length+' applet(s) shown'):'No applets are available to display.';
  for(const a of apps){const c=document.createElement('div');c.className='card';
  c.innerHTML='<img class="icon" src="'+esc(a.IconUrl||'')+'" onerror="this.style.visibility=\'hidden\'"><div><div class="name">'+esc(a.Name)+'</div><div class="meta">v'+esc(a.Version)+' - '+esc(a.Author||'Unknown author')+'</div></div><div class="desc">'+esc(a.Description||'')+'</div><button class="action '+(a.installed?'uninstall':'install')+'">'+(a.installed?'Uninstall':'Install')+'</button>';
  c.querySelector('button').onclick=()=>send(a.installed?'uninstall':'install',a.Id);box.appendChild(c);}
@@ -291,7 +334,16 @@ chrome.webview.addEventListener('message',e=>{const m=e.data;
  }
  if(m.type==='updateAllComplete'){document.getElementById('updateAll').disabled=true;return}
  if(m.type!=='catalog')return;
- apps=m.apps;renderCatalog();if(document.getElementById('updatesPage').style.display==='block')renderUpdates();
+ apps=m.apps;
+ const banner=document.getElementById('repoError');
+ if(m.repositoryError){
+   banner.innerHTML='<strong>Unable to reach repository:</strong> '+esc(m.repositoryError);
+   banner.style.display='block';
+ }else{
+   banner.textContent='';
+   banner.style.display='none';
+ }
+ renderCatalog();if(document.getElementById('updatesPage').style.display==='block')renderUpdates();
 });
 refresh();
 </script></body></html>
