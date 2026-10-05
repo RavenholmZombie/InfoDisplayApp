@@ -97,7 +97,7 @@ namespace InfoDisplayApp
 
             // Check periodically while InfoScreen is running. The first check is
             // kicked off once the visible main UI is ready.
-            _appletUpdateTimer.Interval = (int)TimeSpan.FromMinutes(30).TotalMilliseconds;
+            _appletUpdateTimer.Interval = (int)TimeSpan.FromMinutes(5).TotalMilliseconds;
             _appletUpdateTimer.Tick += AppletUpdateTimer_Tick;
 
             pboxAppsIcon.MouseEnter += pnlBtnApps_MouseEnter;
@@ -362,8 +362,10 @@ namespace InfoDisplayApp
             _appletUpdateCheckInProgress = true;
             try
             {
+                Debug.WriteLine("APPLET UPDATE: checking installed applets against repository.");
                 IReadOnlyList<AppletUpdate> updates =
                     await _appletRepository.GetUpdatesAsync(_appletManager);
+                Debug.WriteLine($"APPLET UPDATE: {updates.Count} update(s) found.");
 
                 if (updates.Count == 0)
                 {
@@ -394,12 +396,30 @@ namespace InfoDisplayApp
             }
             catch (Exception ex)
             {
-                // A background repository outage should not interrupt TV viewing.
-                Debug.WriteLine($"Background applet update check failed: {ex}");
+                // A background repository outage should not interrupt TV viewing,
+                // but leave enough diagnostics to make update failures visible.
+                Debug.WriteLine($"APPLET UPDATE: background check failed: {ex}");
+                LogAppletUpdateCheckFailure(ex);
             }
             finally
             {
                 _appletUpdateCheckInProgress = false;
+            }
+        }
+
+        private static void LogAppletUpdateCheckFailure(Exception ex)
+        {
+            try
+            {
+                string directory = Path.Combine(AppContext.BaseDirectory, "logs");
+                Directory.CreateDirectory(directory);
+                string path = Path.Combine(directory, $"InfoScreen-APPLET-UPDATE-CHECK-{DateTime.Now:yyyy-MM-dd}.log");
+                File.AppendAllText(path,
+                    $"{DateTime.Now:O} Background update check failed.{Environment.NewLine}{ex}{Environment.NewLine}{Environment.NewLine}");
+            }
+            catch
+            {
+                // Update checking must never interrupt normal InfoScreen operation.
             }
         }
 
