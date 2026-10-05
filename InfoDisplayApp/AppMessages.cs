@@ -37,6 +37,17 @@ namespace InfoDisplayApp
         private static Form? _owner;
         private static bool _initialized;
         private static bool _publishing;
+        private static volatile bool _offlineMode;
+
+        /// <summary>
+        /// When true, network-related warning/error windows are suppressed while
+        /// Offline Mode owns the user-facing explanation. Diagnostics are still logged.
+        /// </summary>
+        public static bool OfflineMode
+        {
+            get => _offlineMode;
+            set => _offlineMode = value;
+        }
 
         public static event EventHandler<AppMessageEventArgs>? MessageRaised;
 
@@ -251,6 +262,17 @@ namespace InfoDisplayApp
                 if (type == AppMessageType.Warning || type == AppMessageType.Error)
                     WriteMessageLog(args);
 
+                bool suppressOfflineNetworkMessage =
+                    _offlineMode &&
+                    (type == AppMessageType.Warning || type == AppMessageType.Error) &&
+                    LooksNetworkRelated(message, exception);
+
+                if (suppressOfflineNetworkMessage)
+                {
+                    Debug.WriteLine($"OFFLINE MODE: suppressed network message window: {message}");
+                    return;
+                }
+
                 MessageRaised?.Invoke(null, args);
 
                 void ShowWindow(object? _)
@@ -292,6 +314,41 @@ namespace InfoDisplayApp
                 _publishing = false;
             }
         }
+        private static bool LooksNetworkRelated(string message, Exception? exception)
+        {
+            static bool NetworkException(Exception? ex)
+            {
+                if (ex == null) return false;
+                if (ex is HttpRequestException ||
+                    ex is System.Net.Sockets.SocketException ||
+                    ex is System.Net.WebException ||
+                    ex is TimeoutException ||
+                    ex is TaskCanceledException)
+                    return true;
+
+                if (ex is AggregateException aggregate &&
+                    aggregate.Flatten().InnerExceptions.Any(NetworkException))
+                    return true;
+
+                return NetworkException(ex.InnerException);
+            }
+
+            if (NetworkException(exception))
+                return true;
+
+            string lower = message.ToLowerInvariant();
+            return lower.Contains("internet") ||
+                   lower.Contains("network") ||
+                   lower.Contains("http") ||
+                   lower.Contains("repository") ||
+                   lower.Contains("weather") ||
+                   lower.Contains("remote") ||
+                   lower.Contains("connection") ||
+                   lower.Contains("timed out") ||
+                   lower.Contains("timeout") ||
+                   lower.Contains("unable to reach");
+        }
+
         private static void WriteMessageLog(AppMessageEventArgs args)
         {
             try
