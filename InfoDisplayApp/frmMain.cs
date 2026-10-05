@@ -23,7 +23,9 @@ namespace InfoDisplayApp
         private DisplayDiagnosticsMonitor? _displayDiagnosticsMonitor;
         private WebBrowser? _offlineView;
         private readonly ConnectivityService _connectivity = new();
-        private bool _offlineMode;
+        // Start in a connectivity-unknown state. Network-backed UI is held until
+        // the first probe completes so WebView2 cannot flash its own offline page.
+        private bool _offlineMode = true;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -76,6 +78,10 @@ namespace InfoDisplayApp
         {
             InitializeComponent();
 
+            // Suppress network-derived message windows during the initial
+            // connectivity probe. The result will explicitly enable/disable this.
+            AppMessages.OfflineMode = true;
+
             _startColor = RandomColor();
             _targetColor = RandomColor();
 
@@ -124,12 +130,9 @@ namespace InfoDisplayApp
             _ = PlayStartupSoundAsync();
 
             _alertPollTimer.Start();
-            _ = PollAlertsAsync();
-
             _appletUpdateTimer.Start();
-            _ = CheckForAppletUpdatesAsync();
 
-            _ = _connectivity.StartAsync();
+            _ = InitializeConnectivityAsync();
         }
 
         private async Task PlayStartupSoundAsync()
@@ -315,8 +318,13 @@ namespace InfoDisplayApp
             };
             pnlTV.Controls.Add(_cameraView);
 
-            // Restore the last TV-panel app after the main form has finished loading.
-            BeginInvoke((Action)RestoreLastApp);
+            // Do not restore a WebView-backed app until the first connectivity
+            // probe completes. Keep our local page in front so WebView2 never
+            // flashes its built-in dinosaur/offline error page.
+            _offlineView = CreateOfflineView();
+            pnlTV.Controls.Add(_offlineView);
+            _offlineView.Visible = true;
+            _offlineView.BringToFront();
 
             ctrlTimeDate ctrlTimeDate = new ctrlTimeDate
             {
@@ -328,6 +336,7 @@ namespace InfoDisplayApp
             {
                 Dock = DockStyle.Fill
             };
+            _normalTicker.SetOfflineMode(true);
             pnlTicker.Controls.Add(_normalTicker);
 
             ctrlWeather ctrlWeather = new ctrlWeather
@@ -352,6 +361,23 @@ namespace InfoDisplayApp
             UpdateModeButtons(true);
         }
 
+        private async Task InitializeConnectivityAsync()
+        {
+            await _connectivity.StartAsync();
+
+            if (IsDisposed || Disposing)
+                return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke((Action)(() =>
+                    Connectivity_ConnectivityChanged(_connectivity, _connectivity.IsOnline)));
+                return;
+            }
+
+            Connectivity_ConnectivityChanged(_connectivity, _connectivity.IsOnline);
+        }
+
         private void Connectivity_ConnectivityChanged(object? sender, bool online)
         {
             if (IsDisposed || Disposing)
@@ -371,11 +397,14 @@ namespace InfoDisplayApp
 
         private void EnterOfflineMode()
         {
-            if (_offlineMode)
-                return;
-
+            bool alreadyOffline = _offlineMode;
             _offlineMode = true;
             AppMessages.OfflineMode = true;
+            _normalTicker?.SetOfflineMode(true);
+
+            if (alreadyOffline && _offlineView?.Visible == true)
+                return;
+
             Debug.WriteLine("OFFLINE MODE: entered.");
 
             _appsForm?.Hide();
@@ -412,6 +441,7 @@ namespace InfoDisplayApp
 
             _offlineMode = false;
             AppMessages.OfflineMode = false;
+            _normalTicker?.SetOfflineMode(false);
             Debug.WriteLine("OFFLINE MODE: Internet connection restored.");
 
             if (_offlineView != null)
