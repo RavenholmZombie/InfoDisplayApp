@@ -21,6 +21,9 @@ namespace InfoDisplayApp
         private WaveFileReader? _startupAudioReader;
         private MemoryStream? _startupAudioStream;
         private DisplayDiagnosticsMonitor? _displayDiagnosticsMonitor;
+        private WebBrowser? _offlineView;
+        private readonly ConnectivityService _connectivity = new();
+        private bool _offlineMode;
 
         private readonly Random _random = new Random();
         private readonly System.Windows.Forms.Timer _colorTimer = new System.Windows.Forms.Timer();
@@ -101,6 +104,8 @@ namespace InfoDisplayApp
             _appletUpdateTimer.Interval = (int)TimeSpan.FromMinutes(15).TotalMilliseconds;
             _appletUpdateTimer.Tick += AppletUpdateTimer_Tick;
 
+            _connectivity.ConnectivityChanged += Connectivity_ConnectivityChanged;
+
             pboxAppsIcon.MouseEnter += pnlBtnApps_MouseEnter;
             pboxAppsIcon.MouseLeave += pnlBtnApps_MouseLeave;
             pboxAppsIcon.Click += pnlBtnApps_Click;
@@ -123,6 +128,8 @@ namespace InfoDisplayApp
 
             _appletUpdateTimer.Start();
             _ = CheckForAppletUpdatesAsync();
+
+            _ = _connectivity.StartAsync();
         }
 
         private async Task PlayStartupSoundAsync()
@@ -345,19 +352,135 @@ namespace InfoDisplayApp
             UpdateModeButtons(true);
         }
 
+        private void Connectivity_ConnectivityChanged(object? sender, bool online)
+        {
+            if (IsDisposed || Disposing)
+                return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke((Action)(() => Connectivity_ConnectivityChanged(sender, online)));
+                return;
+            }
+
+            if (online)
+                ExitOfflineMode();
+            else
+                EnterOfflineMode();
+        }
+
+        private void EnterOfflineMode()
+        {
+            if (_offlineMode)
+                return;
+
+            _offlineMode = true;
+            AppMessages.OfflineMode = true;
+            Debug.WriteLine("OFFLINE MODE: entered.");
+
+            _appsForm?.Hide();
+            _infoStore?.Hide();
+
+            if (_appletView != null)
+            {
+                _appletView.SetMuted(true);
+                _appletView.Visible = false;
+            }
+
+            if (_cameraView != null)
+            {
+                _cameraView.SetMuted(true);
+                _cameraView.StopCamera();
+                _cameraView.Visible = false;
+            }
+
+            if (_appletLandingPage != null)
+                _appletLandingPage.Visible = false;
+
+            _offlineView ??= CreateOfflineView();
+            if (!pnlTV.Controls.Contains(_offlineView))
+                pnlTV.Controls.Add(_offlineView);
+
+            _offlineView.Visible = true;
+            _offlineView.BringToFront();
+        }
+
+        private void ExitOfflineMode()
+        {
+            if (!_offlineMode)
+                return;
+
+            _offlineMode = false;
+            AppMessages.OfflineMode = false;
+            Debug.WriteLine("OFFLINE MODE: Internet connection restored.");
+
+            if (_offlineView != null)
+                _offlineView.Visible = false;
+
+            if (!TryRestoreLastContent())
+                ShowAppletLandingPage();
+
+            _ = PollAlertsAsync();
+            _ = CheckForAppletUpdatesAsync();
+        }
+
+        private WebBrowser CreateOfflineView()
+        {
+            WebBrowser browser = new()
+            {
+                Dock = DockStyle.Fill,
+                ScriptErrorsSuppressed = true,
+                IsWebBrowserContextMenuEnabled = false,
+                WebBrowserShortcutsEnabled = false,
+                AllowNavigation = false,
+                BackColor = Color.FromArgb(18, 18, 18)
+            };
+
+            browser.DocumentText = """
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<style>
+html,body{height:100%;margin:0;background:#121212;color:#fff;font-family:'Segoe UI',Arial,sans-serif}
+.wrap{height:100%;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box}
+.card{max-width:900px;width:100%;background:#202020;border-radius:18px;padding:48px;box-sizing:border-box;box-shadow:0 10px 35px rgba(0,0,0,.35)}
+h1{font-size:42px;margin:0 0 18px}p{font-size:23px;line-height:1.5;color:#ddd}
+h2{font-size:25px;margin:32px 0 12px}li{font-size:20px;line-height:1.65;color:#ddd}
+.status{margin-top:32px;padding:18px 22px;background:#2b2b2b;border-radius:10px;font-size:20px;color:#bbb}
+</style>
+</head>
+<body><div class="wrap"><div class="card">
+<h1>InfoScreen requires an Internet connection</h1>
+<p>InfoScreen is currently unable to reach the Internet. Local services may continue to operate, but online applets and information services are unavailable.</p>
+<h2>Things to try</h2>
+<ul>
+<li>Make sure your Ethernet cable or Wi-Fi connection is connected.</li>
+<li>Check that your router or modem has Internet access.</li>
+<li>Try restarting your router or modem.</li>
+<li>If other devices are also offline, contact your Internet service provider.</li>
+</ul>
+<div class="status">InfoScreen will reconnect automatically. Checking connection every 30 seconds...</div>
+</div></div></body></html>
+""";
+            return browser;
+        }
+
         private async void AlertPollTimer_Tick(object? sender, EventArgs e)
         {
+            if (_offlineMode) return;
             await PollAlertsAsync();
         }
 
         private async void AppletUpdateTimer_Tick(object? sender, EventArgs e)
         {
+            if (_offlineMode) return;
             await CheckForAppletUpdatesAsync();
         }
 
         private async Task CheckForAppletUpdatesAsync()
         {
-            if (_appletUpdateCheckInProgress || IsDisposed || Disposing)
+            if (_offlineMode || _appletUpdateCheckInProgress || IsDisposed || Disposing)
                 return;
 
             _appletUpdateCheckInProgress = true;
@@ -426,7 +549,7 @@ namespace InfoDisplayApp
 
         private async Task PollAlertsAsync(bool replayActiveAlert = false)
         {
-            if (_alertPollInProgress || IsDisposed)
+            if (_offlineMode || _alertPollInProgress || IsDisposed)
                 return;
 
             _alertPollInProgress = true;
@@ -964,7 +1087,10 @@ namespace InfoDisplayApp
             _alertPollTimer.Dispose();
             _appletUpdateTimer.Stop();
             _appletUpdateTimer.Dispose();
-            LogShutdown("Alert and applet update timers disposed.");
+            _connectivity.ConnectivityChanged -= Connectivity_ConnectivityChanged;
+            _connectivity.Dispose();
+            AppMessages.OfflineMode = false;
+            LogShutdown("Alert, applet update, and connectivity timers disposed.");
 
             _displayDiagnosticsMonitor?.Dispose();
             _displayDiagnosticsMonitor = null;
