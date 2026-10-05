@@ -78,6 +78,13 @@ public sealed class frmInfoStore : Form
 
             if (action == "close") { CloseRequested?.Invoke(this, EventArgs.Empty); return; }
             if (action == "refresh") { await SendCatalogAsync(); return; }
+            if (action == "checkUpdates")
+            {
+                Post(new { type = "updateCheckState", state = "checking" });
+                await SendCatalogAsync();
+                Post(new { type = "updateCheckState", state = "complete" });
+                return;
+            }
 
             if (action == "updateAll")
             {
@@ -229,7 +236,7 @@ h1{margin:0;font-size:34px;line-height:1}.top{background:#444;color:#fff;border:
 </style></head><body>
 <header><div class="brand"><img class="store-icon" src="https://raw.githubusercontent.com/RavenholmZombie/InfoScreenAppRepository/main/AppIcons/infostore.png" onerror="this.style.display='none'"><h1>InfoStore</h1></div><button class="top" onclick="showUpdates()">Updates</button><button class="top" onclick="refresh()">Refresh</button><button class="top" onclick="send('close')">Close</button></header>
 <div id="catalogPage"><div id="status">Loading applets...</div><div id="apps" class="grid"></div></div>
-<div id="updatesPage"><div class="updates-head"><h2>Applet Updates Center</h2><button id="updateAll" class="top" onclick="updateAll()">Update All</button><button class="top" onclick="showCatalog()">Back</button></div><div id="updateStatus"></div><div id="updates" class="grid"></div></div>
+<div id="updatesPage"><div class="updates-head"><h2>Applet Updates Center</h2><button id="checkUpdates" class="top" onclick="checkUpdates()">Check for Updates</button><button id="updateAll" class="top" onclick="updateAll()">Update All</button><button class="top" onclick="showCatalog()">Back</button></div><div id="updateStatus"></div><div id="updates" class="grid"></div></div>
 <script>
 let apps=[];
 const send=(action,id)=>chrome.webview.postMessage(id?{action,id}:{action});
@@ -237,6 +244,12 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const refresh=()=>{document.getElementById('status').textContent='Loading applets...';send('refresh')};
 const showCatalog=()=>{document.getElementById('catalogPage').style.display='block';document.getElementById('updatesPage').style.display='none'};
 const showUpdates=()=>{document.getElementById('catalogPage').style.display='none';document.getElementById('updatesPage').style.display='block';renderUpdates()};
+const checkUpdates=()=>{
+ const b=document.getElementById('checkUpdates');
+ b.disabled=true;b.textContent='Checking...';
+ document.getElementById('updateStatus').innerHTML='<div id="status">Checking the InfoScreen App Repository for updates...</div>';
+ send('checkUpdates');
+};
 const updateAll=()=>{document.getElementById('updateAll').disabled=true;send('updateAll')};
 
 function renderCatalog(){
@@ -265,6 +278,12 @@ function setState(id,state){
 chrome.webview.addEventListener('message',e=>{const m=e.data;
  if(m.type==='error'){document.getElementById('status').textContent=m.message;return}
  if(m.type==='showUpdates'){showUpdates();return}
+ if(m.type==='updateCheckState'){
+   const b=document.getElementById('checkUpdates');
+   if(m.state==='checking'){b.disabled=true;b.textContent='Checking...'}
+   if(m.state==='complete'){b.disabled=false;b.textContent='Check for Updates'}
+   return
+ }
  if(m.type==='updateState'){
    setState(m.id,m.state);
    if(m.state==='current'){const a=apps.find(x=>x.Id===m.id);if(a){a.installedVersion=a.Version;a.updateAvailable=false}}
