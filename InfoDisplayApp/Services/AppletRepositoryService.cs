@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,6 +9,9 @@ public sealed class AppletRepositoryService
 {
     private const string RawRoot = "https://raw.githubusercontent.com/RavenholmZombie/InfoScreenAppRepository/main/";
     private const string AppletsApiUrl = "https://api.github.com/repos/RavenholmZombie/InfoScreenAppRepository/contents/applets?ref=main";
+
+    private static string CacheBust(string url) =>
+        url + (url.Contains('?') ? "&" : "?") + "_infoscreen=" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     private readonly System.Net.Http.HttpClient _httpClient = CreateHttpClient();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
@@ -32,8 +36,17 @@ public sealed class AppletRepositoryService
                     ? file.DownloadUrl
                     : new Uri(new Uri(RawRoot), "applets/" + file.Name).ToString();
 
-                AppletDefinition? applet = await _httpClient.GetFromJsonAsync<AppletDefinition>(
-                    appletUrl, JsonOptions, cancellationToken);
+                using HttpRequestMessage request = new(HttpMethod.Get, CacheBust(appletUrl));
+                request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
+                {
+                    NoCache = true,
+                    NoStore = true
+                };
+
+                using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+                response.EnsureSuccessStatusCode();
+                AppletDefinition? applet = await response.Content.ReadFromJsonAsync<AppletDefinition>(
+                    JsonOptions, cancellationToken);
 
                 if (applet != null && AppletManager.IsValid(applet))
                     result.Add(applet);
@@ -112,6 +125,11 @@ public sealed class AppletRepositoryService
         // GitHub's REST API requires a User-Agent header.
         client.DefaultRequestHeaders.UserAgent.ParseAdd("InfoScreen/1.0");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+        client.DefaultRequestHeaders.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
+        {
+            NoCache = true,
+            NoStore = true
+        };
         return client;
     }
 
