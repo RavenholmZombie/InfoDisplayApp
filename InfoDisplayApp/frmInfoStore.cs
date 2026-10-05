@@ -84,7 +84,7 @@ public sealed class frmInfoStore : Form
                 IReadOnlyList<AppletUpdate> updates = await _repository.GetUpdatesAsync(_manager);
                 foreach (AppletUpdate update in updates)
                     await UpdateAppletAsync(update.Available);
-                await SendCatalogAsync();
+                Post(new { type = "updateAllComplete" });
                 return;
             }
 
@@ -110,7 +110,6 @@ public sealed class frmInfoStore : Form
             else if (action == "update" && applet != null)
             {
                 await UpdateAppletAsync(applet);
-                await SendCatalogAsync();
             }
         }
         catch (Exception ex)
@@ -266,7 +265,12 @@ function setState(id,state){
 chrome.webview.addEventListener('message',e=>{const m=e.data;
  if(m.type==='error'){document.getElementById('status').textContent=m.message;return}
  if(m.type==='showUpdates'){showUpdates();return}
- if(m.type==='updateState'){setState(m.id,m.state);return}
+ if(m.type==='updateState'){
+   setState(m.id,m.state);
+   if(m.state==='current'){const a=apps.find(x=>x.Id===m.id);if(a){a.installedVersion=a.Version;a.updateAvailable=false}}
+   return
+ }
+ if(m.type==='updateAllComplete'){document.getElementById('updateAll').disabled=true;return}
  if(m.type!=='catalog')return;
  apps=m.apps;renderCatalog();if(document.getElementById('updatesPage').style.display==='block')renderUpdates();
 });
