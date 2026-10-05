@@ -198,6 +198,11 @@ namespace InfoDisplayApp
             string trimmed = message.Trim();
             string lower = trimmed.ToLowerInvariant();
 
+            // Ping diagnostics are status/telemetry, never something that should
+            // interrupt the TV/dashboard with a modal message window.
+            if (lower.Contains("ping"))
+                return;
+
             // The battery-powered Tapo doorbell normally stops answering pings
             // while asleep. That is expected behavior and should remain a ticker
             // status only, not interrupt the TV/dashboard with a warning window.
