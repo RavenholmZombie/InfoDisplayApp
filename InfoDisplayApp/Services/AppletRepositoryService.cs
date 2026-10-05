@@ -11,15 +11,29 @@ public sealed class AppletRepositoryService
     private const string AppletsApiUrl = "https://api.github.com/repos/RavenholmZombie/InfoScreenAppRepository/contents/applets?ref=main";
 
     private static string CacheBust(string url) =>
-        url + (url.Contains('?') ? "&" : "?") + "_infoscreen=" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        url + (url.Contains('?') ? "&" : "?") + "_infoscreen=" +
+        Guid.NewGuid().ToString("N");
 
     private readonly System.Net.Http.HttpClient _httpClient = CreateHttpClient();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public async Task<IReadOnlyList<AppletDefinition>> GetAvailableAppletsAsync(CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<GitHubContentItem>? files = await _httpClient.GetFromJsonAsync<IReadOnlyList<GitHubContentItem>>(
-            AppletsApiUrl, JsonOptions, cancellationToken);
+        using HttpRequestMessage listingRequest = new(HttpMethod.Get, CacheBust(AppletsApiUrl));
+        listingRequest.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
+        {
+            NoCache = true,
+            NoStore = true,
+            MaxAge = TimeSpan.Zero
+        };
+
+        using HttpResponseMessage listingResponse =
+            await _httpClient.SendAsync(listingRequest, cancellationToken);
+        listingResponse.EnsureSuccessStatusCode();
+
+        IReadOnlyList<GitHubContentItem>? files =
+            await listingResponse.Content.ReadFromJsonAsync<IReadOnlyList<GitHubContentItem>>(
+                JsonOptions, cancellationToken);
 
         if (files == null)
             return Array.Empty<AppletDefinition>();
@@ -40,8 +54,10 @@ public sealed class AppletRepositoryService
                 request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
                 {
                     NoCache = true,
-                    NoStore = true
+                    NoStore = true,
+                    MaxAge = TimeSpan.Zero
                 };
+                request.Headers.Pragma.ParseAdd("no-cache");
 
                 using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
                 response.EnsureSuccessStatusCode();
@@ -128,8 +144,10 @@ public sealed class AppletRepositoryService
         client.DefaultRequestHeaders.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
         {
             NoCache = true,
-            NoStore = true
+            NoStore = true,
+            MaxAge = TimeSpan.Zero
         };
+        client.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
         return client;
     }
 
