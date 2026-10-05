@@ -111,6 +111,7 @@ namespace InfoDisplayApp
             _appletUpdateTimer.Tick += AppletUpdateTimer_Tick;
 
             _connectivity.ConnectivityChanged += Connectivity_ConnectivityChanged;
+            _connectivity.ProbeStatusChanged += Connectivity_ProbeStatusChanged;
 
             pboxAppsIcon.MouseEnter += pnlBtnApps_MouseEnter;
             pboxAppsIcon.MouseLeave += pnlBtnApps_MouseLeave;
@@ -378,6 +379,50 @@ namespace InfoDisplayApp
             Connectivity_ConnectivityChanged(_connectivity, _connectivity.IsOnline);
         }
 
+        private void Connectivity_ProbeStatusChanged(object? sender, ConnectivityProbeEventArgs e)
+        {
+            if (IsDisposed || Disposing)
+                return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke((Action)(() => Connectivity_ProbeStatusChanged(sender, e)));
+                return;
+            }
+
+            // While online these 30-second checks stay invisible. Once Offline
+            // Mode is active, surface the retry/result directly on the local page.
+            if (!_offlineMode)
+                return;
+
+            string text = e.State switch
+            {
+                ConnectivityProbeState.Checking => "Checking for Internet connection...",
+                ConnectivityProbeState.Failed => "Failed. Internet is unreachable.",
+                ConnectivityProbeState.Succeeded => "Connectivity restored. Switching out of offline mode...",
+                _ => ""
+            };
+
+            SetOfflineStatus(text);
+        }
+
+        private void SetOfflineStatus(string text)
+        {
+            if (_offlineView?.Document == null)
+                return;
+
+            try
+            {
+                HtmlElement? status = _offlineView.Document.GetElementById("connectionStatus");
+                if (status != null)
+                    status.InnerText = text;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"OFFLINE MODE: unable to update connection status: {ex.Message}");
+            }
+        }
+
         private void Connectivity_ConnectivityChanged(object? sender, bool online)
         {
             if (IsDisposed || Disposing)
@@ -390,7 +435,7 @@ namespace InfoDisplayApp
             }
 
             if (online)
-                ExitOfflineMode();
+                _ = ExitOfflineModeAsync();
             else
                 EnterOfflineMode();
         }
@@ -434,15 +479,24 @@ namespace InfoDisplayApp
             _offlineView.BringToFront();
         }
 
-        private void ExitOfflineMode()
+        private async Task ExitOfflineModeAsync()
         {
             if (!_offlineMode)
+                return;
+
+            SetOfflineStatus("Connectivity restored. Switching out of offline mode...");
+            Debug.WriteLine("OFFLINE MODE: Internet connection restored; holding recovery message.");
+
+            // Give the user a moment to see that recovery succeeded instead of
+            // instantly replacing the page at the exact moment the probe returns.
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            if (IsDisposed || Disposing || !_connectivity.IsOnline)
                 return;
 
             _offlineMode = false;
             AppMessages.OfflineMode = false;
             _normalTicker?.SetOfflineMode(false);
-            Debug.WriteLine("OFFLINE MODE: Internet connection restored.");
 
             if (_offlineView != null)
                 _offlineView.Visible = false;
@@ -490,7 +544,7 @@ h2{font-size:25px;margin:32px 0 12px}li{font-size:20px;line-height:1.65;color:#d
 <li>Try restarting your router or modem.</li>
 <li>If other devices are also offline, contact your Internet service provider.</li>
 </ul>
-<div class="status">InfoScreen will reconnect automatically. Checking connection every 30 seconds...</div>
+<div class="status"><div id="connectionStatus">Checking for Internet connection...</div><div style="margin-top:8px;font-size:16px;color:#999">InfoScreen checks the connection automatically every 30 seconds.</div></div>
 </div></div></body></html>
 """;
             return browser;
@@ -1118,6 +1172,7 @@ h2{font-size:25px;margin:32px 0 12px}li{font-size:20px;line-height:1.65;color:#d
             _appletUpdateTimer.Stop();
             _appletUpdateTimer.Dispose();
             _connectivity.ConnectivityChanged -= Connectivity_ConnectivityChanged;
+            _connectivity.ProbeStatusChanged -= Connectivity_ProbeStatusChanged;
             _connectivity.Dispose();
             AppMessages.OfflineMode = false;
             LogShutdown("Alert, applet update, and connectivity timers disposed.");
