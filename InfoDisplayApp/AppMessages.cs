@@ -263,9 +263,9 @@ namespace InfoDisplayApp
                     WriteMessageLog(args);
 
                 bool suppressOfflineNetworkMessage =
-                    _offlineMode &&
                     (type == AppMessageType.Warning || type == AppMessageType.Error) &&
-                    LooksNetworkRelated(message, exception);
+                    LooksNetworkRelated(message, exception) &&
+                    (_offlineMode || LooksLikePingFailure(message, exception));
 
                 if (suppressOfflineNetworkMessage)
                 {
@@ -314,6 +314,15 @@ namespace InfoDisplayApp
                 _publishing = false;
             }
         }
+        private static bool LooksLikePingFailure(string message, Exception? exception)
+        {
+            string lower = message.ToLowerInvariant();
+            return lower.Contains("ping failed") ||
+                   lower.Contains("ping failure") ||
+                   (lower.Contains("ping") && lower.Contains("unreachable")) ||
+                   (exception is System.Net.NetworkInformation.PingException);
+        }
+
         private static bool LooksNetworkRelated(string message, Exception? exception)
         {
             static bool NetworkException(Exception? ex)
