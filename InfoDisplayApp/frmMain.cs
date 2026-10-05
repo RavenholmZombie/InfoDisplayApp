@@ -355,6 +355,7 @@ namespace InfoDisplayApp
             {
                 Dock = DockStyle.Fill
             };
+            _appsPanel.SetOfflineMode(true);
 
             _appsForm = new frmApps(_appsPanel);
             PositionAppsForm();
@@ -446,6 +447,7 @@ namespace InfoDisplayApp
             _offlineMode = true;
             AppMessages.OfflineMode = true;
             _normalTicker?.SetOfflineMode(true);
+            _appsPanel?.SetOfflineMode(true);
 
             if (alreadyOffline && _offlineView?.Visible == true)
                 return;
@@ -497,6 +499,7 @@ namespace InfoDisplayApp
             _offlineMode = false;
             AppMessages.OfflineMode = false;
             _normalTicker?.SetOfflineMode(false);
+            _appsPanel?.SetOfflineMode(false);
 
             if (_offlineView != null)
                 _offlineView.Visible = false;
