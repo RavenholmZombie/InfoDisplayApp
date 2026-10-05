@@ -54,6 +54,21 @@ public sealed class AppletManager
         }
     }
 
+    public async Task UpdateAsync(AppletDefinition applet)
+    {
+        if (!IsValid(applet))
+            throw new InvalidDataException("The applet definition is incomplete or invalid.");
+
+        string destination = Path.Combine(AppletsDirectory, GetSafeId(applet.Id) + ".json");
+
+        // Updates intentionally replace the installed definition rather than
+        // merging it, so removed/renamed repository fields cannot linger.
+        if (File.Exists(destination))
+            File.Delete(destination);
+
+        await InstallAsync(applet);
+    }
+
     public string? GetCachedIconPath(string id)
     {
         string prefix = GetSafeId(id) + ".";
