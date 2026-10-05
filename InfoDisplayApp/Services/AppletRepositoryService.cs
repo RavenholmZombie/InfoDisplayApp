@@ -7,8 +7,8 @@ namespace InfoDisplayApp.Services;
 
 public sealed class AppletRepositoryService
 {
-    private const string RawRoot = "https://raw.githubusercontent.com/RavenholmZombie/InfoScreenAppRepository/main/";
-    private const string AppletsApiUrl = "https://api.github.com/repos/RavenholmZombie/InfoScreenAppRepository/contents/applets?ref=main";
+    private const string RepositoryApiRoot = "https://api.github.com/repos/RavenholmZombie/InfoScreenAppRepository";
+    private const string AppletsApiUrl = RepositoryApiRoot + "/contents/applets?ref=main";
 
     private static string CacheBust(string url) =>
         url + (url.Contains('?') ? "&" : "?") + "_infoscreen=" +
@@ -19,21 +19,20 @@ public sealed class AppletRepositoryService
 
     public async Task<IReadOnlyList<AppletDefinition>> GetAvailableAppletsAsync(CancellationToken cancellationToken = default)
     {
-        using HttpRequestMessage listingRequest = new(HttpMethod.Get, CacheBust(AppletsApiUrl));
-        listingRequest.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
-        {
-            NoCache = true,
-            NoStore = true,
-            MaxAge = TimeSpan.Zero
-        };
+        // Resolve main to its current commit first, then read every applet by that
+        // immutable commit SHA. This avoids raw.githubusercontent.com/CDN caching
+        // and guarantees one internally-consistent repository snapshot per check.
+        GitHubBranch? branch = await GetJsonAsync<GitHubBranch>(
+            CacheBust(RepositoryApiRoot + "/branches/main"), cancellationToken);
+        string commitSha = branch?.Commit?.Sha ?? "";
 
-        using HttpResponseMessage listingResponse =
-            await _httpClient.SendAsync(listingRequest, cancellationToken);
-        listingResponse.EnsureSuccessStatusCode();
+        if (string.IsNullOrWhiteSpace(commitSha))
+            throw new InvalidDataException("GitHub did not return the current InfoScreen applet repository commit.");
 
         IReadOnlyList<GitHubContentItem>? files =
-            await listingResponse.Content.ReadFromJsonAsync<IReadOnlyList<GitHubContentItem>>(
-                JsonOptions, cancellationToken);
+            await GetJsonAsync<IReadOnlyList<GitHubContentItem>>(
+                CacheBust(RepositoryApiRoot + "/contents/applets?ref=" + Uri.EscapeDataString(commitSha)),
+                cancellationToken);
 
         if (files == null)
             return Array.Empty<AppletDefinition>();
@@ -46,23 +45,10 @@ public sealed class AppletRepositoryService
         {
             try
             {
-                string appletUrl = !string.IsNullOrWhiteSpace(file.DownloadUrl)
-                    ? file.DownloadUrl
-                    : new Uri(new Uri(RawRoot), "applets/" + file.Name).ToString();
-
-                using HttpRequestMessage request = new(HttpMethod.Get, CacheBust(appletUrl));
-                request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
-                {
-                    NoCache = true,
-                    NoStore = true,
-                    MaxAge = TimeSpan.Zero
-                };
-                request.Headers.Pragma.ParseAdd("no-cache");
-
-                using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
-                response.EnsureSuccessStatusCode();
-                AppletDefinition? applet = await response.Content.ReadFromJsonAsync<AppletDefinition>(
-                    JsonOptions, cancellationToken);
+                AppletDefinition? applet = await GetJsonAsync<AppletDefinition>(
+                    CacheBust(RepositoryApiRoot + "/contents/applets/" +
+                        Uri.EscapeDataString(file.Name) + "?ref=" + Uri.EscapeDataString(commitSha)),
+                    cancellationToken);
 
                 if (applet != null && AppletManager.IsValid(applet))
                     result.Add(applet);
@@ -79,6 +65,39 @@ public sealed class AppletRepositoryService
             .Select(group => group.First())
             .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private async Task<T?> GetJsonAsync<T>(string url, CancellationToken cancellationToken)
+    {
+        using HttpRequestMessage request = new(HttpMethod.Get, url);
+        request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
+        {
+            NoCache = true,
+            NoStore = true,
+            MaxAge = TimeSpan.Zero
+        };
+        request.Headers.Pragma.ParseAdd("no-cache");
+
+        using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        // GitHub's Contents API returns file bodies as base64 JSON metadata rather
+        // than the raw file. Decode that payload when T is an applet definition.
+        if (typeof(T) == typeof(AppletDefinition))
+        {
+            GitHubFileContent? file =
+                await response.Content.ReadFromJsonAsync<GitHubFileContent>(JsonOptions, cancellationToken);
+
+            if (file == null || string.IsNullOrWhiteSpace(file.Content))
+                return default;
+
+            string compact = file.Content.Replace("\r", "").Replace("\n", "");
+            byte[] bytes = Convert.FromBase64String(compact);
+            AppletDefinition? applet = JsonSerializer.Deserialize<AppletDefinition>(bytes, JsonOptions);
+            return (T?)(object?)applet;
+        }
+
+        return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken);
     }
 
     public async Task<IReadOnlyList<AppletUpdate>> GetUpdatesAsync(
@@ -155,9 +174,21 @@ public sealed class AppletRepositoryService
     {
         public string Name { get; set; } = "";
         public string Type { get; set; } = "";
+    }
 
-        [JsonPropertyName("download_url")]
-        public string DownloadUrl { get; set; } = "";
+    private sealed class GitHubBranch
+    {
+        public GitHubCommit? Commit { get; set; }
+    }
+
+    private sealed class GitHubCommit
+    {
+        public string Sha { get; set; } = "";
+    }
+
+    private sealed class GitHubFileContent
+    {
+        public string Content { get; set; } = "";
     }
 }
 
