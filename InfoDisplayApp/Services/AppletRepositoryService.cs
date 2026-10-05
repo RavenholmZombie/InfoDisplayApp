@@ -19,9 +19,9 @@ public sealed class AppletRepositoryService
 
     public async Task<IReadOnlyList<AppletDefinition>> GetAvailableAppletsAsync(CancellationToken cancellationToken = default)
     {
-        // Resolve main to its current commit first, then read every applet by that
-        // immutable commit SHA. This avoids raw.githubusercontent.com/CDN caching
-        // and guarantees one internally-consistent repository snapshot per check.
+        // Resolve main once, then fetch the entire applets tree in ONE GitHub API
+        // request at that immutable commit. The previous implementation made one
+        // API request per applet, which was slow and could trigger GitHub failures.
         GitHubBranch? branch = await GetJsonAsync<GitHubBranch>(
             CacheBust(RepositoryApiRoot + "/branches/main"), cancellationToken);
         string commitSha = branch?.Commit?.Sha ?? "";
@@ -39,26 +39,56 @@ public sealed class AppletRepositoryService
 
         List<AppletDefinition> result = new();
 
-        foreach (GitHubContentItem file in files.Where(item =>
-                     item.Type.Equals("file", StringComparison.OrdinalIgnoreCase) &&
-                     item.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
+        // download_url returned for a commit-pinned Contents request is itself
+        // pinned to that immutable SHA. Fetch these raw files concurrently instead
+        // of issuing another GitHub API request for every applet.
+        IEnumerable<GitHubContentItem> jsonFiles = files.Where(item =>
+            item.Type.Equals("file", StringComparison.OrdinalIgnoreCase) &&
+            item.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(item.DownloadUrl));
+
+        using SemaphoreSlim gate = new(6);
+        Task<AppletDefinition?>[] downloads = jsonFiles.Select(async file =>
         {
+            await gate.WaitAsync(cancellationToken);
             try
             {
-                AppletDefinition? applet = await GetJsonAsync<AppletDefinition>(
-                    CacheBust(RepositoryApiRoot + "/contents/applets/" +
-                        Uri.EscapeDataString(file.Name) + "?ref=" + Uri.EscapeDataString(commitSha)),
-                    cancellationToken);
+                using HttpRequestMessage request = new(HttpMethod.Get, CacheBust(file.DownloadUrl));
+                request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
+                {
+                    NoCache = true,
+                    NoStore = true,
+                    MaxAge = TimeSpan.Zero
+                };
+                request.Headers.Pragma.ParseAdd("no-cache");
 
-                if (applet != null && AppletManager.IsValid(applet))
-                    result.Add(applet);
+                using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadFromJsonAsync<AppletDefinition>(
+                    JsonOptions, cancellationToken);
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // One malformed/unavailable applet should not prevent the rest
-                // of the InfoStore catalog from loading.
+                System.Diagnostics.Debug.WriteLine(
+                    $"APPLET REPOSITORY: failed to fetch {file.Name}: {ex.Message}");
+                return null;
             }
+            finally
+            {
+                gate.Release();
+            }
+        }).ToArray();
+
+        AppletDefinition?[] applets = await Task.WhenAll(downloads);
+        foreach (AppletDefinition? applet in applets)
+        {
+            if (applet != null && AppletManager.IsValid(applet))
+                result.Add(applet);
         }
+
+        System.Diagnostics.Debug.WriteLine(
+            $"APPLET REPOSITORY: commit {commitSha[..Math.Min(8, commitSha.Length)]}, " +
+            $"loaded {result.Count}/{downloads.Length} applet definitions.");
 
         return result
             .GroupBy(a => a.Id, StringComparer.OrdinalIgnoreCase)
@@ -80,23 +110,6 @@ public sealed class AppletRepositoryService
 
         using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
-
-        // GitHub's Contents API returns file bodies as base64 JSON metadata rather
-        // than the raw file. Decode that payload when T is an applet definition.
-        if (typeof(T) == typeof(AppletDefinition))
-        {
-            GitHubFileContent? file =
-                await response.Content.ReadFromJsonAsync<GitHubFileContent>(JsonOptions, cancellationToken);
-
-            if (file == null || string.IsNullOrWhiteSpace(file.Content))
-                return default;
-
-            string compact = file.Content.Replace("\r", "").Replace("\n", "");
-            byte[] bytes = Convert.FromBase64String(compact);
-            AppletDefinition? applet = JsonSerializer.Deserialize<AppletDefinition>(bytes, JsonOptions);
-            return (T?)(object?)applet;
-        }
-
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken);
     }
 
@@ -174,6 +187,9 @@ public sealed class AppletRepositoryService
     {
         public string Name { get; set; } = "";
         public string Type { get; set; } = "";
+
+        [JsonPropertyName("download_url")]
+        public string DownloadUrl { get; set; } = "";
     }
 
     private sealed class GitHubBranch
@@ -186,10 +202,7 @@ public sealed class AppletRepositoryService
         public string Sha { get; set; } = "";
     }
 
-    private sealed class GitHubFileContent
-    {
-        public string Content { get; set; } = "";
-    }
+
 }
 
 
