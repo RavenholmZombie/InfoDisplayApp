@@ -17,7 +17,7 @@ public sealed class ConnectivityService : IDisposable
         new("https://www.google.com/generate_204")
     };
 
-    private readonly HttpClient _httpClient = new()
+    private readonly System.Net.Http.HttpClient _httpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(5)
     };
