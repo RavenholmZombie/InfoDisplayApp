@@ -40,6 +40,17 @@ public partial class ctrlAppsPanel : UserControl
         RebuildApps();
     }
 
+    public void SetOfflineMode(bool offline)
+    {
+        if (IsDisposed)
+            return;
+
+        // The drawer chrome remains usable so Close/Restart still work, but the
+        // actual app grid is unavailable until Internet connectivity returns.
+        flowLayoutPanel1.Enabled = !offline;
+        _searchBox.Enabled = !offline;
+    }
+
     public void RebuildApps()
     {
         _installedApplets = _appletManager.GetInstalledApplets().ToList();
