@@ -346,7 +346,16 @@ namespace InfoDisplayApp
                    lower.Contains("connection") ||
                    lower.Contains("timed out") ||
                    lower.Contains("timeout") ||
-                   lower.Contains("unable to reach");
+                   lower.Contains("unable to reach") ||
+                   lower.Contains("nws") ||
+                   lower.Contains("forecast") ||
+                   lower.Contains("ping") ||
+                   lower.Contains("tapo") ||
+                   lower.Contains("camera") ||
+                   lower.Contains("rycraft") ||
+                   lower.Contains("rcon") ||
+                   lower.Contains("minecraft") ||
+                   lower.Contains("minestat");
         }
 
         private static void WriteMessageLog(AppMessageEventArgs args)
