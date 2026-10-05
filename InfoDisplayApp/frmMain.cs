@@ -96,9 +96,9 @@ namespace InfoDisplayApp
             _alertPollTimer.Tick += AlertPollTimer_Tick;
 
             // Check periodically while InfoScreen is running. The first check is
-            // kicked off once the visible main UI is ready, then repeat every
-            // 30 seconds so newly-published applet updates are noticed promptly.
-            _appletUpdateTimer.Interval = (int)TimeSpan.FromSeconds(30).TotalMilliseconds;
+            // kicked off once the visible main UI is ready. Keep automatic polling
+            // conservative so the unauthenticated GitHub API rate limit is respected.
+            _appletUpdateTimer.Interval = (int)TimeSpan.FromMinutes(15).TotalMilliseconds;
             _appletUpdateTimer.Tick += AppletUpdateTimer_Tick;
 
             pboxAppsIcon.MouseEnter += pnlBtnApps_MouseEnter;
