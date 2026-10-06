@@ -133,7 +133,9 @@ namespace InfoDisplayApp
             _alertPollTimer.Start();
             _appletUpdateTimer.Start();
 
-            _ = InitializeConnectivityAsync();
+            // Initial connectivity is resolved by StartupApplicationContext before
+            // frmMain is revealed. ConnectivityService continues its 30-second
+            // background checks from there.
         }
 
         private async Task PlayStartupSoundAsync()
