@@ -151,6 +151,9 @@ namespace InfoDisplayApp
                     SetLoadingStep("text ticker...");
                     await _mainForm.WaitForStartupReadyAsync();
 
+                    SetLoadingStep("checking Internet connection...");
+                    await _mainForm.CheckInitialConnectivityAsync();
+
                     SetLoadingStep("final startup tasks...");
 
                     TimeSpan remaining =
