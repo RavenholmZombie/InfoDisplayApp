@@ -13,7 +13,7 @@ public sealed class ConnectivityService : IDisposable
 {
     private static readonly Uri[] ProbeUris =
     {
-        new("https://www.msftconnecttest.com/connecttest.txt"),
+        new("http://www.msftconnecttest.com/connecttest.txt"),
         new("https://www.google.com/generate_204")
     };
 
@@ -85,15 +85,39 @@ public sealed class ConnectivityService : IDisposable
                 using HttpResponseMessage response = await _httpClient.SendAsync(
                     request, HttpCompletionOption.ResponseHeadersRead);
 
-                // Any real HTTP response proves that the Internet path works.
-                // This deliberately includes 403/429/500 responses.
-                if ((int)response.StatusCode >= 100)
+                bool probeSucceeded;
+                if (i == 0)
+                {
+                    // Windows NCSI uses this HTTP endpoint and expects an exact
+                    // 200 response body of "Microsoft Connect Test".
+                    if (response.StatusCode != HttpStatusCode.OK)
+                    {
+                        Debug.WriteLine(
+                            $"CONNECTIVITY: primary probe {uri.Host} returned HTTP {(int)response.StatusCode}; trying fallback probe.");
+                        continue;
+                    }
+
+                    string body = await response.Content.ReadAsStringAsync();
+                    probeSucceeded = string.Equals(
+                        body.Trim(), "Microsoft Connect Test", StringComparison.Ordinal);
+                }
+                else
+                {
+                    // Google's generate_204 endpoint is the independent fallback.
+                    probeSucceeded = response.StatusCode == HttpStatusCode.NoContent;
+                }
+
+                if (probeSucceeded)
                 {
                     if (i > 0)
                         Debug.WriteLine($"CONNECTIVITY: fallback probe {uri.Host} succeeded. Internet connection is available.");
 
                     return true;
                 }
+
+                Debug.WriteLine(
+                    $"CONNECTIVITY: {(i == 0 ? "primary" : "fallback")} probe {uri.Host} returned an unexpected response" +
+                    (hasFallback ? "; trying fallback probe." : "."));
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
