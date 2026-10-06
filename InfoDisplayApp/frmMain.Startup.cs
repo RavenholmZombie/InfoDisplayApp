@@ -22,6 +22,17 @@ namespace InfoDisplayApp
                 EnterOfflineMode();
         }
 
+        internal async Task PrepareTickerForRevealAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (_offlineMode || _normalTicker == null)
+                return;
+
+            await _normalTicker.PrepareOnlineDataAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
         /// <summary>
         /// Waits for startup-critical UI components to finish their initial work.
         /// For now the normal text ticker is the gate because its first message
