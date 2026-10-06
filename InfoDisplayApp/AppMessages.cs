@@ -198,6 +198,15 @@ namespace InfoDisplayApp
             string trimmed = message.Trim();
             string lower = trimmed.ToLowerInvariant();
 
+            // While Offline Mode owns the outage UI, diagnostic Trace/Debug output
+            // must never be promoted into modal message windows. This is the source
+            // of connectivity-probe/DNS spam such as "CONNECTIVITY: probe ... failed".
+            if (_offlineMode)
+            {
+                Debug.WriteLine($"OFFLINE MODE: diagnostic retained without popup: {trimmed}");
+                return;
+            }
+
             // Ping diagnostics are status/telemetry, never something that should
             // interrupt the TV/dashboard with a modal message window.
             if (lower.Contains("ping"))
