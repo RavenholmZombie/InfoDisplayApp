@@ -239,6 +239,27 @@ namespace InfoDisplayApp.Properties
             }
         }
 
+        public async Task PrepareOnlineDataAsync()
+        {
+            if (_offlineMode || IsDisposed || Disposing)
+                return;
+
+            // Startup calls this while frmMain is still covered by the loading
+            // window so the first visible ticker frame already contains fresh
+            // status/weather data instead of restarting after the reveal.
+            await RefreshOnlineDataAsync();
+
+            if (!_offlineMode && !IsDisposed)
+            {
+                LoadTickerMessages();
+                if (_messages.Count > 0)
+                {
+                    ShowCurrentMessage();
+                    StartAnimation();
+                }
+            }
+        }
+
         private void ApplyOfflineTickerMessage()
         {
             _messages.Clear();
