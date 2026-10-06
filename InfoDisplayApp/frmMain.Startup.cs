@@ -5,6 +5,36 @@ namespace InfoDisplayApp
     public partial class frmMain
     {
         /// <summary>
+        /// Resolves the initial Internet state while frmMain is still hidden behind
+        /// the startup/loading UI. This prevents an online launch from briefly
+        /// presenting the Offline Mode page.
+        /// </summary>
+        internal async Task CheckInitialConnectivityAsync(CancellationToken cancellationToken = default)
+        {
+            await _connectivity.StartAsync();
+
+            if (IsDisposed || Disposing)
+                return;
+
+            if (_connectivity.IsOnline)
+            {
+                _offlineMode = false;
+                AppMessages.OfflineMode = false;
+                _normalTicker?.SetOfflineMode(false);
+
+                if (_offlineView != null)
+                    _offlineView.Visible = false;
+
+                if (!TryRestoreLastContent())
+                    ShowAppletLandingPage();
+            }
+            else
+            {
+                EnterOfflineMode();
+            }
+        }
+
+        /// <summary>
         /// Waits for startup-critical UI components to finish their initial work.
         /// For now the normal text ticker is the gate because its first message
         /// depends on status/weather initialization and would otherwise appear
