@@ -134,8 +134,11 @@ namespace InfoDisplayApp
             _appletUpdateTimer.Start();
 
             // Initial connectivity is resolved by StartupApplicationContext before
-            // frmMain is revealed. ConnectivityService continues its 30-second
-            // background checks from there.
+            // frmMain is revealed. Now that AppMessages has a visible owner and the
+            // dashboard is interactive, perform the first repository update check.
+            // The 15-minute timer handles subsequent checks.
+            if (!_offlineMode)
+                _ = CheckForAppletUpdatesAsync();
         }
 
         private async Task PlayStartupSoundAsync()
