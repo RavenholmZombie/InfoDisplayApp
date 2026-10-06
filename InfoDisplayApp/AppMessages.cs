@@ -132,12 +132,6 @@ namespace InfoDisplayApp
             if (string.IsNullOrWhiteSpace(message))
                 return DialogResult.No;
 
-            if (_offlineMode)
-            {
-                Debug.WriteLine($"[Question suppressed by Offline Mode] {message}");
-                return DialogResult.No;
-            }
-
             if (_owner == null || _owner.IsDisposed)
                 return DialogResult.No;
 
