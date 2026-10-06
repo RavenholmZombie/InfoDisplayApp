@@ -498,6 +498,17 @@ namespace InfoDisplayApp
             if (IsDisposed || Disposing || !_connectivity.IsOnline)
                 return;
 
+            ApplyOnlineMode(restoreContent: true);
+
+            _ = PollAlertsAsync();
+            _ = CheckForAppletUpdatesAsync();
+        }
+
+        private void ApplyOnlineMode(bool restoreContent)
+        {
+            // Keep every Offline Mode participant in lockstep. Previously startup
+            // cleared frmMain/ticker state but forgot the Apps drawer, producing a
+            // half-online state (web app restored while the drawer stayed offline).
             _offlineMode = false;
             AppMessages.OfflineMode = false;
             _normalTicker?.SetOfflineMode(false);
@@ -506,11 +517,10 @@ namespace InfoDisplayApp
             if (_offlineView != null)
                 _offlineView.Visible = false;
 
-            if (!TryRestoreLastContent())
+            if (restoreContent && !TryRestoreLastContent())
                 ShowAppletLandingPage();
 
-            _ = PollAlertsAsync();
-            _ = CheckForAppletUpdatesAsync();
+            Debug.WriteLine("OFFLINE MODE: all components switched to online state.");
         }
 
         private WebBrowser CreateOfflineView()
