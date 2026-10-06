@@ -527,7 +527,7 @@ namespace InfoDisplayApp
             Resources.icn_offline.Save(iconStream, System.Drawing.Imaging.ImageFormat.Png);
             string offlineIcon = Convert.ToBase64String(iconStream.ToArray());
 
-            browser.DocumentText = $"""
+            browser.DocumentText = """
 <!doctype html>
 <html>
 <head>
@@ -543,7 +543,7 @@ h2{font-size:25px;margin:32px 0 12px}li{font-size:20px;line-height:1.65;color:#d
 </style>
 </head>
 <body><div class="wrap"><div class="card">
-<img class="offline-icon" src="data:image/png;base64,{{offlineIcon}}" alt="" />
+<img class="offline-icon" src="data:image/png;base64,__OFFLINE_ICON__" alt="" />
 <h1>InfoScreen requires an Internet connection</h1>
 <p>InfoScreen is currently unable to reach the Internet. Local services may continue to operate, but online applets and information services are unavailable.</p>
 <h2>Things to try</h2>
@@ -555,7 +555,7 @@ h2{font-size:25px;margin:32px 0 12px}li{font-size:20px;line-height:1.65;color:#d
 </ul>
 <div class="status"><div id="connectionStatus">Checking for Internet connection...</div><div style="margin-top:8px;font-size:16px;color:#999">InfoScreen checks the connection automatically every 30 seconds.</div></div>
 </div></div></body></html>
-""";
+""".Replace("__OFFLINE_ICON__", offlineIcon);
             return browser;
         }
 
