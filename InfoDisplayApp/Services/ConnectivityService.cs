@@ -71,8 +71,11 @@ public sealed class ConnectivityService : IDisposable
 
     private async Task<bool> ProbeInternetAsync()
     {
-        foreach (Uri uri in ProbeUris)
+        for (int i = 0; i < ProbeUris.Length; i++)
         {
+            Uri uri = ProbeUris[i];
+            bool hasFallback = i < ProbeUris.Length - 1;
+
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, uri);
@@ -85,15 +88,54 @@ public sealed class ConnectivityService : IDisposable
                 // Any real HTTP response proves that the Internet path works.
                 // This deliberately includes 403/429/500 responses.
                 if ((int)response.StatusCode >= 100)
+                {
+                    if (i > 0)
+                        Debug.WriteLine($"CONNECTIVITY: fallback probe {uri.Host} succeeded. Internet connection is available.");
+
                     return true;
+                }
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
-                Debug.WriteLine($"CONNECTIVITY: probe {uri.Host} failed: {ex.Message}");
+                if (hasFallback)
+                {
+                    Debug.WriteLine(
+                        $"CONNECTIVITY: primary probe {uri.Host} unavailable ({GetProbeFailureSummary(ex)}); trying fallback probe.");
+                }
+                else
+                {
+                    Debug.WriteLine(
+                        $"CONNECTIVITY: fallback probe {uri.Host} unavailable ({GetProbeFailureSummary(ex)}).");
+                }
             }
         }
 
+        Debug.WriteLine("CONNECTIVITY: all Internet connectivity probes failed. Entering Offline Mode.");
         return false;
+    }
+
+    private static string GetProbeFailureSummary(Exception ex)
+    {
+        if (ex is TaskCanceledException)
+            return "request timed out";
+
+        if (ex is HttpRequestException http)
+        {
+            Exception? inner = http.InnerException;
+            while (inner?.InnerException != null)
+                inner = inner.InnerException;
+
+            if (inner is System.Net.Sockets.SocketException socket)
+                return $"network/DNS error: {socket.SocketErrorCode}";
+
+            if (http.Message.Contains("SSL", StringComparison.OrdinalIgnoreCase) ||
+                http.Message.Contains("TLS", StringComparison.OrdinalIgnoreCase))
+                return "SSL/TLS connection unavailable";
+
+            return "HTTP connection unavailable";
+        }
+
+        return "connection unavailable";
     }
 
     private void SetState(bool online)
