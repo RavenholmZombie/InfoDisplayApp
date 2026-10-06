@@ -132,6 +132,12 @@ namespace InfoDisplayApp
             if (string.IsNullOrWhiteSpace(message))
                 return DialogResult.No;
 
+            if (_offlineMode)
+            {
+                Debug.WriteLine($"[Question suppressed by Offline Mode] {message}");
+                return DialogResult.No;
+            }
+
             if (_owner == null || _owner.IsDisposed)
                 return DialogResult.No;
 
@@ -278,16 +284,17 @@ namespace InfoDisplayApp
                 if (type == AppMessageType.Warning || type == AppMessageType.Error)
                     WriteMessageLog(args);
 
-                bool suppressOfflineNetworkMessage =
-                    (type == AppMessageType.Warning || type == AppMessageType.Error) &&
-                    LooksNetworkRelated(message, exception) &&
-                    (_offlineMode || LooksLikePingFailure(message, exception));
-
-                if (suppressOfflineNetworkMessage)
-                {
-                    Debug.WriteLine($"OFFLINE MODE: suppressed network message window: {message}");
+                // Offline Mode owns all user-facing outage UI. Never create or
+                // publish a message window while it is active, regardless of the
+                // subsystem or wording. Errors/warnings above are still logged and
+                // echoToDebug already preserves diagnostics in the debug console.
+                if (_offlineMode)
                     return;
-                }
+
+                // Ping failures are telemetry/status, not modal errors, even online.
+                if ((type == AppMessageType.Warning || type == AppMessageType.Error) &&
+                    LooksLikePingFailure(message, exception))
+                    return;
 
                 MessageRaised?.Invoke(null, args);
 
