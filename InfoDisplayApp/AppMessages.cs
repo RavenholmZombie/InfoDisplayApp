@@ -203,7 +203,9 @@ namespace InfoDisplayApp
             // of connectivity-probe/DNS spam such as "CONNECTIVITY: probe ... failed".
             if (_offlineMode)
             {
-                Debug.WriteLine($"OFFLINE MODE: diagnostic retained without popup: {trimmed}");
+                // Do NOT write this back through Debug/Trace here: this method is
+                // itself called by AppMessageTraceListener, so doing so recursively
+                // feeds the diagnostic back into the listener until stack overflow.
                 return;
             }
 
