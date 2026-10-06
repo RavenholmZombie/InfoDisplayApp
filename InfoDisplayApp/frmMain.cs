@@ -523,7 +523,11 @@ namespace InfoDisplayApp
                 BackColor = Color.FromArgb(18, 18, 18)
             };
 
-            browser.DocumentText = """
+            using MemoryStream iconStream = new();
+            Resources.icn_offline.Save(iconStream, System.Drawing.Imaging.ImageFormat.Png);
+            string offlineIcon = Convert.ToBase64String(iconStream.ToArray());
+
+            browser.DocumentText = $"""
 <!doctype html>
 <html>
 <head>
@@ -532,12 +536,14 @@ namespace InfoDisplayApp
 html,body{height:100%;margin:0;background:#121212;color:#fff;font-family:'Segoe UI',Arial,sans-serif}
 .wrap{height:100%;display:flex;align-items:center;justify-content:center;padding:48px;box-sizing:border-box}
 .card{max-width:900px;width:100%;background:#202020;border-radius:18px;padding:48px;box-sizing:border-box;box-shadow:0 10px 35px rgba(0,0,0,.35)}
+.offline-icon{display:block;width:92px;height:92px;object-fit:contain;margin:0 auto 26px}
 h1{font-size:42px;margin:0 0 18px}p{font-size:23px;line-height:1.5;color:#ddd}
 h2{font-size:25px;margin:32px 0 12px}li{font-size:20px;line-height:1.65;color:#ddd}
 .status{margin-top:32px;padding:18px 22px;background:#2b2b2b;border-radius:10px;font-size:20px;color:#bbb}
 </style>
 </head>
 <body><div class="wrap"><div class="card">
+<img class="offline-icon" src="data:image/png;base64,{{offlineIcon}}" alt="" />
 <h1>InfoScreen requires an Internet connection</h1>
 <p>InfoScreen is currently unable to reach the Internet. Local services may continue to operate, but online applets and information services are unavailable.</p>
 <h2>Things to try</h2>
