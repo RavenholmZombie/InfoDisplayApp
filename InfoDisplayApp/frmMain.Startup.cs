@@ -17,21 +17,9 @@ namespace InfoDisplayApp
                 return;
 
             if (_connectivity.IsOnline)
-            {
-                _offlineMode = false;
-                AppMessages.OfflineMode = false;
-                _normalTicker?.SetOfflineMode(false);
-
-                if (_offlineView != null)
-                    _offlineView.Visible = false;
-
-                if (!TryRestoreLastContent())
-                    ShowAppletLandingPage();
-            }
+                ApplyOnlineMode(restoreContent: true);
             else
-            {
                 EnterOfflineMode();
-            }
         }
 
         /// <summary>
