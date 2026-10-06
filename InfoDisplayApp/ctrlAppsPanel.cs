@@ -9,6 +9,8 @@ public partial class ctrlAppsPanel : UserControl
     private readonly AppletManager _appletManager = new();
     private readonly TextBox _searchBox = new();
     private List<AppletDefinition> _installedApplets = new();
+    private bool _offlineMode;
+    private Panel? _offlinePanel;
     private static readonly System.Net.Http.HttpClient IconClient = new() { Timeout = TimeSpan.FromSeconds(10) };
 
     private string ShutdownLogPath =>
@@ -45,16 +47,79 @@ public partial class ctrlAppsPanel : UserControl
         if (IsDisposed)
             return;
 
-        // The drawer chrome remains usable so Close/Restart still work, but the
-        // actual app grid is unavailable until Internet connectivity returns.
-        flowLayoutPanel1.Enabled = !offline;
+        _offlineMode = offline;
         _searchBox.Enabled = !offline;
+
+        if (offline)
+            ShowOfflinePanel();
+        else
+        {
+            if (_offlinePanel != null)
+                _offlinePanel.Visible = false;
+
+            flowLayoutPanel1.Visible = true;
+            flowLayoutPanel1.Enabled = true;
+            ApplySearchFilter();
+        }
     }
 
     public void RebuildApps()
     {
         _installedApplets = _appletManager.GetInstalledApplets().ToList();
-        ApplySearchFilter();
+        if (!_offlineMode)
+            ApplySearchFilter();
+    }
+
+    private void ShowOfflinePanel()
+    {
+        flowLayoutPanel1.Enabled = false;
+        flowLayoutPanel1.Visible = false;
+
+        if (_offlinePanel == null)
+        {
+            _offlinePanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White
+            };
+
+            PictureBox icon = new()
+            {
+                Image = Resources.icn_offline,
+                Size = new Size(76, 76),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Anchor = AnchorStyles.None
+            };
+
+            Label message = new()
+            {
+                AutoSize = false,
+                Text = "Applets require an active Internet connection.\r\nPlease check your Internet connection.",
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 11F),
+                ForeColor = Color.FromArgb(55, 55, 55),
+                Size = new Size(390, 54),
+                Anchor = AnchorStyles.None
+            };
+
+            void CenterOfflineContent(object? sender, EventArgs e)
+            {
+                int groupHeight = icon.Height + 22 + message.Height;
+                int top = Math.Max(20, (_offlinePanel.ClientSize.Height - groupHeight) / 2);
+                icon.Location = new Point((_offlinePanel.ClientSize.Width - icon.Width) / 2, top);
+                message.Location = new Point((_offlinePanel.ClientSize.Width - message.Width) / 2, top + icon.Height + 22);
+            }
+
+            _offlinePanel.Controls.Add(icon);
+            _offlinePanel.Controls.Add(message);
+            _offlinePanel.Resize += CenterOfflineContent;
+            panel1.Controls.Add(_offlinePanel);
+            _offlinePanel.BringToFront();
+            CenterOfflineContent(null, EventArgs.Empty);
+        }
+
+        _offlinePanel.Visible = true;
+        _offlinePanel.BringToFront();
     }
 
     private void ConfigureSearchBox()
