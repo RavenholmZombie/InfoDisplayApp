@@ -523,7 +523,7 @@ namespace InfoDisplayApp
             if (restoreContent && !TryRestoreLastContent())
                 ShowAppletLandingPage();
 
-            Debug.WriteLine("OFFLINE MODE: all components switched to online state.");
+            Debug.WriteLine("CONNECTIVITY: all components switched to online state.");
         }
 
         private WebBrowser CreateOfflineView()
