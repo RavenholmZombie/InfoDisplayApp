@@ -145,14 +145,15 @@ namespace InfoDisplayApp
 
                 try
                 {
+                    SetLoadingStep("checking Internet connection...");
+                    await _mainForm.CheckInitialConnectivityAsync();
+
                     SetLoadingStep("weather and status services...");
                     await Task.Delay(250);
 
-                    SetLoadingStep("text ticker...");
+                    SetLoadingStep("preparing text ticker...");
+                    await _mainForm.PrepareTickerForRevealAsync();
                     await _mainForm.WaitForStartupReadyAsync();
-
-                    SetLoadingStep("checking Internet connection...");
-                    await _mainForm.CheckInitialConnectivityAsync();
 
                     SetLoadingStep("final startup tasks...");
 
