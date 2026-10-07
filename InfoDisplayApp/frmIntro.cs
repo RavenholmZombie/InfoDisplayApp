@@ -38,12 +38,10 @@ namespace InfoDisplayApp.Properties
                 Core.Initialize();
                 LogMilestone("LibVLC core initialized");
 
-                // This is a small local startup asset, not a network stream. Keep
-                // VLC's file cache modest so it does not spend unnecessary time
-                // buffering before presenting the first frame.
-                _libVlc = new LibVLC(
-                    "--no-video-title-show",
-                    "--file-caching=100");
+                // Keep VLC's normal local-file buffering. An earlier 100 ms
+                // file-cache experiment reduced startup buffering but made the
+                // intro visibly jittery on playback.
+                _libVlc = new LibVLC("--no-video-title-show");
                 LogMilestone("LibVLC instance created");
 
                 _mediaPlayer = new MediaPlayer(_libVlc);
