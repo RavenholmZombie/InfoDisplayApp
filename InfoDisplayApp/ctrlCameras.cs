@@ -249,6 +249,59 @@ namespace InfoDisplayApp
             StartCamera();
         }
 
+        /// <summary>
+        /// Detaches LibVLC from the WinForms control immediately and releases the
+        /// native RTSP player on a worker thread. LibVLC Stop() can block while an
+        /// active RTSP session is being torn down, so shutdown must never wait for
+        /// it on the UI thread.
+        /// </summary>
+        public void BeginShutdownCleanup()
+        {
+            _cameraStartCancellation?.Cancel();
+            _cameraStartCancellation?.Dispose();
+            _cameraStartCancellation = null;
+            _cameraStarting = false;
+
+            MediaPlayer? player = _mediaPlayer;
+            Media? media = _media;
+            LibVLC? libVlc = _libVLC;
+
+            _mediaPlayer = null;
+            _media = null;
+            _libVLC = null;
+
+            // Disconnect the native player HWND before frmMain starts disposing
+            // controls. This also prevents CtrlCameras_Disposed from stopping the
+            // same player a second time on the UI thread.
+            try { vlcPlayer.MediaPlayer = null; }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Tapo camera: unable to detach VLC view during shutdown: {ex.Message}");
+            }
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    if (player != null)
+                    {
+                        try { player.Mute = true; } catch { }
+                        try { player.Stop(); } catch { }
+                        try { player.Dispose(); } catch { }
+                    }
+
+                    try { media?.Dispose(); } catch { }
+                    try { libVlc?.Dispose(); } catch { }
+
+                    Debug.WriteLine("Tapo camera: background shutdown cleanup completed.");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Tapo camera: background shutdown cleanup failed: {ex}");
+                }
+            });
+        }
+
         private void CtrlCameras_Disposed(object? sender, EventArgs e)
         {
             _cameraStartCancellation?.Cancel();
