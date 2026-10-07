@@ -1083,13 +1083,13 @@ h2{font-size:25px;margin:32px 0 12px}li{font-size:20px;line-height:1.65;color:#d
 
             try
             {
-                LogShutdown("Stopping camera.");
-                _cameraView?.StopCamera();
-                LogShutdown("Camera stop returned.");
+                LogShutdown("Detaching camera and starting background VLC cleanup.");
+                _cameraView?.BeginShutdownCleanup();
+                LogShutdown("Camera detached; VLC cleanup continues off the UI thread.");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Unable to stop camera during shutdown: {ex}");
+                Debug.WriteLine($"Unable to begin camera cleanup during shutdown: {ex}");
             }
 
             if (_browserForm != null && !_browserForm.IsDisposed)
