@@ -9,6 +9,7 @@ namespace InfoDisplayApp.Properties
         private MediaPlayer? _mediaPlayer;
         private Media? _media;
         private bool _completed;
+        private readonly Stopwatch _startupClock = Stopwatch.StartNew();
 
         public event EventHandler? IntroCompleted;
 
@@ -23,9 +24,28 @@ namespace InfoDisplayApp.Properties
             BringToFront();
             try
             {
-                Core.Initialize();
+                Stopwatch introClock = Stopwatch.StartNew();
+                long lastMilestoneMs = 0;
 
-                _libVlc = new LibVLC("--no-video-title-show");
+                void LogMilestone(string message)
+                {
+                    long now = introClock.ElapsedMilliseconds;
+                    Debug.WriteLine(
+                        $"INTRO: {message} in {now - lastMilestoneMs} ms (total {now} ms).");
+                    lastMilestoneMs = now;
+                }
+
+                Core.Initialize();
+                LogMilestone("LibVLC core initialized");
+
+                // This is a small local startup asset, not a network stream. Keep
+                // VLC's file cache modest so it does not spend unnecessary time
+                // buffering before presenting the first frame.
+                _libVlc = new LibVLC(
+                    "--no-video-title-show",
+                    "--file-caching=100");
+                LogMilestone("LibVLC instance created");
+
                 _mediaPlayer = new MediaPlayer(_libVlc);
 
                 // The intro carries its own soundtrack. Explicitly enable VLC audio
@@ -47,9 +67,12 @@ namespace InfoDisplayApp.Properties
                     throw new FileNotFoundException("The InfoScreen intro video was not found.", introPath);
 
                 _media = new Media(_libVlc, introPath, FromType.FromPath);
+                LogMilestone("intro media created");
 
                 if (!_mediaPlayer.Play(_media))
                     throw new InvalidOperationException("VLC could not start the InfoScreen intro video.");
+
+                LogMilestone("Play() returned");
             }
             catch (Exception ex)
             {
@@ -60,6 +83,9 @@ namespace InfoDisplayApp.Properties
 
         private void MediaPlayer_Playing(object? sender, EventArgs e)
         {
+            Debug.WriteLine(
+                $"INTRO: Playing event received after {_startupClock.ElapsedMilliseconds} ms from frmIntro construction.");
+
             if (IsDisposed || Disposing)
                 return;
 
