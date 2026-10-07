@@ -38,10 +38,14 @@ namespace InfoDisplayApp.Properties
                 Core.Initialize();
                 LogMilestone("LibVLC core initialized");
 
-                // Keep VLC's normal local-file buffering. An earlier 100 ms
-                // file-cache experiment reduced startup buffering but made the
-                // intro visibly jittery on playback.
-                _libVlc = new LibVLC("--no-video-title-show");
+                // Keep the intro decoder simple and predictable on the dedicated
+                // InfoScreen machine. Hardware decoding can take a long time to
+                // initialize on some Windows GPU/driver combinations and, worse,
+                // can fall into extremely low-frame-rate playback. The intro is a
+                // short local asset, so software decoding is the safer choice.
+                _libVlc = new LibVLC(
+                    "--no-video-title-show",
+                    "--avcodec-hw=none");
                 LogMilestone("LibVLC instance created");
 
                 _mediaPlayer = new MediaPlayer(_libVlc);
