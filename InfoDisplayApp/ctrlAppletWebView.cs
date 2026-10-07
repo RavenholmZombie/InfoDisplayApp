@@ -173,7 +173,19 @@ public sealed class ctrlAppletWebView : UserControl
         _recoveryInProgress = true;
         try
         {
-            Debug.WriteLine("Applet media: performing scheduled WebView2 reload recovery.");
+            // Capture whether this WebView actually had playing HTML5 media before
+            // the hard reload. Reloading destroys the old DOM, so the replacement
+            // page otherwise has no way to know that playback should resume.
+            string playbackState = await _webView.CoreWebView2.ExecuteScriptAsync(@"
+(() => {
+    const videos = Array.from(document.querySelectorAll('video'));
+    return videos.some(v => !v.paused && !v.ended);
+})();");
+            bool resumePlayback =
+                string.Equals(playbackState.Trim(), "true", StringComparison.OrdinalIgnoreCase);
+
+            Debug.WriteLine(
+                $"Applet media: performing scheduled WebView2 reload recovery; resume playback={resumePlayback}.");
 
             TaskCompletionSource<bool> navigationFinished =
                 new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -185,8 +197,52 @@ public sealed class ctrlAppletWebView : UserControl
             try
             {
                 _webView.CoreWebView2.Reload();
-                await Task.WhenAny(navigationFinished.Task, Task.Delay(TimeSpan.FromSeconds(20)));
+                Task completed = await Task.WhenAny(
+                    navigationFinished.Task,
+                    Task.Delay(TimeSpan.FromSeconds(20)));
+
                 _webView.CoreWebView2.IsMuted = _muted;
+
+                if (resumePlayback &&
+                    completed == navigationFinished.Task &&
+                    navigationFinished.Task.Result)
+                {
+                    // Give SPA/streaming players a short window to recreate their
+                    // media element after NavigationCompleted, then resume only the
+                    // content that was playing before the recovery.
+                    const string resumeScript = @"
+(async () => {
+    const deadline = Date.now() + 10000;
+
+    while (Date.now() < deadline) {
+        const videos = Array.from(document.querySelectorAll('video'))
+            .filter(v => !v.ended);
+
+        if (videos.length > 0) {
+            for (const video of videos) {
+                try {
+                    await video.play();
+                    return 'resumed';
+                } catch {
+                    // The player may still be rebuilding or waiting for media.
+                }
+            }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 250));
+    }
+
+    return 'not-resumed';
+})();";
+
+                    string resumeResult =
+                        await _webView.CoreWebView2.ExecuteScriptAsync(resumeScript);
+
+                    Debug.WriteLine(
+                        resumeResult.Contains("resumed", StringComparison.OrdinalIgnoreCase)
+                            ? "Applet media: playback resumed after hard A/V recovery."
+                            : "Applet media: playback could not be resumed automatically after hard A/V recovery.");
+                }
             }
             finally
             {
